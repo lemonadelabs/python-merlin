@@ -92,7 +92,7 @@ class Entity(SimObject):
     Commonly used to represent a business capability, a resource or an asset. Entities can contain processes that modify data arriving at the entity's input connectors or generate new data that gets written to the entity's output connectors.
     """
 
-    def __init__(self, simulation, name=''):
+    def __init__(self, simulation, name='', attributes=[]):
         super(Entity, self).__init__(name)
         self.sim = simulation
         self.attributes = attributes
@@ -101,8 +101,6 @@ class Entity(SimObject):
         self.parent = None
         self.children = []
         self.processes = {}
-        self.start = None
-        self.end = None
         self.current_time = None
         self.processed = False
 
@@ -207,8 +205,8 @@ class Action(SimObject):
     Action is considered and abstract class and should be subclassed to create a specific Action.
     """
 
-    def __init__(self, name=''):
-        super(Action, self).__init__(name)
+    def __init__(self):
+        super(Action, self).__init__(name='')
 
     def execute(simulation):
         pass
@@ -239,3 +237,14 @@ class Ruleset:
 
     def core_validate(self, action):
         validate(action)
+
+class MerlinException(Exception):
+    """
+    Base exception class for Merlin
+    """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
