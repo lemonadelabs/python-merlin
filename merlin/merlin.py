@@ -68,6 +68,12 @@ class Simulation(SimObject):
         self.current_time
         init_state()
 
+    def get_entity_by_name(name):
+        for e in self.entities:
+            if e.name == name:
+                return e
+        return None
+
     def init_state():
         for action in self.initial_state:
             action.execute(self)
@@ -119,6 +125,18 @@ class Entity(SimObject):
         if proc.id not in [p.id for p in self.processes.values()]:
             return
         self.processes[proc.priority].remove(proc)
+
+    def get_output_by_type(unit_type):
+        for o in self.outputs:
+            if o.type == unit_type:
+                return o
+        return None
+
+    def get_input_by_type(unit_type):
+        for o in self.inputs:
+            if o.type == unit_type:
+                return o
+        return None
 
 
     def tick(self, time):

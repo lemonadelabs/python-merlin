@@ -85,8 +85,72 @@ class EntityAction(merlin.Action):
 
 class ConnectionAction(merlin.Action):
     """
-    Adds or removes a connecton from an entity
+    Adds or removes a connecton from an entity output to entity input(s).
     """
+
+    def __init__(
+        self,
+        unit_type,
+        parent,
+        endpoints,
+        add=True
+        copy_value=False
+        additive_output=False):
+
+        super(ConnectionAction, self).__init__()
+        self.unit_type = unit_type
+        self.parent = parent
+        self.endpoints = endpoints
+        self.copy_value = copy_value
+        self.additive_output = additive_output
+        self.add = add
+
+    def execute(simulation):
+
+        entity_list = list(self.endpoints)
+        entity_list.append(self.parent)
+
+        # Make sure all entites involved do actually exist in the simulation.
+        for e in entity_list:
+            if e not in [ent.name for ent in simulation.entities]:
+                raise SimNameNotFoundException(e)
+
+        source_entity = simulation.get_entity_by_name(self.parent)
+        endpoint_entities = [simulation.get_entity_by_name(n) for n in self.endpoints]
+
+        # Does an output of this unit_type currently exist?
+        existing_output = source_entity.get_output_by_type(self.unit_type)
+
+        if not existing_output:
+            # create new output
+            new_output = Connector(
+                self.unit_type,
+                existing_output,
+                []
+                ''
+                self.copy_value
+                self.additive_output
+                )
+            source_entity.outputs.append(new_output)
+
+        output = existing_output or new_output
+
+        new_input_cons = list()
+
+        # add new endpoint connectors
+        for ee in endpoint_entities:
+            new_input = Connector(
+                self.unit_type,
+                ee,
+                list(output)
+                ''
+                self.copy_value
+                self.additive_output
+                )
+            ee.inputs.append(new_input)
+            new_input_cons.append(new_input)
+
+        output.endpoints = new_input_cons
 
 # Process Actions
 
