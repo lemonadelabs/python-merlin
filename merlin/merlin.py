@@ -18,7 +18,7 @@ class Application:
     """
 
     def __init__(self, app_name=None):
-        self.simulations = []
+        self.simulations = set()
         self.id = uuid.uuid4()
         self.name = app_name or str(self.id)
 
@@ -36,7 +36,7 @@ class Application:
         :rtype: int
         """
         sim = Simulation(ruleset, config, outputs, name)
-        self.simulations.append(sim)
+        self.simulations.add(sim)
 
 
 
@@ -54,23 +54,56 @@ class Simulation(SimObject):
     A representation of a network with its assocated entities, ruleset, senarios and outputs.
     """
 
-    def __init__(self, ruleset=None, config=[], outputs=[], name=''):
+    def __init__(self, ruleset=None, config=[], outputs=set(), name=''):
         super(Simulation, self).__init__(name)
-        self.entities = []
+        self._unit_types = set()
+        self._attributes = set()
+        self._entities = set()
         self.ruleset = ruleset
         self.initial_state = config
-        self.senarios = []
-        self.source_entities = []
+        self.senarios = set()
+        self.source_entities = set()
         self.outputs = outputs
-        self.unit_types = []
-        self.attributes = []
         self.current_time_interval
         self.current_time
         init_state()
 
+    def add_attributes(ats):
+        diff = self._attributes.difference(ats)
+        for a in diff:
+            self._attributes.add(a)
+
+    def add_unit_types(uts):
+        diff = self._unit_types.difference(ats)
+        if ut in diff:
+            self._unit_types.add(ut)
+
+    def is_attribute(a):
+        return a in self._attributes
+
+    def is_unit_type(ut):
+        pass ut in self._unit_types
+
+    def entities():
+        return self._entities
+
+    def add_entity(e):
+        if e not in self._entities:
+            self._entities.add(e)
+
+    def remove_entity(e):
+        if e in self._entities:
+            self._entities.remove(e)
+
     def get_entity_by_name(name):
-        for e in self.entities:
+        for e in self._entities:
             if e.name == name:
+                return e
+        return None
+
+    def get_entity_by_id(id):
+        for e in self._entities:
+            if e.id == id:
                 return e
         return None
 
@@ -98,46 +131,61 @@ class Entity(SimObject):
     Commonly used to represent a business capability, a resource or an asset. Entities can contain processes that modify data arriving at the entity's input connectors or generate new data that gets written to the entity's output connectors.
     """
 
-    def __init__(self, simulation, name='', attributes=[]):
+    def __init__(self, simulation, name='', attributes=set()):
         super(Entity, self).__init__(name)
+        self._processes = dict()
         self.sim = simulation
         self.attributes = attributes
-        self.inputs = []
-        self.outputs = []
+        self.inputs = set()
+        self.outputs = set()
         self.parent = None
-        self.children = []
-        self.processes = {}
+        self.children = set()
         self.current_time = None
         self.processed = False
 
     def add_process(self, proc):
         # first check to see if the proc has already been added.
-        if proc.id in [p.id for p in self.processes.values()]:
+        if proc.id in [p.id for p in self._processes.values()]:
             return
 
-        if self.processes.has_key(proc.priority):
-            self.processes[proc.priority].append(proc)
+        if self._processes.has_key(proc.priority):
+            self._processes[proc.priority].add(proc)
         else:
-            self.processes[proc.priority] = list(proc)
+            self._processes[proc.priority] = set({proc})
 
+    def remove_process(self, proc_name):
+        proc = get_process_by_name(proc_name)
+        if proc:
+            self._processes[proc.priority].remove(proc)
 
-    def remove_process(self, proc):
-        if proc.id not in [p.id for p in self.processes.values()]:
-            return
-        self.processes[proc.priority].remove(proc)
+    def get_process_by_name(self, proc_name):
+        procs = self._processes.values()
+        for ps in procs:
+            for p in ps:
+                if p.name == proc_name:
+                    return p
+        return None
+
+    def get_connector_by_id(id):
+        connectors = self.inputs.union(self.outputs)
+        for c in connectors:
+            if c.id == id:
+                return c
+        return None
 
     def get_output_by_type(unit_type):
+        result = set()
         for o in self.outputs:
             if o.type == unit_type:
-                return o
-        return None
+                result.add(o)
+        return result
 
     def get_input_by_type(unit_type):
+        result = set()
         for o in self.inputs:
             if o.type == unit_type:
-                return o
-        return None
-
+                result.add(o)
+        return result
 
     def tick(self, time):
         if time < self.current_time:
@@ -158,8 +206,8 @@ class Entity(SimObject):
 
     def _process(self):
         self.processed = True
-        for i in self.processes.keys().sort():
-            for proc in self.processes[i]:
+        for i in self._processes.keys().sort():
+            for proc in self._processes[i]:
                 proc.compute(self.current_time)
 
 class Process(SimObject):
