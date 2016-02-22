@@ -1,6 +1,7 @@
 """
 .. module:: actions
-    :synopsis: Contains the action classes for creating merlin simulation objects.
+    :synopsis: Contains the action classes for creating merlin simulation
+     objects.
 
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
@@ -10,10 +11,15 @@ import importlib
 
 # Exceptions
 
+
 class SimNameNotFoundException(merlin.MerlinException):
+    """
+    foo
+    """
 
     def __init__(self, value):
         super(SimReferenceNotFoundException, self).__init__(value)
+
 
 class EntityNotFoundException(merlin.MerlinException):
 
@@ -21,6 +27,7 @@ class EntityNotFoundException(merlin.MerlinException):
         super(EntityNotFoundException, self).__init__(value)
 
 # Simulation Actions
+
 
 class AddAttributesAction(merlin.Action):
     """
@@ -33,6 +40,7 @@ class AddAttributesAction(merlin.Action):
 
     def execute(simulation):
         simulation.add_attributes(self.attributes)
+
 
 class UnitTypeAction(merlin.Action):
     """
@@ -52,12 +60,11 @@ class UnitTypeAction(merlin.Action):
 class EntityAction(merlin.Action):
     """Adds or Removes an entity from the Simulation"""
     def __init__(
-        self,
-        entity_name,
-        attributes=[],
-        parent=None,
-        add=True
-        ):
+            self,
+            entity_name,
+            attributes=[],
+            parent=None,
+            add=True):
 
         super(CreateEntityAction, self).__init__()
         self.attributes = attributes
@@ -85,7 +92,6 @@ class EntityAction(merlin.Action):
                     break
 
             _remove_entity(entity_to_remove)
-
 
     def _remove_entity(ent):
         connectors = ent.inputs.union(ent.outputs)
@@ -137,12 +143,12 @@ class AddConnectionAction(merlin.Action):
     """
 
     def __init__(
-        self,
-        unit_type,
-        parent,
-        endpoints,
-        copy_value=False,
-        additive_output=False):
+            self,
+            unit_type,
+            parent,
+            endpoints,
+            copy_value=False,
+            additive_output=False):
 
         super(ConnectionAction, self).__init__()
         self.unit_type = unit_type
@@ -163,7 +169,8 @@ class AddConnectionAction(merlin.Action):
                 raise SimNameNotFoundException(e)
 
         source_entity = simulation.get_entity_by_name(self.parent)
-        endpoint_entities = [simulation.get_entity_by_name(n) for n in self.endpoints]
+        endpoint_entities = (
+            [simulation.get_entity_by_name(n) for n in self.endpoints])
 
         # Does an output of this unit_type currently exist?
         existing_output = source_entity.get_output_by_type(self.unit_type)
@@ -201,6 +208,7 @@ class AddConnectionAction(merlin.Action):
 
 # Process Actions
 
+
 class RemoveProcessAction(merlin.Action):
     """
     Removes a process from an entity
@@ -225,13 +233,14 @@ class AddProcessAction(merlin.Action):
     """
 
     def __init__(
-        self,
-        entity_name,
-        process_class,
-        property_config,
-        process_name = '',
-        process_module = '__main__',
-        priority=0):
+            self,
+            entity_name,
+            process_class,
+            property_config,
+            process_name='',
+            process_module='__main__',
+            priority=0):
+
         super(AddProcessAction, self).__init__()
         self.entity_name = entity_name
         self.process_module = process_module

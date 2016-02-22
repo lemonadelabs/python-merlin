@@ -1,6 +1,7 @@
 """
 .. module:: merlin
-    :synopsis: This is the main module containing the core objects in the system
+    :synopsis: This is the main module containing the core objects in
+    the system
     as well as some bootstrap and helper functions.
 
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
@@ -10,11 +11,13 @@ import uuid
 
 # Core classes
 
+
 class Application:
     """
     Represents a set of simulations with their associated outputs.
 
-    It is really a convienience grouping and typically a single client would have one :class:`merlin.Application` instance.
+    It is really a convienience grouping and typically a single client would
+    have one :class:`merlin.Application` instance.
     """
 
     def __init__(self, app_name=None):
@@ -24,11 +27,14 @@ class Application:
 
     def create_simulation(self, config, ruleset, outputs, name=None):
         """
-        Create a new simulation object and populate it with entities, a ruleset and outputs.
+        Create a new simulation object and populate it with entities, a ruleset
+         and outputs.
 
-        :param config: A list of Actions to create the intial state of the :class:`Simulation`.
+        :param config: A list of Actions to create the intial state of the
+        :class:`Simulation`.
         :type config: [Action]
-        :param ruleset: A subclass of the :class:`Ruleset` object that contains the rules for the simulation.
+        :param ruleset: A subclass of the :class:`Ruleset` object that contains
+         the rules for the simulation.
         :type ruleset: Ruleset
         :param outputs: A list of outputs for the simulation.
         :type outputs: [Output]
@@ -37,7 +43,6 @@ class Application:
         """
         sim = Simulation(ruleset, config, outputs, name)
         self.simulations.add(sim)
-
 
 
 class SimObject:
@@ -51,7 +56,8 @@ class SimObject:
 
 class Simulation(SimObject):
     """
-    A representation of a network with its assocated entities, ruleset, senarios and outputs.
+    A representation of a network with its assocated entities, ruleset,
+     senarios and outputs.
     """
 
     def __init__(self, ruleset=None, config=[], outputs=set(), name=''):
@@ -114,6 +120,7 @@ class Simulation(SimObject):
     def run(start, end, stepsize, senario=None):
         pass
 
+
 class Output(SimObject):
     """
     A network flow sink.
@@ -128,7 +135,10 @@ class Entity(SimObject):
     """
     A node in the network.
 
-    Commonly used to represent a business capability, a resource or an asset. Entities can contain processes that modify data arriving at the entity's input connectors or generate new data that gets written to the entity's output connectors.
+    Commonly used to represent a business capability, a resource or an asset.
+     Entities can contain processes that modify data arriving at the entity's
+      input connectors or generate new data that gets written to the entity's
+       output connectors.
     """
 
     def __init__(self, simulation, name='', attributes=set()):
@@ -148,7 +158,7 @@ class Entity(SimObject):
         if proc.id in [p.id for p in self._processes.values()]:
             return
 
-        if self._processes.has_key(proc.priority):
+        if proc.priority in self._processes.keys:
             self._processes[proc.priority].add(proc)
         else:
             self._processes[proc.priority] = set({proc})
@@ -210,11 +220,14 @@ class Entity(SimObject):
             for proc in self._processes[i]:
                 proc.compute(self.current_time)
 
+
 class Process(SimObject):
     """
     A generator, processor and/or consumer of units
 
-    Makes up the core of the graph processing and is considered abstract. Must be subclassed to create specific processes. A process is the most granualr part of a :class:`merlin.Simulation`
+    Makes up the core of the graph processing and is considered abstract. Must
+     be subclassed to create specific processes. A process is the most granualr
+      part of a :class:`merlin.Simulation`
     """
 
     def __init__(self, name=''):
@@ -226,19 +239,21 @@ class Process(SimObject):
     def compute(self, tick):
         pass
 
+
 class Connector(SimObject):
     """
-    An input or output connection to 1 or more endpoints. Can be written to or read from by processes.
+    An input or output connection to 1 or more endpoints. Can be written to or
+     read from by processes.
     """
 
     def __init__(
-        self,
-        unit_type,
-        parent,
-        endpoints,
-        name='',
-        copy_value=False,
-        additive_output=False):
+            self,
+            unit_type,
+            parent,
+            endpoints,
+            name='',
+            copy_value=False,
+            additive_output=False):
 
         super(Connector, self).__init__(name)
         self.type = unit_type
@@ -253,10 +268,13 @@ class Connector(SimObject):
         self.time = self.parent.current_time
         if self.endpoints:
 
-            dist_value = value if self.copy else value / float(len(self.endpoints))
+            dist_value = (
+                value if self.copy else value /
+                float(len(self.endpoints)))
 
             for ep in self.endpoints:
-                ep.value = ep.value + dist_value if self.additive else dist_value
+                ep.value = (
+                    ep.value + dist_value if self.additive else dist_value)
                 ep.time = self.time
                 ep.parent.tick(self.time)
 
@@ -268,7 +286,8 @@ class Action(SimObject):
     """
     Represents a creation or modification act for a :class:`merlin.Simulation`
 
-    Action is considered and abstract class and should be subclassed to create a specific Action.
+    Action is considered and abstract class and should be subclassed to create
+    a specific Action.
     """
 
     def __init__(self):
@@ -276,6 +295,7 @@ class Action(SimObject):
 
     def execute(simulation):
         pass
+
 
 class Event(SimObject):
     """
@@ -289,13 +309,19 @@ class Event(SimObject):
         self.action = action
         self.time = time
 
+
 class Ruleset:
     """
-    A validation class that checks the integrity of a particular :class:`merlin.Simulation`
+    A validation class that checks the integrity of a particular
+     :class:`merlin.Simulation`
 
-    This is an abstract class that must be overridden by a specific ruleset for your simulation. In other words, each simulation will have it's own sublcass of Ruleset.
+    This is an abstract class that must be overridden by a specific ruleset for
+     your simulation. In other words, each simulation will have it's own
+      sublcass of Ruleset.
 
-    In a future version of merlin, it would be desirable to have the rulset be desribed by a configuration file that could be generated from another product or application or written by hand.
+    In a future version of merlin, it would be desirable to have the rulset be
+     desribed by a configuration file that could be generated from another
+      product or application or written by hand.
     """
 
     def validate(self, action):
@@ -303,6 +329,7 @@ class Ruleset:
 
     def core_validate(self, action):
         validate(action)
+
 
 class MerlinException(Exception):
     """
