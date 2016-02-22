@@ -80,7 +80,7 @@ class EntityAction(merlin.Action):
                 simulation.add_entity(e)
         else:
             for ent in simulation.entities():
-                if ent.name = entity_name:
+                if ent.name == entity_name:
                     entity_to_remove = ent
                     break
 
@@ -141,7 +141,7 @@ class AddConnectionAction(merlin.Action):
         unit_type,
         parent,
         endpoints,
-        copy_value=False
+        copy_value=False,
         additive_output=False):
 
         super(ConnectionAction, self).__init__()
@@ -173,9 +173,9 @@ class AddConnectionAction(merlin.Action):
             new_output = Connector(
                 self.unit_type,
                 existing_output,
-                []
-                ''
-                self.copy_value
+                [],
+                '',
+                self.copy_value,
                 self.additive_output
                 )
             source_entity.outputs.add(new_output)
@@ -189,9 +189,9 @@ class AddConnectionAction(merlin.Action):
             new_input = Connector(
                 self.unit_type,
                 ee,
-                list(output)
-                ''
-                self.copy_value
+                list(output),
+                '',
+                self.copy_value,
                 self.additive_output
                 )
             ee.inputs.add(new_input)
@@ -229,8 +229,8 @@ class AddProcessAction(merlin.Action):
         entity_name,
         process_class,
         property_config,
-        process_name = ''
-        process_module = '__main__'
+        process_name = '',
+        process_module = '__main__',
         priority=0):
         super(AddProcessAction, self).__init__()
         self.entity_name = entity_name

@@ -5,7 +5,9 @@
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
 
-class GeneratorProcess(Process):
+from merlin import merlin
+
+class GeneratorProcess(merlin.Process):
     """
     Generates a fixed amount of a specific unittype per tick and sends them to a number of compatible outputs. The store of unittype can be infinite or fixed.
 

@@ -82,7 +82,7 @@ class Simulation(SimObject):
         return a in self._attributes
 
     def is_unit_type(ut):
-        pass ut in self._unit_types
+        return ut in self._unit_types
 
     def entities():
         return self._entities
@@ -237,7 +237,7 @@ class Connector(SimObject):
         parent,
         endpoints,
         name='',
-        copy_value=False
+        copy_value=False,
         additive_output=False):
 
         super(Connector, self).__init__(name)
