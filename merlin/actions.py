@@ -97,12 +97,12 @@ class EntityAction(merlin.Action):
         connectors = ent.inputs.union(ent.outputs)
         for i in connectors:
             for ep in i.endpoints:
-                ep.endpoints.remove(i)
-                if not ep.endpoints:
-                    if ep in ep.parent.inputs:
-                        ep.parent.inputs.remove(ep)
+                ep['connector'].endpoints.remove(i)
+                if not ep['connector'].endpoints:
+                    if ep['connector'] in ep.parent.inputs:
+                        ep['connector'].parent.inputs.remove(ep['connector'])
                     else:
-                        ep.parent.outputs.remove(ep)
+                        ep['connector'].parent.outputs.remove(ep['connector'])
         ent.parent.children.remove(ent)
         for child in ent.children:
             _remove_entity(child)

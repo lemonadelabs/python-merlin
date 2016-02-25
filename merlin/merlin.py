@@ -242,44 +242,85 @@ class Process(SimObject):
 
 class Connector(SimObject):
     """
-    An input or output connection to 1 or more endpoints. Can be written to or
-     read from by processes.
+    abstract base class for input and output connectors.
     """
 
     def __init__(
             self,
             unit_type,
             parent,
-            endpoints,
-            name='',
-            copy_value=False,
-            additive_output=False):
+            name=''):
 
         super(Connector, self).__init__(name)
-        self.type = unit_type
+        self.type = unit_type,
         self.parent = parent
-        self.value = 0.0
-        self.endpoints = endpoints
         self.time = None
-        self.copy = copy_value
-        self.additive = additive_output
+
+
+class OutputConnector(Connector):
+    """
+    Represents an outgoing entity connection.
+    """
+
+    def __init__(
+            self,
+            unit_type,
+            parent,
+            name='',
+            copy_write=False,
+            endpoints=None):
+
+        super(OutputConnector, self).__init__(unit_type, parent, name)
+        self.copy_write = copy_write
+        self._endpoints = endpoints
 
     def write(self, value):
         self.time = self.parent.current_time
-        if self.endpoints:
+        if self._endpoints:
+            for ep in self._endpoints:
+                dist_value = (
+                    value if self.copy_write else value /
+                    ep['bias'])
+                ep['connector'].write(dist_value)
+                ep['connector'].time = self.time
+                ep['connector'].parent.tick(self.time)
 
-            dist_value = (
-                value if self.copy else value /
-                float(len(self.endpoints)))
+    def _get_endpoint(self, input_connector):
+        for ep in self._endpoints:
+            if ep['connector'] == input_connector:
+                result = ep
+        return result
 
-            for ep in self.endpoints:
-                ep.value = (
-                    ep.value + dist_value if self.additive else dist_value)
-                ep.time = self.time
-                ep.parent.tick(self.time)
+    def add_input(self, input_connector, bias=None):
+        if not _get_endpoint(input_connector):
+            ep = dict({'bias'})
 
-    def read(self):
-        return self.value
+    def remove_input(self):
+        pass
+
+    def set_input_bias(self):
+        pass
+
+
+class InputConnector(Connector):
+    """
+    Represents an incoming entity connection.
+    """
+
+    def __init__(
+            self,
+            unit_type,
+            parent,
+            name='',
+            source=None,
+            additive_write=False):
+
+        super(InputConnector, self).__init__(unit_type, parent, name)
+        self.source = source
+        self.additive_write = additive_write
+
+    def write(self, value):
+        self.value = self.value + value if self.additive_write else value
 
 
 class Action(SimObject):
@@ -325,7 +366,7 @@ class Ruleset:
     """
 
     def validate(self, action):
-        pass
+        return False
 
     def core_validate(self, action):
         validate(action)
