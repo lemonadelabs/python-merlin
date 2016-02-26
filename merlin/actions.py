@@ -44,13 +44,13 @@ class UnitTypeAction(merlin.Action):
 class RemoveEntityAction(merlin.Action):
     """ Removes an enity from the simulation"""
 
-    def __init__(self, entity_name):
+    def __init__(self, entity_id):
         super(RemoveEntityAction, self).__init__()
-        self.entity_name = entity_name
+        self.entity_id = entity_id
 
     def execute(self, simulation):
         for ent in simulation.entities():
-            if ent.name == self.entity_name:
+            if ent.id == self.entity_id:
                 entity_to_remove = ent
                 break
 
@@ -191,15 +191,15 @@ class RemoveProcessAction(merlin.Action):
     Removes a process from an entity
     """
 
-    def __init__(self, entity_name, process_name):
+    def __init__(self, entity_id, process_id):
         super(RemoveProcessAction, self)._init__()
-        self.entity_name = entity_name
-        self.process_name = process_name
+        self.entity_id = entity_id
+        self.process_id = process_id
 
     def execute(self, simulation):
-        entity = simulation.get_entity_by_name(self.entity_name)
+        entity = simulation.get_entity_by_id(self.entity_id)
         if entity:
-            entity.remove_process(self.process_name)
+            entity.remove_process(self.process_id)
         else:
             raise merlin.EntityNotFoundException(self.entity_name)
 

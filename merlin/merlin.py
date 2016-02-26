@@ -74,50 +74,50 @@ class Simulation(SimObject):
         self.current_time
         init_state()
 
-    def add_attributes(ats):
+    def add_attributes(self, ats):
         diff = self._attributes.difference(ats)
         for a in diff:
             self._attributes.add(a)
 
-    def add_unit_types(uts):
+    def add_unit_types(self, uts):
         diff = self._unit_types.difference(ats)
         if ut in diff:
             self._unit_types.add(ut)
 
-    def is_attribute(a):
+    def is_attribute(self, a):
         return a in self._attributes
 
-    def is_unit_type(ut):
+    def is_unit_type(self, ut):
         return ut in self._unit_types
 
-    def entities():
+    def entities(self, ):
         return self._entities
 
-    def add_entity(e):
+    def add_entity(self, e):
         if e not in self._entities:
             self._entities.add(e)
 
-    def remove_entity(e):
+    def remove_entity(self, e):
         if e in self._entities:
             self._entities.remove(e)
 
-    def get_entity_by_name(name):
+    def get_entity_by_name(self, name):
         for e in self._entities:
             if e.name == name:
                 return e
         return None
 
-    def get_entity_by_id(id):
+    def get_entity_by_id(self, id):
         for e in self._entities:
             if e.id == id:
                 return e
         return None
 
-    def init_state():
+    def init_state(self, ):
         for action in self.initial_state:
             action.execute(self)
 
-    def run(start, end, stepsize, senario=None):
+    def run(self, start, end, stepsize, senario=None):
         pass
 
 
@@ -163,8 +163,8 @@ class Entity(SimObject):
         else:
             self._processes[proc.priority] = set({proc})
 
-    def remove_process(self, proc_name):
-        proc = get_process_by_name(proc_name)
+    def remove_process(self, proc_id):
+        proc = get_process_by_id(proc_name)
         if proc:
             self._processes[proc.priority].remove(proc)
 
@@ -176,21 +176,29 @@ class Entity(SimObject):
                     return p
         return None
 
-    def get_connector_by_id(id):
+    def get_process_by_id(self, proc_id):
+        for procs in self._processes.values():
+            for ps in procs:
+                for p in ps:
+                    if p.id == proc_id:
+                        return p
+        return None
+
+    def get_connector_by_id(self, id):
         connectors = self.inputs.union(self.outputs)
         for c in connectors:
             if c.id == id:
                 return c
         return None
 
-    def get_output_by_type(unit_type):
+    def get_output_by_type(self, unit_type):
         result = set()
         for o in self.outputs:
             if o.type == unit_type:
                 result.add(o)
         return result
 
-    def get_input_by_type(unit_type):
+    def get_input_by_type(self, unit_type):
         result = set()
         for o in self.inputs:
             if o.type == unit_type:

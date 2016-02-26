@@ -53,7 +53,7 @@ class GeneratorProcess(merlin.Process):
         self.store = store
         self.restrict = restrict
 
-    def compute(current_time):
+    def compute(self, current_time):
         unit = _get_unit()
 
         valid_outputs = filter(
@@ -66,7 +66,7 @@ class GeneratorProcess(merlin.Process):
         for o in self.parent.outputs:
             o.write(unit_per_output)
 
-    def _get_unit():
+    def _get_unit(self, ):
         if self.prod_per_t:
             output = (
                 self.parent.sim.current_time_interval.total_seconds() /
