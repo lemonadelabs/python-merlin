@@ -291,15 +291,52 @@ class OutputConnector(Connector):
                 result = ep
         return result
 
-    def add_input(self, input_connector, bias=None):
+    def get_endpoints(self):
+        return [(e['connector'], e['bias']) for e in self._endpoints]
+
+    def _ballance_bias(self):
+        val = 1.0 / float(len(self._endpoints))
+        for ep in self._endpoints:
+            ep['bias'] = val
+
+    def add_input(self, input_connector, bias=0.0):
         if not _get_endpoint(input_connector):
-            ep = dict({'bias'})
+            ep = dict({'bias': bias, 'connector': input_connector})
+            self._endpoints.add(ep)
+            _ballance_bias()
 
-    def remove_input(self):
-        pass
+    def remove_input(self, input_connector):
+        ep = _get_endpoint(input_connector)
+        if ep:
+            self._endpoints.remove(ep)
+            if self._endpoints:
+                _ballance_bias()
+            else:
+                self.parent.outputs.remove(self)
 
-    def set_input_bias(self):
-        pass
+    def set_input_bias(self, input_connector, bias):
+        ep = _get_endpoint(input_connector)
+        if ep:
+            old_bias = ep['bias']
+            ep['bias'] = bias
+            bias_diff = old_bias - bias
+            # redistribute difference amongst other inputs
+            for e in self._endpoints:
+                if e != ep:
+                    e['bias'] = e['bias'] + bias_diff
+
+    def set_input_biases(self, biases):
+        if len(biases) != len(self._endpoints):
+            raise MerlinException(
+                "Biases arity must match number of endpoints")
+        else:
+            for b in biases:
+                ep = _get_endpoint(b[0])
+                if ep:
+                    ep['bias'] = b[1]
+                else:
+                    raise SimReferenceNotFoundException(
+                        "endpoint does not exist")
 
 
 class InputConnector(Connector):
@@ -334,7 +371,7 @@ class Action(SimObject):
     def __init__(self):
         super(Action, self).__init__(name='')
 
-    def execute(simulation):
+    def execute(self, simulation):
         pass
 
 
@@ -382,3 +419,17 @@ class MerlinException(Exception):
 
     def __str__(self):
         return repr(self.value)
+
+
+class SimNameNotFoundException(MerlinException):
+    """
+    """
+
+    def __init__(self, value):
+        super(SimReferenceNotFoundException, self).__init__(value)
+
+
+class EntityNotFoundException(MerlinException):
+
+    def __init__(self, value):
+        super(EntityNotFoundException, self).__init__(value)
