@@ -55,7 +55,7 @@ class RemoveEntityAction(merlin.Action):
                 break
 
         if entity_to_remove:
-            _remove_entity(entity_to_remove)
+            self._remove_entity(entity_to_remove)
 
     def _remove_entity(self, ent):
         # remove output connections
@@ -66,11 +66,11 @@ class RemoveEntityAction(merlin.Action):
 
         # remove input connections
         for i in ent.inputs:
-            for eps in i.source.remove_input(i)
+            i.source.remove_input(i)
 
         ent.parent.children.remove(ent)
         for child in ent.children:
-            _remove_entity(child)
+            self._remove_entity(child)
         simulation.remove_entity(ent)
 
 
@@ -142,7 +142,7 @@ class AddConnectionAction(merlin.Action):
             output_entity_id,
             input_entity_ids,
             copy_write=False,
-            additive_write=False
+            additive_write=False,
             connector_name=''):
 
         super(AddConnectionAction, self).__init__()
@@ -176,7 +176,7 @@ class AddConnectionAction(merlin.Action):
                 self.unit_type,
                 p,
                 name='{0}_input'.format(self.connector_name),
-                output_con,
+                source=self.output_con,
                 additive_write=self.additive_write) for p in input_entities]
 
         # Connect output endpoint(s)

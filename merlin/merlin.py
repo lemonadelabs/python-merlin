@@ -70,19 +70,19 @@ class Simulation(SimObject):
         self.senarios = set()
         self.source_entities = set()
         self.outputs = outputs
-        self.current_time_interval
-        self.current_time
-        init_state()
+        self.current_time_interval = None
+        self.current_time = None
+        self.init_state()
 
     def add_attributes(self, ats):
-        diff = self._attributes.difference(ats)
-        for a in diff:
-            self._attributes.add(a)
+        for a in ats:
+            if a not in self._attributes:
+                self._attributes.add(a)
 
     def add_unit_types(self, uts):
-        diff = self._unit_types.difference(ats)
-        if ut in diff:
-            self._unit_types.add(ut)
+        if ut in uts:
+            if ut not in self._attributes:
+                self._unit_types.add(ut)
 
     def is_attribute(self, a):
         return a in self._attributes
@@ -113,7 +113,7 @@ class Simulation(SimObject):
                 return e
         return None
 
-    def init_state(self, ):
+    def init_state(self):
         for action in self.initial_state:
             action.execute(self)
 
@@ -164,7 +164,7 @@ class Entity(SimObject):
             self._processes[proc.priority] = set({proc})
 
     def remove_process(self, proc_id):
-        proc = get_process_by_id(proc_name)
+        proc = self.get_process_by_id(proc_name)
         if proc:
             self._processes[proc.priority].remove(proc)
 
@@ -220,7 +220,7 @@ class Entity(SimObject):
                 up_to_date = up_to_date and (i.time == self.current_time)
 
             if up_to_date:
-                _process()
+                self._process()
 
     def _process(self):
         self.processed = True
@@ -311,19 +311,19 @@ class OutputConnector(Connector):
         if not _get_endpoint(input_connector):
             ep = dict({'bias': bias, 'connector': input_connector})
             self._endpoints.add(ep)
-            _ballance_bias()
+            self._ballance_bias()
 
     def remove_input(self, input_connector):
-        ep = _get_endpoint(input_connector)
+        ep = self._get_endpoint(input_connector)
         if ep:
             self._endpoints.remove(ep)
             if self._endpoints:
-                _ballance_bias()
+                self._ballance_bias()
             else:
                 self.parent.outputs.remove(self)
 
     def set_input_bias(self, input_connector, bias):
-        ep = _get_endpoint(input_connector)
+        ep = self._get_endpoint(input_connector)
         if ep:
             old_bias = ep['bias']
             ep['bias'] = bias
@@ -414,7 +414,7 @@ class Ruleset:
         return False
 
     def core_validate(self, action):
-        validate(action)
+        self.validate(action)
 
 
 class MerlinException(Exception):
