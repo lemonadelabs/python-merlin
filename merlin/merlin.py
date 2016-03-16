@@ -80,7 +80,7 @@ class Simulation(SimObject):
                 self._attributes.add(a)
 
     def add_unit_types(self, uts):
-        if ut in uts:
+        for ut in uts:
             if ut not in self._attributes:
                 self._unit_types.add(ut)
 
@@ -90,7 +90,7 @@ class Simulation(SimObject):
     def is_unit_type(self, ut):
         return ut in self._unit_types
 
-    def entities(self, ):
+    def entities(self):
         return self._entities
 
     def add_entity(self, e):
@@ -141,7 +141,7 @@ class Entity(SimObject):
        output connectors.
     """
 
-    def __init__(self, simulation, name='', attributes=set()):
+    def __init__(self, simulation=None, name='', attributes=set()):
         super(Entity, self).__init__(name)
         self._processes = dict()
         self.sim = simulation
@@ -158,13 +158,13 @@ class Entity(SimObject):
         if proc.id in [p.id for p in self._processes.values()]:
             return
 
-        if proc.priority in self._processes.keys:
+        if proc.priority in self._processes.keys():
             self._processes[proc.priority].add(proc)
         else:
             self._processes[proc.priority] = set({proc})
 
     def remove_process(self, proc_id):
-        proc = self.get_process_by_id(proc_name)
+        proc = self.get_process_by_id(proc_id)
         if proc:
             self._processes[proc.priority].remove(proc)
 
@@ -177,15 +177,16 @@ class Entity(SimObject):
         return None
 
     def get_process_by_id(self, proc_id):
-        for procs in self._processes.values():
-            for ps in procs:
-                for p in ps:
-                    if p.id == proc_id:
-                        return p
+        procs = self._processes.values()
+        for ps in procs:
+            for p in ps:
+                if p.id == proc_id:
+                    return p
         return None
 
     def get_connector_by_id(self, id):
         connectors = self.inputs.union(self.outputs)
+        print(connectors)
         for c in connectors:
             if c.id == id:
                 return c
@@ -206,10 +207,10 @@ class Entity(SimObject):
         return result
 
     def tick(self, time):
-        if time < self.current_time:
+        if self.current_time and time < self.current_time:
             return
 
-        if time > self.current_time:
+        if (self.current_time is None) or (time > self.current_time):
             self.processed = False
             self.current_time = time
 
@@ -224,9 +225,10 @@ class Entity(SimObject):
 
     def _process(self):
         self.processed = True
-        for i in self._processes.keys().sort():
-            for proc in self._processes[i]:
-                proc.compute(self.current_time)
+        if self._processes.keys():
+            for i in list(self._processes.keys()).sort():
+                for proc in self._processes[i]:
+                    proc.compute(self.current_time)
 
 
 class Process(SimObject):
@@ -245,7 +247,7 @@ class Process(SimObject):
         self.priority = 0
 
     def compute(self, tick):
-        pass
+        print("This process does absolutely nothing")
 
 
 class Connector(SimObject):
@@ -260,7 +262,7 @@ class Connector(SimObject):
             name=''):
 
         super(Connector, self).__init__(name)
-        self.type = unit_type,
+        self.type = unit_type
         self.parent = parent
         self.time = None
 
@@ -280,7 +282,12 @@ class OutputConnector(Connector):
 
         super(OutputConnector, self).__init__(unit_type, parent, name)
         self.copy_write = copy_write
-        self._endpoints = endpoints
+        self._endpoints = endpoints or set()
+
+    class Endpoint():
+        def __init__(self, connector=None, bias=0.0):
+            self.connector = connector
+            self.bias = bias
 
     def write(self, value):
         self.time = self.parent.current_time
@@ -288,28 +295,29 @@ class OutputConnector(Connector):
             for ep in self._endpoints:
                 dist_value = (
                     value if self.copy_write else value /
-                    ep['bias'])
-                ep['connector'].write(dist_value)
-                ep['connector'].time = self.time
-                ep['connector'].parent.tick(self.time)
+                    ep.bias)
+                ep.connector.write(dist_value)
+                ep.connector.time = self.time
+                ep.connector.parent.tick(self.time)
 
     def _get_endpoint(self, input_connector):
+        result = None
         for ep in self._endpoints:
-            if ep['connector'] == input_connector:
+            if ep.connector == input_connector:
                 result = ep
         return result
 
     def get_endpoints(self):
-        return [(e['connector'], e['bias']) for e in self._endpoints]
+        return [(e.connector, e.bias) for e in self._endpoints]
 
     def _ballance_bias(self):
         val = 1.0 / float(len(self._endpoints))
         for ep in self._endpoints:
-            ep['bias'] = val
+            ep.bias = val
 
     def add_input(self, input_connector, bias=0.0):
-        if not _get_endpoint(input_connector):
-            ep = dict({'bias': bias, 'connector': input_connector})
+        if not self._get_endpoint(input_connector):
+            ep = self.Endpoint(input_connector, bias)
             self._endpoints.add(ep)
             self._ballance_bias()
 
@@ -322,26 +330,30 @@ class OutputConnector(Connector):
             else:
                 self.parent.outputs.remove(self)
 
-    def set_input_bias(self, input_connector, bias):
+    def set_endpoint_bias(self, input_connector, bias):
         ep = self._get_endpoint(input_connector)
         if ep:
-            old_bias = ep['bias']
-            ep['bias'] = bias
+            old_bias = ep.bias
+            ep.bias = bias
             bias_diff = old_bias - bias
             # redistribute difference amongst other inputs
             for e in self._endpoints:
                 if e != ep:
-                    e['bias'] = e['bias'] + bias_diff
+                    e.bias = e.bias + bias_diff
 
-    def set_input_biases(self, biases):
+    def set_endpoint_biases(self, biases):
+        """
+        biases are in the form [(connector, bias)...n]
+        where n is len(self._endpoints)
+        """
         if len(biases) != len(self._endpoints):
             raise MerlinException(
                 "Biases arity must match number of endpoints")
         else:
             for b in biases:
-                ep = _get_endpoint(b[0])
+                ep = self._get_endpoint(b[0])
                 if ep:
-                    ep['bias'] = b[1]
+                    ep.bias = b[1]
                 else:
                     raise SimReferenceNotFoundException(
                         "endpoint does not exist")
@@ -363,6 +375,7 @@ class InputConnector(Connector):
         super(InputConnector, self).__init__(unit_type, parent, name)
         self.source = source
         self.additive_write = additive_write
+        self.value = 0.0
 
     def write(self, value):
         self.value = self.value + value if self.additive_write else value
@@ -430,8 +443,6 @@ class MerlinException(Exception):
 
 
 class SimNameNotFoundException(MerlinException):
-    """
-    """
 
     def __init__(self, value):
         super(SimReferenceNotFoundException, self).__init__(value)
