@@ -82,7 +82,7 @@ def simple_branching_output_graph():
     return (source, sink1, sink2, out_con, in_con1, in_con2)
 
 
-class TestSimulation():
+class TestSimulation:
 
     def test_add_attribute(self, sim):
         sim.add_attributes(['attr'])
@@ -94,12 +94,12 @@ class TestSimulation():
 
     def test_add_entity(self, sim, entity):
         sim.add_entity(entity)
-        assert (entity in sim.entities())
+        assert (entity in sim.get_entities())
 
     def test_remove_entity(self, sim, entity):
         sim.add_entity(entity)
         sim.remove_entity(entity)
-        assert entity not in sim.entities()
+        assert entity not in sim.get_entities()
 
     def test_get_entity_by_name(self, sim, entity):
         sim.add_entity(entity)
@@ -112,7 +112,7 @@ class TestSimulation():
         assert e == entity
 
 
-class TestEntity():
+class TestEntity:
 
     def test_add_process(self, entity, process):
         entity.add_process(process)
@@ -146,7 +146,7 @@ class TestEntity():
         assert seg[3] in i
 
 
-class TestOutputConnector():
+class TestOutputConnector:
 
     def test_write(self, simple_entity_graph):
         seg = simple_entity_graph
@@ -187,28 +187,67 @@ class TestOutputConnector():
                 npt.assert_almost_equal(e[1], 0.1)
 
 
-class TestCoreActions():
+class TestCoreActions:
 
     def test_add_attributes_action(self, sim):
         a = actions.AddAttributesAction(['attr'])
         a.execute(sim)
         assert sim.is_attribute('attr')
 
-    def test_add_unit_type_action(self):
-        a actions.UnitTypeAction(['unit_type'])
+    def test_add_unit_type_action(self, sim):
+        a = actions.UnitTypeAction(['unit_type'])
         a.execute(sim)
         assert sim.is_unit_type('unit_type')
 
-    # def test_remove_entity_action(self, sim, simple_entity_graph):
-    #
-    #     seg = simple_entity_graph
-    #     a = actions.RemoveEntityAction
-    #
-    # def test_add_entity_action(self):
-    #     assert True
-    #
-    # def test_remove_connection_action(self):
-    #     assert True
-    #
-    # def test_add_connection_action(self):
-    #     assert True
+    def test_remove_entity_action(self, sim, simple_entity_graph):
+        seg = simple_entity_graph
+        sim.add_entity(seg[0])
+        sim.add_entity(seg[1])
+        a = actions.RemoveEntityAction(seg[1].id)
+        a.execute(sim)
+        assert seg[1] not in sim.get_entities()
+        assert seg[2] not in seg[0].outputs
+
+    def test_add_entity_action(self, sim, simple_entity_graph):
+        seg = simple_entity_graph
+        e1a = actions.AddEntityAction(
+            'new_entity1', parent=seg[0])
+        e2a = actions.AddEntityAction(
+            'new_entity2', attributes=[], parent=None)
+        e1a.execute(sim)
+        e2a.execute(sim)
+        assert seg[0].get_child_by_name('new_entity1') is not None
+        assert sim.get_entity_by_name('new_entity2') is not None
+
+    def test_remove_connection_action(self, sim, simple_entity_graph):
+        seg = simple_entity_graph
+        sim.add_entity(seg[0])
+        sim.add_entity(seg[1])
+        rca = actions.RemoveConnectionAction(seg[0].id, seg[3].id, seg[2].id)
+        rca.execute(sim)
+        assert seg[2] not in seg[0].outputs
+        assert seg[3] not in seg[1].inputs
+
+    def test_add_connection_action(self, sim):
+        source = merlin.Entity(simulation=sim, name='source', attributes=set())
+        sink = merlin.Entity(simulation=sim, name='sink', attributes=set())
+        sim.add_entity(source)
+        sim.add_entity(sink)
+        aca = actions.AddConnectionAction(
+            'new_unit_type',
+            source.id,
+            [sink.id],
+            copy_write=True,
+            additive_write=True,
+            connector_name='new_con')
+        aca.execute(sim)
+
+        output_con = list(source.get_output_by_type('new_unit_type'))[0]
+        input_con = list(sink.get_input_by_type('new_unit_type'))[0]
+        assert output_con is not None
+        assert input_con is not None
+        assert len(source.outputs) == 1
+        assert len(source.inputs) == 0
+        assert len(sink.inputs) == 1
+        assert len(sink.outputs) == 0
+        assert input_con in [ep[0] for ep in output_con.get_endpoints()]

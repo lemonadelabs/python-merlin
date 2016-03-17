@@ -49,7 +49,7 @@ class RemoveEntityAction(merlin.Action):
         self.entity_id = entity_id
 
     def execute(self, simulation):
-        for ent in simulation.entities():
+        for ent in simulation.get_entities():
             if ent.id == self.entity_id:
                 entity_to_remove = ent
                 break
@@ -68,10 +68,14 @@ class RemoveEntityAction(merlin.Action):
         for i in ent.inputs:
             i.source.remove_input(i)
 
-        ent.parent.children.remove(ent)
-        for child in ent.children:
+        if ent.parent == ent.sim:
+            ent.parent.remove_entity(ent)
+        else:
+            ent.parent.remove_child(ent.id)
+
+        for child in ent.get_children():
             self._remove_entity(child)
-        simulation.remove_entity(ent)
+        ent.sim.remove_entity(ent)
 
 
 class AddEntityAction(merlin.Action):
@@ -88,15 +92,12 @@ class AddEntityAction(merlin.Action):
         self.parent = parent
 
     def execute(self, simulation):
-        e = Entity(simulation, entity_name, attributes)
-        if parent:
-            if parent in [ent.name for ent in simulation.entities()]:
-                for ent in simulation.entities():
-                    if ent.name == parent:
-                        ent.children.add(e)
-                        e.parent = ent
-            else:
-                raise merlin.SimNameNotFoundException(parent)
+        e = merlin.Entity(simulation, self.entity_name, self.attributes)
+        if self.parent == simulation or self.parent is None:
+            simulation.add_entity(e)
+        else:
+            self.parent.add_child(e)
+
 
 # Connection Actions
 
@@ -118,11 +119,11 @@ class RemoveConnectionAction(merlin.Action):
         self.output_connector_id = output_connector_id
 
     def execute(self, simulation):
-        entity = simulation.get_entity_by_name(self.source_entity_id)
+        entity = simulation.get_entity_by_id(self.source_entity_id)
         output_con = entity.get_connector_by_id(self.output_connector_id)
-        if isinstance(output_con, OutputConnector):
+        if isinstance(output_con, merlin.OutputConnector):
             for ep in output_con.get_endpoints():
-                if ep[0].id == input_connector_id:
+                if ep[0].id == self.input_connector_id:
                     ep[0].parent.inputs.remove(ep[0])
                     output_con.remove_input(ep[0])
         else:
@@ -163,7 +164,7 @@ class AddConnectionAction(merlin.Action):
                 for eid in self.input_entity_ids]
 
         # Create the output connector
-        output_con = OutputConnector(
+        output_con = merlin.OutputConnector(
             self.unit_type,
             output_entity,
             name='{0}_output'.format(self.connector_name),
@@ -172,15 +173,16 @@ class AddConnectionAction(merlin.Action):
 
         # Create the input connector(s)
         input_cons = \
-            [InputConnector(
+            [merlin.InputConnector(
                 self.unit_type,
                 p,
                 name='{0}_input'.format(self.connector_name),
-                source=self.output_con,
+                source=output_con,
                 additive_write=self.additive_write) for p in input_entities]
 
         # Connect output endpoint(s)
         for ic in input_cons:
+            ic.parent.add_input(ic)
             output_con.add_input(ic)
 
 

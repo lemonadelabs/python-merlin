@@ -90,12 +90,14 @@ class Simulation(SimObject):
     def is_unit_type(self, ut):
         return ut in self._unit_types
 
-    def entities(self):
+    def get_entities(self):
         return self._entities
 
     def add_entity(self, e):
         if e not in self._entities:
             self._entities.add(e)
+            e.parent = self
+            e.sim = self
 
     def remove_entity(self, e):
         if e in self._entities:
@@ -149,9 +151,48 @@ class Entity(SimObject):
         self.inputs = set()
         self.outputs = set()
         self.parent = None
-        self.children = set()
+        self._children = set()
         self.current_time = None
         self.processed = False
+
+    def add_child(self, entity):
+        if entity not in self._children:
+            self._children.add(entity)
+            entity.parent = self
+
+    def remove_child(self, entity_id):
+        child_to_remove = None
+        for c in self.children():
+            if c.id == entity_id:
+                child_to_remove = c
+        if child_to_remove:
+            child_to_remove.parent = None
+            self._children.remove(child_to_remove)
+
+    def get_children(self):
+        return self._children
+
+    def get_child_by_id(self, entity_id):
+        for c in self.get_children():
+            if c.id == entity_id:
+                return c
+        return None
+
+    def get_child_by_name(self, entity_name):
+        for c in self.get_children():
+            if c.name == entity_name:
+                return c
+        return None
+
+    def add_input(self, input_con):
+        if input_con not in self.inputs:
+            input_con.parent = self
+            self.inputs.add(input_con)
+
+    def add_output(self, output_con):
+        if output_con not in self.outputs:
+            output_con.parent = self
+            self.outputs.add(output_con)
 
     def add_process(self, proc):
         # first check to see if the proc has already been added.
@@ -162,10 +203,12 @@ class Entity(SimObject):
             self._processes[proc.priority].add(proc)
         else:
             self._processes[proc.priority] = set({proc})
+        proc.parent = self
 
     def remove_process(self, proc_id):
         proc = self.get_process_by_id(proc_id)
         if proc:
+            proc.parent = None
             self._processes[proc.priority].remove(proc)
 
     def get_process_by_name(self, proc_name):
