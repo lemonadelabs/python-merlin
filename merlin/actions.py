@@ -187,6 +187,7 @@ class AddConnectionAction(merlin.Action):
 
 
 # Process Actions
+# TODO: Refactor process actions
 
 class RemoveProcessAction(merlin.Action):
     """

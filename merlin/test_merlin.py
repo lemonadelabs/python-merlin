@@ -3,10 +3,11 @@ import numpy.testing as npt
 from datetime import datetime
 from merlin import merlin
 from merlin import actions
-from merlin import processes
+
+# Test Processes
+
 
 # module fixtures
-
 
 @pytest.fixture()
 def sim():
@@ -246,8 +247,12 @@ class TestCoreActions:
         input_con = list(sink.get_input_by_type('new_unit_type'))[0]
         assert output_con is not None
         assert input_con is not None
+        assert output_con.parent == source
+        assert input_con.parent == sink
         assert len(source.outputs) == 1
         assert len(source.inputs) == 0
         assert len(sink.inputs) == 1
         assert len(sink.outputs) == 0
         assert input_con in [ep[0] for ep in output_con.get_endpoints()]
+
+        # TODO Create tests for process actions.

@@ -8,6 +8,8 @@
 """
 
 import uuid
+import sys
+from enum import Enum
 
 # Core classes
 
@@ -278,19 +280,88 @@ class Process(SimObject):
     """
     A generator, processor and/or consumer of units
 
-    Makes up the core of the graph processing and is considered abstract. Must
-     be subclassed to create specific processes. A process is the most granualr
-      part of a :class:`merlin.Simulation`
+    Makes up the core of the graph processing and is considered abstract.
+    Must be subclassed to create specific processes.
+    Things to override in the subclass:
+    * inputs
+    * outputs
+    * process_properties
+    * compute
     """
 
     def __init__(self, name=''):
         super(Process, self).__init__(name)
         self.parent = None
-        self.requires = []
         self.priority = 0
+        self.inputs = dict()
+        self.outputs = dict()
+        self.process_properties = dict()
+
+    def get_prop(name):
+        if name in self.process_properties:
+            return self.process_properties[name].value
+
+    def get_properties():
+        return self.process_properties.values()
 
     def compute(self, tick):
         print("This process does absolutely nothing")
+
+
+class ProcessInput(SimObject):
+
+    def __init__(self, name, unit_type, connector=None, requirement=None):
+        super(ProcessInput, self).__init__(name)
+        self.type = unit_type
+        self.requirement = requirement
+        self.connector = connector
+
+    def get_requirement():
+        return self.requirement()
+
+    def read():
+        pass
+
+
+class ProcessOutput(SimObject):
+
+    def __init__(self, name, unit_type, connector=None):
+        super(ProcessOutput, self).__init__(name)
+        self.type = unit_type
+        self.connector = connector
+
+    def write():
+        pass
+
+
+class ProcessProperty(SimObject):
+
+    class PropertyType(Enum):
+        bool_type = 1
+        float_type = 2
+        int_type = 3
+
+    def __init__(
+            self,
+            name,
+            property_type=PropertyType.float_type,
+            default=0.0,
+            parent=None):
+        super(ProcessProperty, self).__init__(name)
+        self.type = property_type
+        self.max_val = 0.0
+        self.min_val = 0.0
+        self.default = default
+        self.parent = parent
+        self._value = self.default
+
+    def set_value(value):
+        value = value if value >= self.min_val else self.min_val
+        value = value if value <= self.max_val else self.max_val
+        self._value = value
+
+    def get_value():
+        return self._value
 
 
 class Connector(SimObject):
