@@ -72,9 +72,14 @@ class Simulation(SimObject):
         self.senarios = set()
         self.source_entities = set()
         self.outputs = outputs
-        self.current_time_interval = None
-        self.current_time = None
+        self.step_interval = 1
+        self.num_steps = 0
+        self.current_step = None
+        self.run_errors = list()
         self.init_state()
+
+    def set_time_span(self, num_months):
+        self.num_steps = num_steps
 
     def add_attributes(self, ats):
         for a in ats:
@@ -121,8 +126,26 @@ class Simulation(SimObject):
         for action in self.initial_state:
             action.execute(self)
 
-    def run(self, start, end, stepsize, senario=None):
-        pass
+    def get_last_run_errors():
+        return [e in self.run_errors]
+
+    def run(self, start=0, end=self.num_steps, senario=set()):
+        self.run_errors = list()
+
+        # clear data from the last run
+        for o in self.outputs:
+            o.output = list()
+
+        # run all the steps in the sim
+        for t in range(start, stop=end, step=self.step_interval):
+            self.current_step = t
+            self._run_senario_events()
+            # get sim outputs
+            for se in self.source_entities:
+                try:
+                    se.tick(t)
+                except InputRequirementException e:
+                    self.run_errors.append(e)
 
 
 class Output(SimObject):
@@ -131,8 +154,32 @@ class Output(SimObject):
     """
     def __init__(self, name=''):
         super(Output, self).__init__(name)
-        self.inputs = []
+        self.inputs = set()
         self.type = None
+        self.current_time = None
+        self.processed = False
+        self.unit_type = None
+        self.output = list()
+
+    def tick(self, time):
+        if self.current_time and time < self.current_time:
+            return
+
+        if (self.current_time is None) or (time > self.current_time):
+            self.processed = False
+            self.current_time = time
+
+        if time == self.current_time and not self.processed:
+            # need to check if we have all inputs updated before processing
+            up_to_date = True
+            for i in self.inputs:
+                up_to_date = up_to_date and (i.time == self.current_time)
+
+            if up_to_date:
+                o = 0.0
+                for i in self.inputs:
+                    o += i.value
+                self.output.append(o)
 
 
 class Entity(SimObject):
@@ -274,6 +321,8 @@ class Entity(SimObject):
             for i in list(self._processes.keys()).sort():
                 for proc in self._processes[i]:
                     proc.compute(self.current_time)
+        for o in self.outputs:
+            o.tick()
 
 
 class Process(SimObject):
@@ -297,11 +346,11 @@ class Process(SimObject):
         self.outputs = dict()
         self.process_properties = dict()
 
-    def get_prop(name):
+    def get_prop(self, name):
         if name in self.process_properties:
             return self.process_properties[name].value
 
-    def get_properties():
+    def get_properties(self):
         return self.process_properties.values()
 
     def compute(self, tick):
@@ -313,14 +362,10 @@ class ProcessInput(SimObject):
     def __init__(self, name, unit_type, connector=None, requirement=None):
         super(ProcessInput, self).__init__(name)
         self.type = unit_type
-        self.requirement = requirement
         self.connector = connector
 
-    def get_requirement():
-        return self.requirement()
-
-    def read():
-        pass
+    def consume(self, value):
+        self.connector.value -= value
 
 
 class ProcessOutput(SimObject):
@@ -329,9 +374,6 @@ class ProcessOutput(SimObject):
         super(ProcessOutput, self).__init__(name)
         self.type = unit_type
         self.connector = connector
-
-    def write():
-        pass
 
 
 class ProcessProperty(SimObject):
@@ -355,12 +397,12 @@ class ProcessProperty(SimObject):
         self.parent = parent
         self._value = self.default
 
-    def set_value(value):
+    def set_value(self, value):
         value = value if value >= self.min_val else self.min_val
         value = value if value <= self.max_val else self.max_val
         self._value = value
 
-    def get_value():
+    def get_value(self):
         return self._value
 
 
@@ -403,6 +445,12 @@ class OutputConnector(Connector):
             self.connector = connector
             self.bias = bias
 
+    def tick(self):
+        if self.time == self.parent.current_time:
+            for ep in self._endpoints:
+                if ep.connector.time == self.time:
+                    ep.connector.parent.tick(self.time)
+
     def write(self, value):
         self.time = self.parent.current_time
         if self._endpoints:
@@ -412,7 +460,6 @@ class OutputConnector(Connector):
                     ep.bias)
                 ep.connector.write(dist_value)
                 ep.connector.time = self.time
-                ep.connector.parent.tick(self.time)
 
     def _get_endpoint(self, input_connector):
         result = None
@@ -543,6 +590,8 @@ class Ruleset:
     def core_validate(self, action):
         self.validate(action)
 
+# Core package exceptions
+
 
 class MerlinException(Exception):
     """
@@ -554,6 +603,19 @@ class MerlinException(Exception):
 
     def __str__(self):
         return repr(self.value)
+
+
+class InputRequirementException(MerlinException):
+    """
+    Should be thrown by a process if an input quantity produces a zero
+    output by the compute function. Is used to indicate what input was
+    deficient to make debugging the model easier.
+    """
+
+    def __init__(self, process, process_input, value):
+        super(InputRequirementException, self).__init__(value)
+        self.process = process
+        self.process_input = process_input
 
 
 class SimNameNotFoundException(MerlinException):
