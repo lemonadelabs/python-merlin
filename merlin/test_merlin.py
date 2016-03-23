@@ -4,10 +4,226 @@ from datetime import datetime
 from merlin import merlin
 from merlin import actions
 
-# Test Processes
+
+class BudgetProcess(merlin.Process):
+
+    def __init__(self, name='Budget', start_amount=10000000.00):
+        super(BudgetProcess, self).__init__(name)
+
+        # Define outputs
+        p_output = merlin.ProcessOutput('output_$', '$', connector=None)
+
+        # Define properties
+        p_property = merlin.ProcessProperty(
+            'amount',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=start_amount,
+            parent=self)
+
+        self.outputs = {'$': p_output}
+        self.props = {'amount': p_property}
+
+    def reset(self):
+        # define internal instance variables on init
+        self.current_amount = self.props['amount'].get_value()
+        self.amount_per_step = self.current_amount / self.parent.sim.num_steps
+
+    def compute(self, tick):
+        if self.current_amount > 0.00:
+            output = self.amount_per_step if self.amount_per_step >= \
+                self.current_amount else self.current_amount
+            self.current_amount -= output
+            self.outputs['$'].connector.write(output)
+        self.outputs['$'].connector.write(0.00)
 
 
-# module fixtures
+class CallCenterStaffProcess(merlin.Process):
+
+    def __init__(self, name='Call Center Staff'):
+        super(CallCenterStaffProcess, self).__init__(name)
+
+        # Define inputs
+        i_desks = merlin.ProcessInput('i_desks', 'desks', connector=None)
+        i_funds = merlin.ProcessInput('i_$', '$', connector=None)
+
+        # Define outputs
+        o_requests_handled = merlin.ProcessOutput(
+            'o_requests_handled',
+            'requests_handled',
+            connector=None)
+
+        # Define properties
+        p_staff = merlin.ProcessProperty(
+            'staff number',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=100,
+            parent=self)
+
+        p_staff_salary = merlin.ProcessProperty(
+            'staff salary',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=100.00,
+            parent=self)
+
+        p_staff_per_desk = merlin.ProcessProperty(
+            'staff per desk',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=1,
+            parent=self)
+
+        p_months_to_train = merlin.ProcessProperty(
+            'months to train',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=2,
+            parent=self)
+
+        self.props = {
+            'staff_number': p_staff,
+            'staff_salary': p_staff_salary,
+            'staff_per_desk': p_staff_per_desk,
+            'months_to_train': p_months_to_train}
+
+        self.inputs = {'desks': i_desks, '$': i_funds}
+        self.outputs = {'requests_handled': o_requests_handled}
+
+    def reset(self):
+        # Calculations that
+        # you do not expect to change should be put in the
+        # reset function as this is called only once at the
+        # start of the simualtion run.
+        self.desks_required = (
+            self.props['staff_number'].get_value() /
+            self.props['staff_per_desk'].get_value())
+        self.funds_required = (
+            self.props['staff_number'].get_value() *
+            self.props['staff_salary'].get_value())
+        self.maximal_output = self.props['staff_number'].get_value()
+        self.train_slope = 1.0 / self.props['months_to_train'].get_value()
+
+    def compute(self, tick):
+        # check requirements
+        if self.inputs['desks'].connector.value < self.desks_required:
+            raise merlin.InputRequirementException(
+                self,
+                self.inputs['desks'],
+                self.inputs['desks'].connector.value,
+                self.desks_required)
+        if self.inputs['$'].connector.value < self.funds_required:
+            raise merlin.InputRequirementException(
+                self,
+                self.inputs['$'],
+                self.inputs['$'].connector.value,
+                self.funds_required)
+
+        # compute outputs
+        output = self.maximal_output * _train_modifier(tick)
+        self.inputs['desks'].consume(self.desks_required)
+        self.inputs['$'].consume(self.funds_required)
+        self.outputs['requests_handled'].connector.write(output)
+
+    def _train_modifier(self, tick):
+        if tick < self.props['months_to_train'].get_value():
+            return tick * train_slope
+        else:
+            return 1.0
+
+
+class BuildingMaintainenceProcess(merlin.Process):
+    """foo"""
+    def __init__(self, name='Building Maintainance'):
+        super(BuildingMaintainenceProcess, self).__init__(name)
+
+        # Define inputs
+        i_funds = merlin.ProcessInput('i_$', '$', connector=None)
+
+        # Define outputs
+        o_desks = merlin.ProcessOutput('o_desks', 'desks', connector=None)
+
+        # Define properties
+        p_maintainance_cost = merlin.ProcessProperty(
+            'monthly maintainance cost',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=10.00,
+            parent=self)
+
+        p_desks_provided = merlin.ProcessProperty(
+            'desks provided',
+            property_type=merlin.ProcessProperty.PropertyType.number_type,
+            default=100,
+            parent=self)
+
+        self.props = {
+            'cost': p_maintainance_cost,
+            'desks': p_desks_provided}
+
+        self.inputs = {'$': i_funds}
+        self.outputs = {'desks': o_desks}
+
+    def reset(self):
+        pass
+
+    def compute(self, tick):
+        # Check requirements
+        if self.inputs['$'].connector.value < self.props['cost'].get_value():
+            raise merlin.InputRequirementException(
+                self,
+                self.inputs['$'],
+                self.inputs['$'].connector.value,
+                self.props['cost'].get_value())
+
+        # Compute outputs
+        self.inputs['$'].consume(self.props['cost'].get_value())
+        self.outputs['desks'].connector.write(self.props['desks'].get_value())
+
+
+@pytest.fixture()
+def computation_test_harness(sim):
+
+    # Configure sim properties
+    sim.set_time_span(12)
+    sim.add_attributes(['budget', 'capability', 'fixed_asset'])
+    sim.add_unit_types(['$', 'desks', 'requests_handled'])
+
+    sim_output = merlin.Output('requests_handled', name='requests handled')
+    sim_output.type = 'requests_handled'
+    sim.outputs.add(sim_output)
+
+    # Create Entities
+    e_budget = merlin.Entity(
+        name='Budget',
+        attributes={'budget'})
+
+    e_call_center = merlin.Entity(
+        name='call center',
+        attributes={'capability'})
+
+    e_office = merlin.Entity(
+        name='office building',
+        attributes={'capability', 'fixed_asset'})
+
+    sim.add_entities([e_budget, e_call_center, e_office])
+    sim.set_source_entities([e_budget])
+
+    # Create Entity Connectons
+    # Budget connections
+    sim.connect_entities(e_budget, e_call_center, '$')
+    sim.connect_entities(e_budget, e_office, '$')
+
+    # Call center connections
+    sim.connect_output(e_call_center, sim_output)
+
+    # Office connections
+    sim.connect_entities(e_office, e_call_center, 'desks')
+
+    # Add entity processes
+    p_budget = BudgetProcess(name='Budget', start_amount=1000.00)
+    p_staff = CallCenterStaffProcess(name='Call Center Staff')
+    p_building = BuildingMaintainenceProcess(name='Building Maintainance')
+    e_budget.add_process(p_budget)
+    e_call_center.add_process(p_staff)
+    e_office.add_process(p_building)
+    return sim
+
 
 @pytest.fixture()
 def sim():
@@ -44,7 +260,7 @@ def simple_entity_graph():
         source,
         name='output')
     in_con.source = out_con
-    out_con.add_input(in_con, bias=1.0)
+    out_con.add_input(in_con)
     source.outputs.add(out_con)
     sink.inputs.add(in_con)
     return (source, sink, out_con, in_con)
@@ -83,6 +299,15 @@ def simple_branching_output_graph():
     return (source, sink1, sink2, out_con, in_con1, in_con2)
 
 
+class TestIntegration:
+
+    def test_output(self, computation_test_harness):
+        cth = computation_test_harness
+        cth.run()
+        print(list(cth.outputs)[0].result)
+        assert False
+
+
 class TestSimulation:
 
     def test_add_attribute(self, sim):
@@ -112,6 +337,40 @@ class TestSimulation:
         e = sim.get_entity_by_id(entity.id)
         assert e == entity
 
+    def test_connect_entities(self, sim):
+        e1 = merlin.Entity(name='e1')
+        e2 = merlin.Entity(name='e2')
+        sim.add_entity(e1)
+        sim.add_entity(e2)
+        sim.connect_entities(e1, e2, 'unit_type')
+        o_con = e1.get_output_by_type('unit_type')
+        i_con = e2.get_input_by_type('unit_type')
+        assert e1.get_input_by_type('unit_type') is None
+        assert e2.get_output_by_type('unit_type') is None
+        assert o_con
+        assert i_con
+        assert o_con.type == 'unit_type'
+        assert i_con.type == 'unit_type'
+        assert len(o_con.get_endpoints()) == 1
+        assert i_con.source == o_con
+
+    def test_add_output(self, sim):
+        o = merlin.Output('unit_type', name='output')
+        sim.add_output(o)
+        assert len(sim.outputs) == 1
+        assert o.sim == sim
+
+    def test_connect_output(self, sim):
+        e1 = merlin.Entity(name='e1')
+        o = merlin.Output('unit_type', name='output')
+        sim.add_entity(e1)
+        sim.add_output(o)
+        sim.connect_output(e1, o)
+        o_con = e1.get_output_by_type('unit_type')
+        i_con = list(o.inputs)[0]
+        assert o_con
+        assert i_con
+
 
 class TestEntity:
 
@@ -139,12 +398,12 @@ class TestEntity:
     def test_get_output_by_type(self, simple_entity_graph):
         seg = simple_entity_graph
         o = seg[0].get_output_by_type('unit_type')
-        assert seg[2] in o
+        assert seg[2] == o
 
     def test_get_input_by_type(self, simple_entity_graph):
         seg = simple_entity_graph
         i = seg[1].get_input_by_type('unit_type')
-        assert seg[3] in i
+        assert seg[3] == i
 
 
 class TestOutputConnector:
@@ -243,8 +502,8 @@ class TestCoreActions:
             connector_name='new_con')
         aca.execute(sim)
 
-        output_con = list(source.get_output_by_type('new_unit_type'))[0]
-        input_con = list(sink.get_input_by_type('new_unit_type'))[0]
+        output_con = source.get_output_by_type('new_unit_type')
+        input_con = sink.get_input_by_type('new_unit_type')
         assert output_con is not None
         assert input_con is not None
         assert output_con.parent == source

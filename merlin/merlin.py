@@ -9,42 +9,16 @@
 
 import uuid
 import sys
+import logging
 from enum import Enum
 
-# Core classes
-
-
-class Application:
-    """
-    Represents a set of simulations with their associated outputs.
-
-    It is really a convienience grouping and typically a single client would
-    have one :class:`merlin.Application` instance.
-    """
-
-    def __init__(self, app_name=None):
-        self.simulations = set()
-        self.id = uuid.uuid4()
-        self.name = app_name or str(self.id)
-
-    def create_simulation(self, config, ruleset, outputs, name=None):
-        """
-        Create a new simulation object and populate it with entities, a ruleset
-         and outputs.
-
-        :param config: A list of Actions to create the intial state of the
-        :class:`Simulation`.
-        :type config: [Action]
-        :param ruleset: A subclass of the :class:`Ruleset` object that contains
-         the rules for the simulation.
-        :type ruleset: Ruleset
-        :param outputs: A list of outputs for the simulation.
-        :type outputs: [Output]
-        :return: A Simulation object id
-        :rtype: int
-        """
-        sim = Simulation(ruleset, config, outputs, name)
-        self.simulations.add(sim)
+# Global module settings
+logging_level = logging.INFO
+log_to_file = ''
+logging.basicConfig(
+    filename=log_to_file,
+    level=logging_level,
+    format='%(asctime)s: [%(levelname)s] %(message)s')
 
 
 class SimObject:
@@ -72,14 +46,78 @@ class Simulation(SimObject):
         self.senarios = set()
         self.source_entities = set()
         self.outputs = outputs
-        self.step_interval = 1
-        self.num_steps = 0
-        self.current_step = None
+        self.num_steps = 1
+        self.current_step = 1
         self.run_errors = list()
-        self.init_state()
+        self.verbose = True
+
+    def _run_senario_events(self):
+        # TODO: Implement senario events
+        pass
+
+    def connect_entities(
+            self,
+            from_entity,
+            to_entity,
+            unit_type,
+            input_additive_write=False,
+            output_copy_write=False):
+
+        o_con = from_entity.get_output_by_type(unit_type)
+        i_con = to_entity.get_input_by_type(unit_type)
+
+        if not o_con:
+            o_con = OutputConnector(
+                unit_type,
+                from_entity,
+                name='{0}_output'.format(unit_type),
+                copy_write=output_copy_write)
+
+        if not i_con:
+            i_con = InputConnector(
+                unit_type,
+                to_entity,
+                name='{0}_input'.format(unit_type),
+                additive_write=input_additive_write)
+
+        i_con.source = o_con
+        o_con.add_input(i_con)
+        from_entity.add_output(o_con)
+        to_entity.add_input(i_con)
+
+    def connect_output(
+            self,
+            entity,
+            output,
+            input_additive_write=False,
+            output_copy_write=False):
+
+        if output not in self.outputs:
+            return
+
+        o_con = entity.get_input_by_type(output.type)
+
+        if not o_con:
+            o_con = OutputConnector(
+                output.type,
+                entity,
+                name='{0}_output'.format(output.type),
+                copy_write=output_copy_write)
+
+        i_con = InputConnector(
+            output.type,
+            output,
+            name='{0}_input_from_{1}'.format(output.type, entity.id),
+            additive_write=input_additive_write)
+
+        i_con.source = o_con
+        o_con.add_input(i_con)
+        entity.add_output(o_con)
+        if i_con not in output.inputs:
+            output.inputs.add(i_con)
 
     def set_time_span(self, num_months):
-        self.num_steps = num_steps
+        self.num_steps = num_months
 
     def add_attributes(self, ats):
         for a in ats:
@@ -97,14 +135,30 @@ class Simulation(SimObject):
     def is_unit_type(self, ut):
         return ut in self._unit_types
 
+    def set_source_entities(self, entities):
+        for e in entities:
+            if e in self._entities and e not in self.source_entities:
+                self.source_entities.add(e)
+
     def get_entities(self):
         return self._entities
 
-    def add_entity(self, e):
+    def add_entities(self, es):
+        for e in es:
+            self.add_entity(e)
+
+    def add_output(self, o):
+        if o not in self.outputs:
+            self.outputs.add(o)
+            o.sim = self
+
+    def add_entity(self, e, is_source_entity=False):
         if e not in self._entities:
             self._entities.add(e)
             e.parent = self
             e.sim = self
+            if is_source_entity:
+                self.source_entities.add(e)
 
     def remove_entity(self, e):
         if e in self._entities:
@@ -126,40 +180,54 @@ class Simulation(SimObject):
         for action in self.initial_state:
             action.execute(self)
 
-    def get_last_run_errors():
-        return [e in self.run_errors]
+    def get_last_run_errors(self):
+        return list(self.run_errors)
 
-    def run(self, start=0, end=self.num_steps, senario=set()):
+    def validate(self):
+        # TODO: Write basic validation function for sim
+        return True
+
+    def run(self, start=1, end=-1, senario=set()):
+        logging.info("Merlin simulation {0} started".format(self.name))
         self.run_errors = list()
+
+        sim_start = start if start > 1 else 1
+        sim_end = end if (end > 0 and end < self.num_steps) else self.num_steps
 
         # clear data from the last run
         for o in self.outputs:
-            o.output = list()
+            o.result = list()
+
+        # call reset on all processes
+        for e in self._entities:
+            e.reset()
 
         # run all the steps in the sim
-        for t in range(start, stop=end, step=self.step_interval):
+        for t in range(sim_start, sim_end+1):
+            logging.debug('Simulation step {0}'.format(t))
             self.current_step = t
             self._run_senario_events()
             # get sim outputs
             for se in self.source_entities:
                 try:
                     se.tick(t)
-                except InputRequirementException e:
+                except InputRequirementException as e:
                     self.run_errors.append(e)
+        logging.info("merlin simulation {0} finished".format(self.name))
 
 
 class Output(SimObject):
     """
     A network flow sink.
     """
-    def __init__(self, name=''):
+    def __init__(self, unit_type, name=''):
         super(Output, self).__init__(name)
         self.inputs = set()
-        self.type = None
         self.current_time = None
         self.processed = False
-        self.unit_type = None
-        self.output = list()
+        self.type = unit_type
+        self.result = list()
+        self.sim = None
 
     def tick(self, time):
         if self.current_time and time < self.current_time:
@@ -179,7 +247,7 @@ class Output(SimObject):
                 o = 0.0
                 for i in self.inputs:
                     o += i.value
-                self.output.append(o)
+                self.result.append(o)
 
 
 class Entity(SimObject):
@@ -243,6 +311,12 @@ class Entity(SimObject):
             output_con.parent = self
             self.outputs.add(output_con)
 
+    def reset(self):
+        procs = self._processes.values()
+        for ps in procs:
+            for p in ps:
+                p.reset()
+
     def add_process(self, proc):
         # first check to see if the proc has already been added.
         if proc.id in [p.id for p in self._processes.values()]:
@@ -254,10 +328,40 @@ class Entity(SimObject):
             self._processes[proc.priority] = set({proc})
         proc.parent = self
 
+        # Connect process outputs to entity outputs.
+        # Create entity outputs if they dont exist.
+        for po in proc.outputs.values():
+            o_con = self.get_output_by_type(po.type)
+            if not o_con:
+                o_con = OutputConnector(
+                    po.type,
+                    self,
+                    name='{0}_output'.format(po.type))
+                self.add_output(o_con)
+
+            po.connector = o_con
+
+        # Connect process inputs to entity inputs
+        # Create enity inputs if thet dont exist
+        for pi in proc.inputs.values():
+            i_con = self.get_input_by_type(pi.type)
+            if not i_con:
+                i_con = InputConnector(
+                    pi.type,
+                    self,
+                    name='{0}_output'.format(pi.type))
+                self.add_input(i_con)
+
+            pi.connector = i_con
+
     def remove_process(self, proc_id):
         proc = self.get_process_by_id(proc_id)
         if proc:
             proc.parent = None
+            for po in proc.outputs.values():
+                po.connector = None
+            for pi in proc.outputs.values():
+                pi.connector = None
             self._processes[proc.priority].remove(proc)
 
     def get_process_by_name(self, proc_name):
@@ -285,24 +389,24 @@ class Entity(SimObject):
         return None
 
     def get_output_by_type(self, unit_type):
-        result = set()
         for o in self.outputs:
             if o.type == unit_type:
-                result.add(o)
-        return result
+                return o
+        return None
 
     def get_input_by_type(self, unit_type):
-        result = set()
         for o in self.inputs:
             if o.type == unit_type:
-                result.add(o)
-        return result
+                return o
+        return None
 
     def tick(self, time):
+        logging.debug('Entity {0} received tick {1}'.format(self.name, time))
         if self.current_time and time < self.current_time:
             return
 
         if (self.current_time is None) or (time > self.current_time):
+            logging.debug("Entity {0} time updated".format(self.name))
             self.processed = False
             self.current_time = time
 
@@ -310,16 +414,22 @@ class Entity(SimObject):
             # need to check if we have all inputs updated before processing
             up_to_date = True
             for i in self.inputs:
+                # logging.debug(i)
                 up_to_date = up_to_date and (i.time == self.current_time)
 
             if up_to_date:
+                logging.debug(
+                    "Entity {0} inputs are all refreshed, processing..".format(
+                        self.name))
                 self._process()
 
     def _process(self):
         self.processed = True
         if self._processes.keys():
-            for i in list(self._processes.keys()).sort():
+            for i in sorted(self._processes.keys()):
                 for proc in self._processes[i]:
+                    logging.debug(
+                        "Computing level {0} process {1}".format(i, proc.name))
                     proc.compute(self.current_time)
         for o in self.outputs:
             o.tick()
@@ -344,22 +454,44 @@ class Process(SimObject):
         self.priority = 0
         self.inputs = dict()
         self.outputs = dict()
-        self.process_properties = dict()
+        self.props = dict()
 
     def get_prop(self, name):
-        if name in self.process_properties:
-            return self.process_properties[name].value
+        if name in self.props:
+            return self.props[name]
+        else:
+            return None
+
+    def get_prop_value(self, name):
+        p = self.get_prop(name)
+        if p:
+            return p.value
+        else:
+            return None
 
     def get_properties(self):
-        return self.process_properties.values()
+        return self.props.values()
 
     def compute(self, tick):
+        """
+        Called on each process every simulation step. override
+        with your custom process function. If a processes input
+        requirement arn't met, raise an InputRequirementException
+        """
         print("This process does absolutely nothing")
+
+    def reset(self):
+        """
+        Called at the start of a simuation run on each
+        process so the process can init itself if nessesary.
+        override with your custom init code.
+        """
+        pass
 
 
 class ProcessInput(SimObject):
 
-    def __init__(self, name, unit_type, connector=None, requirement=None):
+    def __init__(self, name, unit_type, connector=None):
         super(ProcessInput, self).__init__(name)
         self.type = unit_type
         self.connector = connector
@@ -380,18 +512,18 @@ class ProcessProperty(SimObject):
 
     class PropertyType(Enum):
         bool_type = 1
-        float_type = 2
+        number_type = 2
         int_type = 3
 
     def __init__(
             self,
             name,
-            property_type=PropertyType.float_type,
+            property_type=PropertyType.number_type,
             default=0.0,
             parent=None):
         super(ProcessProperty, self).__init__(name)
         self.type = property_type
-        self.max_val = 0.0
+        self.max_val = default
         self.min_val = 0.0
         self.default = default
         self.parent = parent
@@ -476,9 +608,9 @@ class OutputConnector(Connector):
         for ep in self._endpoints:
             ep.bias = val
 
-    def add_input(self, input_connector, bias=0.0):
+    def add_input(self, input_connector):
         if not self._get_endpoint(input_connector):
-            ep = self.Endpoint(input_connector, bias)
+            ep = self.Endpoint(input_connector, 0.0)
             self._endpoints.add(ep)
             self._ballance_bias()
 
@@ -612,10 +744,19 @@ class InputRequirementException(MerlinException):
     deficient to make debugging the model easier.
     """
 
-    def __init__(self, process, process_input, value):
-        super(InputRequirementException, self).__init__(value)
+    def __init__(self, process, process_input, input_value, required_input):
+        super(InputRequirementException, self).__init__(required_input)
         self.process = process
         self.process_input = process_input
+        self.input_value = input_value
+        logging.exception((
+            "InputRequirementException in process {0} with " +
+            "process input: {1}  input value = {2} / required value = " +
+            "{3}").format(
+                self.process.name,
+                self.process_input.name,
+                self.input_value,
+                self.value))
 
 
 class SimNameNotFoundException(MerlinException):
