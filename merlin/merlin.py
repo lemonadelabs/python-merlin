@@ -8,7 +8,6 @@
 """
 
 import uuid
-import sys
 import logging
 from datetime import datetime
 from enum import Enum
@@ -37,16 +36,16 @@ class Simulation(SimObject):
      senarios and outputs.
     """
 
-    def __init__(self, ruleset=None, config=[], outputs=set(), name=''):
+    def __init__(self, ruleset=None, config=None, outputs=None, name=''):
         super(Simulation, self).__init__(name)
         self._unit_types = set()
         self._attributes = set()
         self._entities = set()
         self.ruleset = ruleset
-        self.initial_state = config
+        self.initial_state = config or []
         self.senarios = set()
         self.source_entities = set()
-        self.outputs = outputs
+        self.outputs = outputs or set()
         self.num_steps = 1
         self.current_step = 1
         self.run_errors = list()
@@ -171,9 +170,9 @@ class Simulation(SimObject):
                 return e
         return None
 
-    def get_entity_by_id(self, id):
+    def get_entity_by_id(self, e_id):
         for e in self._entities:
-            if e.id == id:
+            if e.id == e_id:
                 return e
         return None
 
@@ -184,9 +183,9 @@ class Simulation(SimObject):
                 return p
         return None
 
-    def get_process_by_id(self, id):
+    def get_process_by_id(self, pid):
         for e in self._entities:
-            p = e.get_process_by_id(id)
+            p = e.get_process_by_id(pid)
             if p:
                 return p
         return None
@@ -208,7 +207,7 @@ class Simulation(SimObject):
         self.run_errors = list()
 
         sim_start = start if start > 1 else 1
-        sim_end = end if (end > 0 and end < self.num_steps) else self.num_steps
+        sim_end = end if (0 < end < self.num_steps) else self.num_steps
 
         # clear data from the last run
         for o in self.outputs:
@@ -317,7 +316,7 @@ class Entity(SimObject):
 
     def remove_child(self, entity_id):
         child_to_remove = None
-        for c in self.children():
+        for c in self._children:
             if c.id == entity_id:
                 child_to_remove = c
         if child_to_remove:
@@ -363,7 +362,7 @@ class Entity(SimObject):
         if proc.priority in self._processes.keys():
             self._processes[proc.priority].add(proc)
         else:
-            self._processes[proc.priority] = set({proc})
+            self._processes[proc.priority] = {proc}
         proc.parent = self
 
         # Connect process outputs to entity outputs.
@@ -418,11 +417,11 @@ class Entity(SimObject):
                     return p
         return None
 
-    def get_connector_by_id(self, id):
+    def get_connector_by_id(self, cid):
         connectors = self.inputs.union(self.outputs)
         print(connectors)
         for c in connectors:
-            if c.id == id:
+            if c.id == cid:
                 return c
         return None
 
@@ -625,7 +624,7 @@ class OutputConnector(Connector):
             self.copy_write,
             self.get_endpoints())
 
-    class Endpoint():
+    class Endpoint:
         def __init__(self, connector=None, bias=0.0):
             self.connector = connector
             self.bias = bias
@@ -839,7 +838,7 @@ class InputRequirementException(MerlinException):
                 self.value))
 
 
-class SimNameNotFoundException(MerlinException):
+class SimReferenceNotFoundException(MerlinException):
 
     def __init__(self, value):
         super(SimReferenceNotFoundException, self).__init__(value)
