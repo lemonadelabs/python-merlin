@@ -10,6 +10,7 @@
 import uuid
 import sys
 import logging
+from datetime import datetime
 from enum import Enum
 
 # Global module settings
@@ -176,6 +177,20 @@ class Simulation(SimObject):
                 return e
         return None
 
+    def get_process_by_name(self, name):
+        for e in self._entities:
+            p = e.get_process_by_name(name)
+            if p:
+                return p
+        return None
+
+    def get_process_by_id(self, id):
+        for e in self._entities:
+            p = e.get_process_by_id(id)
+            if p:
+                return p
+        return None
+
     def init_state(self):
         for action in self.initial_state:
             action.execute(self)
@@ -188,6 +203,7 @@ class Simulation(SimObject):
         return True
 
     def run(self, start=1, end=-1, senario=set()):
+        start_time = datetime.now()
         logging.info("Merlin simulation {0} started".format(self.name))
         self.run_errors = list()
 
@@ -204,7 +220,7 @@ class Simulation(SimObject):
 
         # run all the steps in the sim
         for t in range(sim_start, sim_end+1):
-            logging.debug('Simulation step {0}'.format(t))
+            logging.info('Simulation step {0}'.format(t))
             self.current_step = t
             self._run_senario_events()
             # get sim outputs
@@ -213,7 +229,10 @@ class Simulation(SimObject):
                     se.tick(t)
                 except InputRequirementException as e:
                     self.run_errors.append(e)
-        logging.info("merlin simulation {0} finished".format(self.name))
+        logging.info(
+            "merlin simulation {0} finished in {1}".format(
+                self.name,
+                datetime.now() - start_time))
 
 
 class Output(SimObject):
@@ -271,6 +290,25 @@ class Entity(SimObject):
         self._children = set()
         self.current_time = None
         self.processed = False
+
+    def __str__(self):
+        return """
+        <Entity>
+         name: {0},
+         attributes: {1},
+         inputs: {2},
+         outputs: {3},
+         parent: {4},
+         children: {5},
+         processes: {6}
+        """.format(
+            self.name,
+            self.attributes,
+            self.inputs,
+            self.outputs,
+            self.parent,
+            self._children,
+            self._processes)
 
     def add_child(self, entity):
         if entity not in self._children:
@@ -530,8 +568,6 @@ class ProcessProperty(SimObject):
         self._value = self.default
 
     def set_value(self, value):
-        value = value if value >= self.min_val else self.min_val
-        value = value if value <= self.max_val else self.max_val
         self._value = value
 
     def get_value(self):
@@ -572,10 +608,34 @@ class OutputConnector(Connector):
         self.copy_write = copy_write
         self._endpoints = endpoints or set()
 
+    def __str__(self):
+        return """
+        <OutputConnector>
+         name: {0},
+         unit_type: {1},
+         parent: {2},
+         time: {3},
+         copy_write: {4},
+         endpoints: {5}
+        """.format(
+            self.name,
+            self.type,
+            self.parent,
+            self.time,
+            self.copy_write,
+            self.get_endpoints())
+
     class Endpoint():
         def __init__(self, connector=None, bias=0.0):
             self.connector = connector
             self.bias = bias
+
+        def __str__(self):
+            return """
+            <Endpoint>
+             connector: {0},
+             bias: {1}
+             """.format(self.connector, self.bias)
 
     def tick(self):
         if self.time == self.parent.current_time:
@@ -584,12 +644,15 @@ class OutputConnector(Connector):
                     ep.connector.parent.tick(self.time)
 
     def write(self, value):
+        logging.debug(
+            "WRITING to Output {1} value: {0} ***".format(value, self))
         self.time = self.parent.current_time
         if self._endpoints:
             for ep in self._endpoints:
                 dist_value = (
-                    value if self.copy_write else value /
+                    value if self.copy_write else value *
                     ep.bias)
+                logging.debug("dist_value: {0}".format(dist_value))
                 ep.connector.write(dist_value)
                 ep.connector.time = self.time
 
@@ -669,6 +732,23 @@ class InputConnector(Connector):
         self.source = source
         self.additive_write = additive_write
         self.value = 0.0
+
+    def __str__(self):
+        return """
+        <InputConnector>
+          name: {0},
+          unit_type: {1},
+          parent: {2},
+          time: {3},
+          additive_write: {4},
+          source: {5}
+        """.format(
+            self.name,
+            self.type,
+            self.parent,
+            self.time,
+            self.additive_write,
+            self.source)
 
     def write(self, value):
         self.value = self.value + value if self.additive_write else value

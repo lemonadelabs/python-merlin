@@ -1,5 +1,6 @@
 import pytest
 import numpy.testing as npt
+import logging
 from datetime import datetime
 from merlin import merlin
 from merlin import actions
@@ -7,7 +8,7 @@ from merlin import actions
 
 class BudgetProcess(merlin.Process):
 
-    def __init__(self, name='Budget', start_amount=10000000.00):
+    def __init__(self, name='Budget', start_amount=10000.00):
         super(BudgetProcess, self).__init__(name)
 
         # Define outputs
@@ -27,14 +28,23 @@ class BudgetProcess(merlin.Process):
         # define internal instance variables on init
         self.current_amount = self.props['amount'].get_value()
         self.amount_per_step = self.current_amount / self.parent.sim.num_steps
+        logging.debug(
+            ("<Budget process setup> current_amount: {0}," +
+                " amount per step: {1}," +
+                " steps: {2}").format(
+                    self.current_amount,
+                    self.amount_per_step,
+                    self.parent.sim.num_steps))
 
     def compute(self, tick):
         if self.current_amount > 0.00:
-            output = self.amount_per_step if self.amount_per_step >= \
-                self.current_amount else self.current_amount
+            output = self.amount_per_step
+            if output > self.current_amount:
+                output = self.current_amount
             self.current_amount -= output
             self.outputs['$'].connector.write(output)
-        self.outputs['$'].connector.write(0.00)
+        else:
+            self.outputs['$'].connector.write(0.00)
 
 
 class CallCenterStaffProcess(merlin.Process):
@@ -62,7 +72,7 @@ class CallCenterStaffProcess(merlin.Process):
         p_staff_salary = merlin.ProcessProperty(
             'staff salary',
             property_type=merlin.ProcessProperty.PropertyType.number_type,
-            default=100.00,
+            default=5.00,
             parent=self)
 
         p_staff_per_desk = merlin.ProcessProperty(
@@ -74,7 +84,7 @@ class CallCenterStaffProcess(merlin.Process):
         p_months_to_train = merlin.ProcessProperty(
             'months to train',
             property_type=merlin.ProcessProperty.PropertyType.number_type,
-            default=2,
+            default=5,
             parent=self)
 
         self.props = {
@@ -116,20 +126,23 @@ class CallCenterStaffProcess(merlin.Process):
                 self.funds_required)
 
         # compute outputs
-        output = self.maximal_output * _train_modifier(tick)
+        output = self.maximal_output * self._train_modifier(tick)
         self.inputs['desks'].consume(self.desks_required)
         self.inputs['$'].consume(self.funds_required)
         self.outputs['requests_handled'].connector.write(output)
 
     def _train_modifier(self, tick):
-        if tick < self.props['months_to_train'].get_value():
+        # This is just a linear function with the
+        # slope steepness = months to train
+        mtt = self.props['months_to_train'].get_value()
+        train_slope = 1.0 / float(mtt)
+        if tick < mtt:
             return tick * train_slope
         else:
             return 1.0
 
 
 class BuildingMaintainenceProcess(merlin.Process):
-    """foo"""
     def __init__(self, name='Building Maintainance'):
         super(BuildingMaintainenceProcess, self).__init__(name)
 
@@ -143,13 +156,13 @@ class BuildingMaintainenceProcess(merlin.Process):
         p_maintainance_cost = merlin.ProcessProperty(
             'monthly maintainance cost',
             property_type=merlin.ProcessProperty.PropertyType.number_type,
-            default=10.00,
+            default=500.00,
             parent=self)
 
         p_desks_provided = merlin.ProcessProperty(
             'desks provided',
             property_type=merlin.ProcessProperty.PropertyType.number_type,
-            default=100,
+            default=100.0,
             parent=self)
 
         self.props = {
@@ -164,6 +177,8 @@ class BuildingMaintainenceProcess(merlin.Process):
 
     def compute(self, tick):
         # Check requirements
+        # logging.debug(self.inputs['$'].connector)
+        # logging.debug(self.inputs['$'].connector.value)
         if self.inputs['$'].connector.value < self.props['cost'].get_value():
             raise merlin.InputRequirementException(
                 self,
@@ -180,7 +195,7 @@ class BuildingMaintainenceProcess(merlin.Process):
 def computation_test_harness(sim):
 
     # Configure sim properties
-    sim.set_time_span(12)
+    sim.set_time_span(10)
     sim.add_attributes(['budget', 'capability', 'fixed_asset'])
     sim.add_unit_types(['$', 'desks', 'requests_handled'])
 
@@ -216,7 +231,7 @@ def computation_test_harness(sim):
     sim.connect_entities(e_office, e_call_center, 'desks')
 
     # Add entity processes
-    p_budget = BudgetProcess(name='Budget', start_amount=1000.00)
+    p_budget = BudgetProcess(name='Budget')
     p_staff = CallCenterStaffProcess(name='Call Center Staff')
     p_building = BuildingMaintainenceProcess(name='Building Maintainance')
     e_budget.add_process(p_budget)
@@ -302,10 +317,28 @@ def simple_branching_output_graph():
 class TestIntegration:
 
     def test_output(self, computation_test_harness):
-        cth = computation_test_harness
-        cth.run()
-        print(list(cth.outputs)[0].result)
-        assert False
+        sim = computation_test_harness
+        sim.run()
+        result = list(sim.outputs)[0].result
+        expected_result = \
+            [20.0, 40.0, 60.0, 80.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+
+        for i in range(0, len(result)):
+            npt.assert_almost_equal(result[i], expected_result[i])
+
+    def test_input_requirement_exception(self, computation_test_harness):
+        sim = computation_test_harness
+        ccs = sim.get_process_by_name('Call Center Staff')
+        salary_prop = ccs.get_prop('staff_salary')
+        salary_prop.set_value(6.00)
+        sim.run()
+        errors = sim.get_last_run_errors()
+        first = errors[0]
+        assert len(errors) == 10
+        assert first.process == ccs
+        assert first.process_input == ccs.inputs['$']
+        assert first.input_value == 500.0
+        assert first.value == 600.0
 
 
 class TestSimulation:
@@ -336,6 +369,17 @@ class TestSimulation:
         sim.add_entity(entity)
         e = sim.get_entity_by_id(entity.id)
         assert e == entity
+
+    def test_get_process_by_id(self, computation_test_harness):
+        sim = computation_test_harness
+        bn = sim.get_process_by_name('Budget')
+        bi = sim.get_process_by_id(bn.id)
+        assert bi
+
+    def test_get_process_by_name(self, computation_test_harness):
+        sim = computation_test_harness
+        b = sim.get_process_by_name('Budget')
+        assert b
 
     def test_connect_entities(self, sim):
         e1 = merlin.Entity(name='e1')
