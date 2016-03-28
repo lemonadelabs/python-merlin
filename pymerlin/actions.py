@@ -6,7 +6,7 @@
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
 
-from merlin import merlin
+from pymerlin import merlin
 import importlib
 
 

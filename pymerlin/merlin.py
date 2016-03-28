@@ -229,7 +229,7 @@ class Simulation(SimObject):
                 except InputRequirementException as e:
                     self.run_errors.append(e)
         logging.info(
-            "merlin simulation {0} finished in {1}".format(
+            "pymerlin simulation {0} finished in {1}".format(
                 self.name,
                 datetime.now() - start_time))
 
@@ -755,7 +755,7 @@ class InputConnector(Connector):
 
 class Action(SimObject):
     """
-    Represents a creation or modification act for a :class:`merlin.Simulation`
+    Represents a creation or modification act for a :class:`pymerlin.Simulation`
 
     Action is considered and abstract class and should be subclassed to create
     a specific Action.
@@ -772,7 +772,7 @@ class Event(SimObject):
     """
     An event is a pairing of a time and an action.
 
-    A collection of events make up a :class:`merlin.Simulation` senario.
+    A collection of events make up a :class:`pymerlin.Simulation` senario.
     """
 
     def __init__(self, action, time, name=''):
@@ -784,13 +784,13 @@ class Event(SimObject):
 class Ruleset:
     """
     A validation class that checks the integrity of a particular
-     :class:`merlin.Simulation`
+     :class:`pymerlin.Simulation`
 
     This is an abstract class that must be overridden by a specific ruleset for
      your simulation. In other words, each simulation will have it's own
       sublcass of Ruleset.
 
-    In a future version of merlin, it would be desirable to have the rulset be
+    In a future version of pymerlin, it would be desirable to have the rulset be
      desribed by a configuration file that could be generated from another
       product or application or written by hand.
     """

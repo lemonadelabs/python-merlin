@@ -2,9 +2,8 @@ import pytest
 import numpy.testing as npt
 import logging
 from datetime import datetime
-from merlin import merlin
-from merlin import actions
-
+from pymerlin import merlin
+from pymerlin import actions
 
 class BudgetProcess(merlin.Process):
 
