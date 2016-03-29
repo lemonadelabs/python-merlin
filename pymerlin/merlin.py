@@ -1,8 +1,8 @@
 """
 .. module:: merlin
-    :synopsis: This is the main module containing the core objects in
-    the system
-    as well as some bootstrap and helper functions.
+
+This is the main module containing the core objects in
+the system as well as some bootstrap and helper functions.
 
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
@@ -27,13 +27,19 @@ class SimObject:
     """
     def __init__(self, name=''):
         self.id = uuid.uuid4()
+        """auto-generated UUID"""
+
         self.name = name or str(self.id)
+        """name or self.id (default)"""
 
 
 class Simulation(SimObject):
     """
-    A representation of a network with its assocated entities, ruleset,
-     senarios and outputs.
+    A representation of a network with its associated entities, ruleset,
+     scenarios and outputs.
+
+    Any new enitity needs to be added to the simulation
+    with one of the `add_` methods (?)
     """
 
     def __init__(self, ruleset=None, config=None, outputs=None, name=''):
@@ -52,7 +58,7 @@ class Simulation(SimObject):
         self.verbose = True
 
     def _run_senario_events(self):
-        # TODO: Implement senario events
+        # TODO: Implement scenario events
         pass
 
     def connect_entities(
@@ -239,6 +245,19 @@ class Output(SimObject):
     A network flow sink.
     """
     def __init__(self, unit_type, name=''):
+        """
+        :param str unit_type: the string identifying the unit of the
+            output value
+        :param str name: the name string for the base class.
+
+        This collects the outputs for a branch or department from the different
+        entities containing :py:class:`pymerlin.merlin.Process`.
+
+        ``unit_type`` needs to be added to the simulation with
+        :py:meth:`pymerlin.merlin.add_unit_types`.
+
+        Todo: is there an expected minimum?
+        """
         super(Output, self).__init__(name)
         self.inputs = set()
         self.current_time = None
@@ -477,12 +496,19 @@ class Process(SimObject):
     A generator, processor and/or consumer of units
 
     Makes up the core of the graph processing and is considered abstract.
-    Must be subclassed to create specific processes.
+    Must be sub-classed to create specific processes.
+
     Things to override in the subclass:
-    * inputs
-    * outputs
-    * process_properties
-    * compute
+
+    * :py:attr:`inputs`: dictionary with ``{name: ProcessInput}``
+    * :py:attr:`outputs`: dictionary with ``{name: ProcessOutput}``
+    * :py:attr:`props`: process_properties dictionary with
+      ``{name: ProcessProperty}``
+    * :py:attr:`compute` and
+    * :py:attr:`reset` if this process has internal states.
+
+    The process object is added to an :py:class:`pymerlin.merlin.Entity` using
+    the :py:meth:`pymerlin.merlin.Enitity.add_process` method.
     """
 
     def __init__(self, name=''):
@@ -494,12 +520,23 @@ class Process(SimObject):
         self.props = dict()
 
     def get_prop(self, name):
+        """
+        :return: the property with this name, None otherwise
+        :rtype: :py:class:`pymerlin.merlin.ProcessProperty`
+        """
+
         if name in self.props:
             return self.props[name]
         else:
             return None
 
     def get_prop_value(self, name):
+        """
+        :return: the current (?) value of the property with this name,
+            None otherwise
+        :rtype: the type as indicated by
+           :py:attr:`pymerlin.merlin.ProcessProperty.type`.
+        """
         p = self.get_prop(name)
         if p:
             return p.value
@@ -511,17 +548,43 @@ class Process(SimObject):
 
     def compute(self, tick):
         """
+        :param int tick: the actual tick from
+           :py:meth:`pymerlin.merlin.Simulation.run`
+        :return: None, see below for handling of compute results
+
         Called on each process every simulation step. override
-        with your custom process function. If a processes input
-        requirement arn't met, raise an InputRequirementException
+        with your custom process function.
+
+        Use the method :py:meth:`pymerlin.merlin.ProcessOutput.write` to
+        provide the output value. The output write function allows the
+        dependent processes to be executed, so even if nothing is produced,
+        a ``write(0)`` is expected.
+
+        Use the :py:class:`pymerlin.merlin.InputConnector` to access the
+        inputs available:
+
+        .. code-block:: python3
+
+            available = self.inputs['$'].connector.value
+            self.inputs['$'].connector.consume(utilized)
+
+        If a processes input requirement isn't met, raise an
+        :py:exc:`pymerlin.merlin.InputRequirementException`.
+        To allow the processes "downstream" to be executed, use a ``write(0)``.
+
+        It is safe to assume that :py:meth:`reset`, is called before this
+        method.
         """
         print("This process does absolutely nothing")
 
     def reset(self):
         """
-        Called at the start of a simuation run on each
-        process so the process can init itself if nessesary.
+        Called at the start of a simulation run on each
+        process so the process can init itself if necessary.
         override with your custom init code.
+
+        This method is called for all entities by
+        :py:meth:`pymerlin.merlin.Simulation.run`.
         """
         pass
 
@@ -540,12 +603,29 @@ class ProcessInput(SimObject):
 class ProcessOutput(SimObject):
 
     def __init__(self, name, unit_type, connector=None):
+        """
+        :param str name: name for :py:attr:`pymerlin.merlin.SimObject.name`
+        :param str unit_type: string identifying the unit of the output value
+        :param object connector: not used right now
+
+        Used to define the outputs of a :py:class:`pymerlin.merlin.Process`.
+
+        The outputs and inputs are connected via the entities using
+        :py:meth:`pymerlin.merlin.Simulation.connect_entites`.
+
+        The unit needs to be registered with
+        :py:meth:`pymerlin.Simuation.add_unit_types`
+        """
         super(ProcessOutput, self).__init__(name)
         self.type = unit_type
         self.connector = connector
 
 
 class ProcessProperty(SimObject):
+    """
+    allows for parameterization of a process, e.g. productivity or
+    cost per piece.
+    """
 
     class PropertyType(Enum):
         bool_type = 1
@@ -558,6 +638,14 @@ class ProcessProperty(SimObject):
             property_type=PropertyType.number_type,
             default=0.0,
             parent=None):
+        """
+        :param str name: a name for easy identification
+        :param Enum property_type: the type of the property, choose from
+           :py:class:`PropertyType`
+        :param object default: a default value for this property
+        :param Process parent: the process using this property
+        """
+
         super(ProcessProperty, self).__init__(name)
         self.type = property_type
         self.max_val = default
@@ -824,6 +912,21 @@ class InputRequirementException(MerlinException):
     """
 
     def __init__(self, process, process_input, input_value, required_input):
+        """
+        :param Process process: the :py:class:`pymerlin.merlin.Process`,
+            typically the ``self`` of the ``compute`` method.
+        :param ProcessInput process_input: the input, which was found
+            insufficient
+        :param number input_value: the value found insufficient
+        :param number required_input: the (minimum) value expected
+
+        often used in :py:meth:`pymerlin.merlin.Process.compute`, the
+        simulation does not stop, but the exceptions are caught and collected
+        for reporting/introspection purposes.
+
+        todo: what if two inputs are insufficient?
+        """
+
         super(InputRequirementException, self).__init__(required_input)
         self.process = process
         self.process_input = process_input

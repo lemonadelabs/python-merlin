@@ -5,6 +5,7 @@ from datetime import datetime
 from pymerlin import merlin
 from pymerlin import actions
 
+
 class BudgetProcess(merlin.Process):
 
     def __init__(self, name='Budget', start_amount=10000.00):
@@ -142,7 +143,7 @@ class CallCenterStaffProcess(merlin.Process):
 
 
 class BuildingMaintainenceProcess(merlin.Process):
-    def __init__(self, name='Building Maintainance'):
+    def __init__(self, name='Building Maintenance'):
         super(BuildingMaintainenceProcess, self).__init__(name)
 
         # Define inputs
@@ -152,8 +153,8 @@ class BuildingMaintainenceProcess(merlin.Process):
         o_desks = merlin.ProcessOutput('o_desks', 'desks', connector=None)
 
         # Define properties
-        p_maintainance_cost = merlin.ProcessProperty(
-            'monthly maintainance cost',
+        p_maintenance_cost = merlin.ProcessProperty(
+            'monthly maintenance cost',
             property_type=merlin.ProcessProperty.PropertyType.number_type,
             default=500.00,
             parent=self)
@@ -165,7 +166,7 @@ class BuildingMaintainenceProcess(merlin.Process):
             parent=self)
 
         self.props = {
-            'cost': p_maintainance_cost,
+            'cost': p_maintenance_cost,
             'desks': p_desks_provided}
 
         self.inputs = {'$': i_funds}
@@ -199,7 +200,6 @@ def computation_test_harness(sim):
     sim.add_unit_types(['$', 'desks', 'requests_handled'])
 
     sim_output = merlin.Output('requests_handled', name='requests handled')
-    sim_output.type = 'requests_handled'
     sim.outputs.add(sim_output)
 
     # Create Entities
@@ -232,7 +232,7 @@ def computation_test_harness(sim):
     # Add entity processes
     p_budget = BudgetProcess(name='Budget')
     p_staff = CallCenterStaffProcess(name='Call Center Staff')
-    p_building = BuildingMaintainenceProcess(name='Building Maintainance')
+    p_building = BuildingMaintainenceProcess(name='Building Maintenance')
     e_budget.add_process(p_budget)
     e_call_center.add_process(p_staff)
     e_office.add_process(p_building)
@@ -374,6 +374,12 @@ class TestSimulation:
         bn = sim.get_process_by_name('Budget')
         bi = sim.get_process_by_id(bn.id)
         assert bi
+
+    def test_get_process_value_by_name(self, computation_test_harness):
+        sim = computation_test_harness
+        bn = sim.get_process_by_name('Budget')
+        val = bn.get_prop_value("amount")
+        assert val
 
     def test_get_process_by_name(self, computation_test_harness):
         sim = computation_test_harness
