@@ -648,8 +648,8 @@ class ProcessProperty(SimObject):
 
         super(ProcessProperty, self).__init__(name)
         self.type = property_type
-        self.max_val = default
-        self.min_val = 0.0
+        self.max_val = None
+        self.min_val = None
         self.default = default
         self.parent = parent
         self._value = self.default
