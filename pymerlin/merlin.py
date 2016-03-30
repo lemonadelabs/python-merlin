@@ -68,6 +68,14 @@ class Simulation(SimObject):
             unit_type,
             input_additive_write=False,
             output_copy_write=False):
+        """
+        :param Entity from_entity:
+        :param Entity to_entity:
+        :param str unit_type: the exact InputConnector and OutputConnector
+           are identified by their ``type`` attribute.
+        :param bool input_additive_write: sets ``additive write`` for the input
+        :param bool output_copy_write: sets ``copy_write`` for the output
+        """
 
         o_con = from_entity.get_output_by_type(unit_type)
         i_con = to_entity.get_input_by_type(unit_type)
@@ -123,14 +131,34 @@ class Simulation(SimObject):
             output.inputs.add(i_con)
 
     def set_time_span(self, num_months):
+        """
+        :param int num_months: number of months, acts as default stop value for
+           :py:meth:`pymerlin.merlin.Simulation.run`. So, without parameters
+           ``run`` will run from ``1`` to ``num_months`` (inclusive).
+        """
         self.num_steps = num_months
 
     def add_attributes(self, ats):
+        """
+        :param iterable with str ats: iterable with string identifiers
+
+        the attributes identify the entities as assets, resources, branch, ...
+        used in the parameter for instantiating
+        :py:class:`pymerlin.merlin.Entity`.
+        """
         for a in ats:
             if a not in self._attributes:
                 self._attributes.add(a)
 
     def add_unit_types(self, uts):
+        """
+        :param iterable with str uts: iterable with string identifiers for
+            units
+
+        used for instantiating :py:class:`pymerlin.merlin.ProcessOutput`,
+        :py:class:`pymerlin.merlin.ProcessInput` and by
+        :py:meth:`pymerlin.merlin.Simulation.connect_entities`
+        """
         for ut in uts:
             if ut not in self._attributes:
                 self._unit_types.add(ut)
@@ -208,6 +236,14 @@ class Simulation(SimObject):
         return True
 
     def run(self, start=1, end=-1, senario=set()):
+        """
+        :param int start:
+        :param int end:
+        :param set scenario: not implemented
+
+        runs the simulation in end-start+1 steps, where the end defaults to
+        and is limited to ``self.num_steps``. Start is 1 or higher.
+        """
         start_time = datetime.now()
         logging.info("Merlin simulation {0} started".format(self.name))
         self.run_errors = list()
@@ -292,9 +328,9 @@ class Entity(SimObject):
     A node in the network.
 
     Commonly used to represent a business capability, a resource or an asset.
-     Entities can contain processes that modify data arriving at the entity's
-      input connectors or generate new data that gets written to the entity's
-       output connectors.
+    Entities can contain processes that modify data arriving at the entity's
+    input connectors or generate new data that gets written to the entity's
+    output connectors.
     """
 
     def __init__(self, simulation=None, name='', attributes=set()):
@@ -368,12 +404,26 @@ class Entity(SimObject):
             self.outputs.add(output_con)
 
     def reset(self):
+        """
+        resets all processes in this entity to prepare for a new simulation
+        run, (i.e. executing the ``tick`` method several times in sequence
+        goverened by the connector network.
+        """
         procs = self._processes.values()
         for ps in procs:
             for p in ps:
                 p.reset()
 
     def add_process(self, proc):
+        """
+        adds a :py:class:`pymerlin.merlin.Process` to an entity.
+
+        If the Entity is already connected to other entities and the process
+        inputs/outputs are matching, they are connected accordingly.
+
+        This matching is done by ``type``!
+        """
+
         # first check to see if the proc has already been added.
         if proc.id in [p.id for p in self._processes.values()]:
             return
@@ -508,13 +558,20 @@ class Process(SimObject):
     * :py:attr:`reset` if this process has internal states.
 
     The process object is added to an :py:class:`pymerlin.merlin.Entity` using
-    the :py:meth:`pymerlin.merlin.Enitity.add_process` method.
+    the :py:meth:`pymerlin.merlin.Enitity.add_process` method *AFTER* the
+    entities are connected to each other.
     """
 
     def __init__(self, name=''):
         super(Process, self).__init__(name)
         self.parent = None
         self.priority = 0
+        """
+        this number influences the execution order of the compute methods.
+        The lower the number the earlier the compute method of this process
+        will be executed. Processes with the same priority will be executed
+        in an arbitrary order.
+        """
         self.inputs = dict()
         self.outputs = dict()
         self.props = dict()
@@ -539,7 +596,7 @@ class Process(SimObject):
         """
         p = self.get_prop(name)
         if p:
-            return p.value
+            return p.get_value()
         else:
             return None
 
