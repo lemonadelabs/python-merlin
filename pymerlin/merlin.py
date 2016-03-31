@@ -36,10 +36,10 @@ class SimObject:
 class Simulation(SimObject):
     """
     A representation of a network with its associated entities, ruleset,
-     scenarios and outputs.
+    scenarios and outputs.
 
-    Any new enitity needs to be added to the simulation
-    with one of the `add_` methods (?)
+    Any new :py:class:`.Entity` needs to be added to the
+    simulation with the :py:meth:`.add_entities` methods.
     """
 
     def __init__(self, ruleset=None, config=None, outputs=None, name=''):
@@ -73,8 +73,10 @@ class Simulation(SimObject):
         :param Entity to_entity:
         :param str unit_type: the exact InputConnector and OutputConnector
            are identified by their ``type`` attribute.
-        :param bool input_additive_write: sets ``additive write`` for the input
-        :param bool output_copy_write: sets ``copy_write`` for the output
+        :param bool input_additive_write: sets ``additive write`` for the
+            :py:class:`InputConnector` (only if not already exists!)
+        :param bool output_copy_write: sets ``copy_write`` for the
+           :py:class:`.OutputConnector` (only if not already exists!)
         """
 
         o_con = from_entity.get_output_by_type(unit_type)
