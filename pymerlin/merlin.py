@@ -478,6 +478,13 @@ class Entity(SimObject):
                 pi.connector = None
             self._processes[proc.priority].remove(proc)
 
+    def get_processes(self):
+        procs = self._processes.values()
+        output = []
+        for ps in procs:
+            output += ps
+        return output
+
     def get_process_by_name(self, proc_name):
         procs = self._processes.values()
         for ps in procs:

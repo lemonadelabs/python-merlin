@@ -68,8 +68,8 @@ class RemoveEntityAction(merlin.Action):
         for i in ent.inputs:
             i.source.remove_input(i)
 
-        if ent.parent == ent.sim:
-            ent.parent.remove_entity(ent)
+        if ent.parent == None:
+            ent.sim.remove_entity(ent)
         else:
             ent.parent.remove_child(ent.id)
 

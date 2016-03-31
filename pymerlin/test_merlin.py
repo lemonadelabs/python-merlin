@@ -433,6 +433,12 @@ class TestEntity:
         p = entity.get_process_by_id(process.id)
         assert p == process
 
+    def test_get_processes(self, entity, process):
+        entity.add_process(process)
+        ps = entity.get_processes()
+        assert len(ps) == 1
+        assert ps[0].name == 'test_process'
+
     def test_remove_process(self, entity, process):
         entity.add_process(process)
         entity.remove_process(process.id)
