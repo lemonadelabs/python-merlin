@@ -194,10 +194,10 @@ class Simulation(SimObject):
             self.outputs.add(o)
             o.sim = self
 
-    def add_entity(self, e, is_source_entity=False):
+    def add_entity(self, e, is_source_entity=False, parent=None):
         if e not in self._entities:
             self._entities.add(e)
-            e.parent = self
+            e.parent = parent
             e.sim = self
             if is_source_entity:
                 self.source_entities.add(e)
