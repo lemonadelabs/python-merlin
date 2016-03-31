@@ -12,14 +12,6 @@ import logging
 from datetime import datetime
 from enum import Enum
 
-# Global module settings
-logging_level = logging.INFO
-log_to_file = ''
-logging.basicConfig(
-    filename=log_to_file,
-    level=logging_level,
-    format='%(asctime)s: [%(levelname)s] %(message)s')
-
 
 class SimObject:
     """
@@ -415,7 +407,7 @@ class Entity(SimObject):
         """
         resets all processes in this entity to prepare for a new simulation
         run, (i.e. executing the ``tick`` method several times in sequence
-        goverened by the connector network.
+        governed by the connector network.
         """
         procs = self._processes.values()
         for ps in procs:
@@ -443,7 +435,7 @@ class Entity(SimObject):
         proc.parent = self
 
         # Connect process outputs to entity outputs.
-        # Create entity outputs if they dont exist.
+        # Create entity outputs if they don't exist.
         for po in proc.outputs.values():
             o_con = self.get_output_by_type(po.type)
             if not o_con:
@@ -753,6 +745,9 @@ class Connector(SimObject):
 class OutputConnector(Connector):
     """
     Represents an outgoing entity connection.
+
+    Stores the connected :py:class:`.InputConnector`s as
+    :py:class:`.Endpoint`.
     """
 
     def __init__(
@@ -762,6 +757,14 @@ class OutputConnector(Connector):
             name='',
             copy_write=False,
             endpoints=None):
+        """
+        is created by :py:meth:`.Simulation.connect_entities` or
+        :py:meth:`.Simulation.connect_output`.
+
+        :param str unit_type: the unit of the value put into this output
+        :param Entity parent: the Entity featuring this output connector.
+
+        """
 
         super(OutputConnector, self).__init__(unit_type, parent, name)
         self.copy_write = copy_write
@@ -785,6 +788,16 @@ class OutputConnector(Connector):
             self.get_endpoints())
 
     class Endpoint:
+        """
+        This class is used to organize the :py:class:`.InputConnector`s which
+        are connected to an :py:class:`.OutputConnector`.
+
+        The :py:attr:`.bias` allows for a weighted distribution of the values
+        written to the :py:class:`.OutputConnector` instance.
+
+        On connecting or removing endpoints, the biases are recalculated to
+        equal weight.
+        """
         def __init__(self, connector=None, bias=0.0):
             self.connector = connector
             self.bias = bias
@@ -797,6 +810,10 @@ class OutputConnector(Connector):
              """.format(self.connector, self.bias)
 
     def tick(self):
+        """
+        propagates the control flow along the endpoints if they are ready for
+        it, which is decided by the time stamps
+        """
         if self.time == self.parent.current_time:
             for ep in self._endpoints:
                 if ep.connector.time == self.time:
@@ -823,6 +840,13 @@ class OutputConnector(Connector):
         return result
 
     def get_endpoints(self):
+        """
+        Get the :py:class:`.InputConnector`s and their biases connected to this
+        :py:class:`.OutputConnector`.
+
+        :rtype: list
+        :returns: list of (:py:class:`.InputConnector`, bias)
+        """
         return [(e.connector, e.bias) for e in self._endpoints]
 
     def _ballance_bias(self):
@@ -863,7 +887,7 @@ class OutputConnector(Connector):
         """
         if len(biases) != len(self._endpoints):
             raise MerlinException(
-                "Biases arity must match number of endpoints")
+                "Biases parity must match number of endpoints")
         else:
             for b in biases:
                 ep = self._get_endpoint(b[0])
@@ -915,7 +939,7 @@ class InputConnector(Connector):
 
 class Action(SimObject):
     """
-    Represents a creation or modification act for a :class:`pymerlin.Simulation`
+    Represents a creation or modification act for a :class:`.Simulation`
 
     Action is considered and abstract class and should be subclassed to create
     a specific Action.
@@ -947,12 +971,12 @@ class Ruleset:
      :class:`pymerlin.Simulation`
 
     This is an abstract class that must be overridden by a specific ruleset for
-     your simulation. In other words, each simulation will have it's own
-      sublcass of Ruleset.
+    your simulation. In other words, each simulation will have it's own
+    sublcass of Ruleset.
 
-    In a future version of pymerlin, it would be desirable to have the rulset be
-     desribed by a configuration file that could be generated from another
-      product or application or written by hand.
+    In a future version of pymerlin, it would be desirable to have the rulset
+    be desribed by a configuration file that could be generated from another
+    product or application or written by hand.
     """
 
     def validate(self, action):
