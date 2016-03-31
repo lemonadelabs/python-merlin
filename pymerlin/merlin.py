@@ -152,6 +152,9 @@ class Simulation(SimObject):
             if a not in self._attributes:
                 self._attributes.add(a)
 
+    def get_attributes(self):
+        return set(self._attributes)
+
     def add_unit_types(self, uts):
         """
         :param iterable with str uts: iterable with string identifiers for
@@ -164,6 +167,9 @@ class Simulation(SimObject):
         for ut in uts:
             if ut not in self._attributes:
                 self._unit_types.add(ut)
+
+    def get_unit_types(self):
+        return set(self._unit_types)
 
     def is_attribute(self, a):
         return a in self._attributes
