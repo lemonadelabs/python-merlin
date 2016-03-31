@@ -1,11 +1,22 @@
 '''
 Created on 29/03/2016
 
-..code-author:: achim
+..code-author:: Achim Gaedke <Achim.Gaedke@lemonadelabs.io>
+
+A printer with minimal staff required.
 '''
 
+import logging
 from pymerlin import merlin
 from pymerlin.test_merlin import BudgetProcess
+
+# Global logging settings
+logging_level = logging.DEBUG
+log_to_file = ''
+logging.basicConfig(
+    filename=log_to_file,
+    level=logging_level,
+    format='%(asctime)s: [%(levelname)s] %(message)s')
 
 
 class ppStaff(merlin.Process):
@@ -35,14 +46,15 @@ class ppStaff(merlin.Process):
 
         # set up the input/s
         inBudget = merlin.ProcessInput("in_budget",
-                                       "NZD")
+                                       "$")
         self.inputs = {"budget": inBudget}
 
     def compute(self, tick):
 
         budget_available = self.inputs["budget"].connector.value
         staff_no = self.props["staffNo"].get_value()
-        staff_pay = self.props["staffPay"].get_value()
+        # convert annual figure to monthly pay
+        staff_pay = self.props["staffPay"].get_value()/12
         budget_required = staff_no * staff_pay
         if budget_available < budget_required:
             # not enough money there
@@ -84,7 +96,7 @@ class ppPrinter(merlin.Process):
 
         # set up the input/s
         inBudget = merlin.ProcessInput("in_budget",
-                                       "NZD")
+                                       "$")
         inStaff = merlin.ProcessInput("in_staffNo",
                                       "FTE")
         self.inputs = {"budget": inBudget,
@@ -126,7 +138,7 @@ def IPSbranch():
     sim = merlin.Simulation()
     sim.set_time_span(12)
     sim.add_attributes(["budget", "asset", "resource"])
-    sim.add_unit_types(["FTE", "NZD", "count"])
+    sim.add_unit_types(["FTE", "$", "count"])
 
     # define outputs
     pp_delivered = merlin.Output("count",
@@ -144,11 +156,9 @@ def IPSbranch():
     sim.set_source_entities([e_budget])
 
     # connect all entities
-    sim.connect_entities(e_budget, e_staff, "NZD")
-    sim.connect_entities(e_budget, e_printer, "NZD")
-
+    sim.connect_entities(e_budget, e_staff, "$")
+    sim.connect_entities(e_budget, e_printer, "$")
     sim.connect_entities(e_staff, e_printer, "FTE")
-
     sim.connect_output(e_printer, pp_delivered)
 
     # and finally add the processes to the entities
@@ -160,6 +170,17 @@ def IPSbranch():
     the_staff_process.priority = -1  # pay the people first!
     e_staff.add_process(the_staff_process)
     e_printer.add_process(ppPrinter())
+
+    # setup an apportioning bias for staff and printer budget
+    budget_out_con = e_budget.get_output_by_type("$")
+    budget_apportioning = {e_staff: 0.7, e_printer: 0.3}
+    new_biases = []
+    for ic, _ in budget_out_con.get_endpoints():
+        # if entity not in the apportioning, then just give no funds
+        new_biases.append((ic,
+                           budget_apportioning.get(ic.parent, 0.0)))
+    # set the endpoint biases
+    budget_out_con.set_endpoint_biases(new_biases)
 
     return sim
 
