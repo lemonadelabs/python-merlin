@@ -348,7 +348,6 @@ class TestSimulation:
         tel = sim.get_sim_telemetry()
 
         for to in tel:
-            print(to)
             if 'result' in to['data']:
                 assert len(to['data']['result']) == sim.num_steps
             if 'value' in to['data']:
