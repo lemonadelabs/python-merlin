@@ -6,8 +6,6 @@ Created on 5/04/2016
 
 import pytest
 import numpy.testing as npt
-import logging
-from datetime import datetime
 from pymerlin import merlin
 
 
@@ -16,7 +14,7 @@ def OutputConnector_with_Endpoints():
 
     outEntity = merlin.Entity()
 
-    # set no biases, rely on daults
+    # set no biases, rely on defaults
     out = merlin.OutputConnector("$", outEntity, "testOut")
 
     for i in range(4):
@@ -63,7 +61,7 @@ class TestApportioning:
         out.apportioning = merlin.OutputConnector.apportioningRules.weighted
         out.set_endpoint_biases([(ep, 0.0) for ep, _ in out.get_endpoints()])
 
-        out_value = 1.0
+        out_value = 10.0
         out.write(out_value)
         # expect something
         values = []
@@ -158,10 +156,11 @@ class TestApportioning:
                          )
 
         bias_values = (0.5, 0.3, 0.1, 0.2)
-        expected_output = (0.5/1.1, 0.3/1.1, 0.1/1.1, 0.2/1.1)
+        out_value = 3.0
+
+        expected_output = [b/sum(bias_values)*out_value for b in bias_values]
         out.set_endpoint_biases(list(zip(endpoints, bias_values)))
 
-        out_value = 1.0
         out.write(out_value)
         # expect something
         values = []
