@@ -86,7 +86,7 @@ class Simulation(SimObject):
             to_entity,
             unit_type,
             input_additive_write=False,
-            output_copy_write=False):
+            apportioning=None):
         """
         :param Entity from_entity:
         :param Entity to_entity:
@@ -94,7 +94,7 @@ class Simulation(SimObject):
            are identified by their ``type`` attribute.
         :param bool input_additive_write: sets ``additive write`` for the
             :py:class:`InputConnector` (only if not already exists!)
-        :param bool output_copy_write: sets ``copy_write`` for the
+        :param apportioningRules apportioning: sets apportioning rule for
            :py:class:`.OutputConnector` (only if not already exists!)
         """
 
@@ -106,7 +106,7 @@ class Simulation(SimObject):
                 unit_type,
                 from_entity,
                 name='{0}_output'.format(unit_type),
-                copy_write=output_copy_write)
+                apportioning=apportioning)
 
         if not i_con:
             i_con = InputConnector(
@@ -125,7 +125,15 @@ class Simulation(SimObject):
             entity,
             output,
             input_additive_write=False,
-            output_copy_write=False):
+            apportioning=None):
+        """
+        :param Entity entity:
+        :param Entity output:
+        :param bool input_additive_write: sets ``additive write`` for the
+            :py:class:`InputConnector` (only if not already exists!)
+        :param apportioningRules apportioning: sets apportioning rule for
+           :py:class:`.OutputConnector` (only if not already exists!)
+        """
 
         if output not in self.outputs:
             return
@@ -137,7 +145,7 @@ class Simulation(SimObject):
                 output.type,
                 entity,
                 name='{0}_output'.format(output.type),
-                copy_write=output_copy_write)
+                apportioning=apportioning)
 
         i_con = InputConnector(
             output.type,
@@ -574,6 +582,13 @@ class Entity(SimObject):
         return None
 
     def tick(self, time):
+        """
+        :param int time: tick integer
+
+        Executes all processes within an entity if all inputs are updated.
+        Once all processes are executed with :py:meth:`.Process.compute`,
+        the control flow goes depth-first to :py:meth:`.Output.tick`.
+        """
         logging.debug('Entity {0} received tick {1}'.format(self.name, time))
         if self.current_time and time < self.current_time:
             return
@@ -823,7 +838,7 @@ class OutputConnector(Connector):
             unit_type,
             parent,
             name='',
-            copy_write=False,
+            apportioning=None,
             endpoints=None):
         """
         is created by :py:meth:`.Simulation.connect_entities` or
@@ -832,10 +847,15 @@ class OutputConnector(Connector):
         :param str unit_type: the unit of the value put into this output
         :param Entity parent: the Entity featuring this output connector.
 
+        :param .apportioningRules apportioning: the rule how an output value
+                 is split on the inputs, the default is ``weighted``.
+        :param iterable of .InputConnector endpoints: or None to create an
+                 empty set.
         """
 
         super(OutputConnector, self).__init__(unit_type, parent, name)
-        self.copy_write = copy_write
+        self.apportioning = (self.apportioningRules.weighted
+                             if apportioning is None else apportioning)
         self._endpoints = endpoints or set()
 
     def __str__(self):
@@ -845,14 +865,14 @@ class OutputConnector(Connector):
          unit_type: {1},
          parent: {2},
          time: {3},
-         copy_write: {4},
+         apportioning: {4},
          endpoints: {5}
         """.format(
             self.name,
             self.type,
             self.parent,
             self.time,
-            self.copy_write,
+            self.apportioning,
             self.get_endpoints())
 
     class Endpoint:
@@ -863,7 +883,7 @@ class OutputConnector(Connector):
         The :py:attr:`.bias` allows for a weighted distribution of the values
         written to the :py:class:`.OutputConnector` instance.
 
-        On connecting or removing endpoints, the biases are recalculated to
+        On connecting or removing end-points, the biases are recalculated to
         equal weight.
         """
         def __init__(self, connector=None, bias=0.0):
@@ -877,9 +897,14 @@ class OutputConnector(Connector):
              bias: {1}
              """.format(self.connector, self.bias)
 
+    class apportioningRules(Enum):
+        copy_write = 1
+        weighted = 2
+        absolute = 3
+
     def tick(self):
         """
-        propagates the control flow along the endpoints if they are ready for
+        propagates the control flow along the end-points if they are ready for
         it, which is decided by the time stamps
         """
         if self.time == self.parent.current_time:
@@ -889,17 +914,75 @@ class OutputConnector(Connector):
 
     def write(self, value):
         self.set_telemetry_value('value', value)
+        """
+        distribute or copy value to the :py:attr:`.Endpoint.connector`.
+
+        The distribution is governed by :py:class:`.apportioningRules`, using
+        the values of :py:attr:`.Endpoint.connector.bias`.
+
+        This method hands over the control flow to what is behind each
+        end-point, resulting in a depth first like iteration.
+
+        Describe apportioning rules:
+
+        *copy_write*: The value written is copied to all end-points
+
+        *weighted*: The bias values are used to apportion the value according
+        to the weights. If all weights are 0, the value is split up in even
+        parts over the end-points.
+
+        *absolute*: The bias values are used as absolute values, i.e. in the
+        simple case, these values are written to the outputs if their sum is
+        not larger than the value parameter. In more general terms: The
+        end-points are apportioned in to order of decreasing bias. Each
+        endpoint gets the value of bias, if the sum of the values already
+        apportioned is allowing for it. Otherwise it gets the remainder value
+        or 0.
+        """
+
         logging.debug(
             "WRITING to Output {1} value: {0} ***".format(value, self))
         self.time = self.parent.current_time
-        if self._endpoints:
-            for ep in self._endpoints:
-                dist_value = (
-                    value if self.copy_write else value *
-                    ep.bias)
-                logging.debug("dist_value: {0}".format(dist_value))
-                ep.connector.write(dist_value)
-                ep.connector.time = self.time
+
+        # pre-calculate the values to be written
+        # and provide them in ep_output
+        if self.apportioning is self.apportioningRules.copy_write:
+            # very simple rule, just copy
+            ep_output = [(ep, value) for ep in self._endpoints]
+
+        elif self.apportioning is self.apportioningRules.weighted:
+            # get an ordered version of the end-points
+            eps = list(self._endpoints)
+            biases = [ep.bias for ep in eps]
+            assert all(b >= 0 for b in biases), "biases must not be negative"
+            bias_sum = sum(biases)
+            if bias_sum == 0:
+                # handle no biases set (default case)
+                biases = [1.0]*len(eps)
+                bias_sum = sum(biases)
+            ep_output = zip(eps, (b/bias_sum*value for b in biases))
+
+        elif self.apportioning is self.apportioningRules.absolute:
+            # get sorted list of end-points, start with biggest one!
+            eps = list(sorted(self._endpoints,
+                              key=lambda ep: ep.bias,
+                              reverse=True))
+            value_remaining = value+0.0
+            ep_output = []
+            for ep in eps:
+                out_val = min(value_remaining, max(ep.bias, 0.0))
+                ep_output.append((ep, out_val))
+                value_remaining -= out_val
+
+        else:
+            assert False, ("unexpected apportioning rule value "
+                           "{}".format(self.apportioning))
+
+        # now do the output writing
+        for ep, dist_value in ep_output:
+            logging.debug("dist_value: {0}".format(dist_value))
+            ep.connector.write(dist_value)
+            ep.connector.time = self.time
 
     def _get_endpoint(self, input_connector):
         result = None

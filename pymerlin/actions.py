@@ -69,7 +69,7 @@ class RemoveEntityAction(merlin.Action):
         for i in ent.inputs:
             i.source.remove_input(i)
 
-        if ent.parent == None:
+        if ent.parent is None:
             ent.sim.remove_entity(ent)
         else:
             ent.parent.remove_child(ent.id)
@@ -135,7 +135,7 @@ class RemoveConnectionAction(merlin.Action):
 
 class AddConnectionAction(merlin.Action):
     """
-    Adds or removes a connecton from an entity output to entity input(s).
+    Adds a connection from an entity output to entity input(s).
     """
 
     def __init__(
@@ -143,7 +143,7 @@ class AddConnectionAction(merlin.Action):
             unit_type,
             output_entity_id,
             input_entity_ids,
-            copy_write=False,
+            apportioning=None,
             additive_write=False,
             connector_name=''):
 
@@ -152,7 +152,7 @@ class AddConnectionAction(merlin.Action):
         self.unit_type = unit_type
         self.output_entity_id = output_entity_id
         self.input_entity_ids = input_entity_ids
-        self.copy_write = copy_write
+        self.apportioning = apportioning
         self.additive_write = additive_write
         self.connector_name = connector_name
 
@@ -169,7 +169,7 @@ class AddConnectionAction(merlin.Action):
             self.unit_type,
             output_entity,
             name='{0}_output'.format(self.connector_name),
-            copy_write=self.copy_write)
+            apportioning=self.apportioning)
         output_entity.outputs.add(output_con)
 
         # Create the input connector(s)
