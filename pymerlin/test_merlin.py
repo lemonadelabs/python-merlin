@@ -552,7 +552,7 @@ class TestCoreActions:
             'new_unit_type',
             source.id,
             [sink.id],
-            copy_write=True,
+            apportioning=None,
             additive_write=True,
             connector_name='new_con')
         aca.execute(sim)
