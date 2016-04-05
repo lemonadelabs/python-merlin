@@ -94,7 +94,7 @@ class Simulation(SimObject):
            are identified by their ``type`` attribute.
         :param bool input_additive_write: sets ``additive write`` for the
             :py:class:`InputConnector` (only if not already exists!)
-        :param apportioningRules apportioning: sets apportioning rule for
+        :param ApportioningRules apportioning: sets apportioning rule for
            :py:class:`.OutputConnector` (only if not already exists!)
         """
 
@@ -128,10 +128,10 @@ class Simulation(SimObject):
             apportioning=None):
         """
         :param Entity entity:
-        :param Entity output:
+        :param Output output:
         :param bool input_additive_write: sets ``additive write`` for the
             :py:class:`InputConnector` (only if not already exists!)
-        :param apportioningRules apportioning: sets apportioning rule for
+        :param ApportioningRules apportioning: sets apportioning rule for
            :py:class:`.OutputConnector` (only if not already exists!)
         """
 
@@ -847,14 +847,14 @@ class OutputConnector(Connector):
         :param str unit_type: the unit of the value put into this output
         :param Entity parent: the Entity featuring this output connector.
 
-        :param .apportioningRules apportioning: the rule how an output value
+        :param .ApportioningRules apportioning: the rule how an output value
                  is split on the inputs, the default is ``weighted``.
         :param iterable of .InputConnector endpoints: or None to create an
                  empty set.
         """
 
         super(OutputConnector, self).__init__(unit_type, parent, name)
-        self.apportioning = (self.apportioningRules.weighted
+        self.apportioning = (self.ApportioningRules.weighted
                              if apportioning is None else apportioning)
         self._endpoints = endpoints or set()
 
@@ -897,7 +897,7 @@ class OutputConnector(Connector):
              bias: {1}
              """.format(self.connector, self.bias)
 
-    class apportioningRules(Enum):
+    class ApportioningRules(Enum):
         copy_write = 1
         weighted = 2
         absolute = 3
@@ -917,7 +917,7 @@ class OutputConnector(Connector):
         """
         distribute or copy value to the :py:attr:`.Endpoint.connector`.
 
-        The distribution is governed by :py:class:`.apportioningRules`, using
+        The distribution is governed by :py:class:`.ApportioningRules`, using
         the values of :py:attr:`.Endpoint.connector.bias`.
 
         This method hands over the control flow to what is behind each
@@ -946,11 +946,11 @@ class OutputConnector(Connector):
 
         # pre-calculate the values to be written
         # and provide them in ep_output
-        if self.apportioning is self.apportioningRules.copy_write:
+        if self.apportioning is self.ApportioningRules.copy_write:
             # very simple rule, just copy
             ep_output = [(ep, value) for ep in self._endpoints]
 
-        elif self.apportioning is self.apportioningRules.weighted:
+        elif self.apportioning is self.ApportioningRules.weighted:
             # get an ordered version of the end-points
             eps = list(self._endpoints)
             biases = [ep.bias for ep in eps]
@@ -962,7 +962,7 @@ class OutputConnector(Connector):
                 bias_sum = sum(biases)
             ep_output = zip(eps, (b/bias_sum*value for b in biases))
 
-        elif self.apportioning is self.apportioningRules.absolute:
+        elif self.apportioning is self.ApportioningRules.absolute:
             # get sorted list of end-points, start with biggest one!
             eps = list(sorted(self._endpoints,
                               key=lambda ep: ep.bias,

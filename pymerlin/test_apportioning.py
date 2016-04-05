@@ -58,7 +58,7 @@ class TestApportioning:
         out = OutputConnector_with_Endpoints
 
         # set the rule and biases
-        out.apportioning = merlin.OutputConnector.apportioningRules.weighted
+        out.apportioning = merlin.OutputConnector.ApportioningRules.weighted
         out.set_endpoint_biases([(ep, 0.0) for ep, _ in out.get_endpoints()])
 
         out_value = 10.0
@@ -89,7 +89,7 @@ class TestApportioning:
         out = OutputConnector_with_Endpoints
 
         # set the rule and biases
-        out.apportioning = merlin.OutputConnector.apportioningRules.copy_write
+        out.apportioning = merlin.OutputConnector.ApportioningRules.copy_write
 
         out_value = 1.0
         out.write(out_value)
@@ -108,7 +108,7 @@ class TestApportioning:
     def test_absolute_apportioning(self, OutputConnector_with_Endpoints):
         out = OutputConnector_with_Endpoints
 
-        out.apportioning = merlin.OutputConnector.apportioningRules.absolute
+        out.apportioning = merlin.OutputConnector.ApportioningRules.absolute
 
         # get an ordered version of the endpoints set
         endpoints = list(sorted((ep for ep, _ in out.get_endpoints()),
@@ -148,7 +148,7 @@ class TestApportioning:
     def test_weighted_apportioning(self, OutputConnector_with_Endpoints):
         out = OutputConnector_with_Endpoints
 
-        out.apportioning = merlin.OutputConnector.apportioningRules.weighted
+        out.apportioning = merlin.OutputConnector.ApportioningRules.weighted
 
         # get an ordered version of the endpoints set
         endpoints = list(sorted((ep for ep, _ in out.get_endpoints()),
