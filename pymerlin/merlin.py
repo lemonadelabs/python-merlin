@@ -11,18 +11,40 @@ import uuid
 import logging
 from datetime import datetime
 from enum import Enum
+from typing import Iterable, Set, Mapping, Any, MutableMapping, MutableSet
+from typing import MutableSequence
+from typing import Union
 
 
 class SimObject:
     """
     Basic properties of all sim objects.
     """
-    def __init__(self, name=''):
+    def __init__(self, name: str=''):
         self.id = uuid.uuid4()
         """auto-generated UUID"""
 
         self.name = name or str(self.id)
         """name or self.id (default)"""
+
+        self._telemetry = dict()  # type: MutableMapping[str, Iterable[Any]]
+        """
+        Stores a series of properties and
+        time series of values for that property
+        """
+
+    def reset_telemetry(self) -> None:
+        self._telemetry = dict()
+
+    def set_telemetry_value(self, prop: str, value: Any) -> None:
+
+        if prop not in self._telemetry:
+            self._telemetry[prop] = list()
+
+        self._telemetry[prop].append(value)
+
+    def get_telemetry_data(self) -> Mapping[str, Iterable[Any]]:
+        return self._telemetry
 
 
 class Simulation(SimObject):
@@ -36,22 +58,27 @@ class Simulation(SimObject):
 
     def __init__(self, ruleset=None, config=None, outputs=None, name=''):
         super(Simulation, self).__init__(name)
-        self._unit_types = set()
-        self._attributes = set()
-        self._entities = set()
+        self._unit_types = set()  # type: MutableSet[str]
+        self._attributes = set()  # type: MutableSet[str]
+        self._entities = set()  # type: MutableSet[Entity]
         self.ruleset = ruleset
         self.initial_state = config or []
-        self.senarios = set()
-        self.source_entities = set()
+        self.source_entities = set()  # type: MutableSet[Entity]
         self.outputs = outputs or set()
         self.num_steps = 1
         self.current_step = 1
         self.run_errors = list()
         self.verbose = True
 
-    def _run_senario_events(self):
-        # TODO: Implement scenario events
+    def _run_senario_events(self, scenario: Set['Event']) -> None:
         pass
+
+    def _get_object_telemetry(self, so: SimObject) -> Mapping[str, Any]:
+        return {
+            'type': so.__class__.__name__,
+            'id': so.id,
+            'name': so.name,
+            'data': so.get_telemetry_data()}
 
     def connect_entities(
             self,
@@ -235,11 +262,33 @@ class Simulation(SimObject):
         # TODO: Write basic validation function for sim
         return True
 
-    def run(self, start=1, end=-1, senario=set()):
+    def get_sim_telemetry(self) -> MutableSequence[Mapping[str, Any]]:
+        output = list()
+        for o in self.outputs:
+            output.append(self._get_object_telemetry(o))
+
+        for e in self.get_entities():
+            for i in e.inputs:
+                output.append(self._get_object_telemetry(i))
+
+            for o in e.outputs:
+                output.append(self._get_object_telemetry(o))
+
+            for p in e.get_processes():
+                for pprop in p.get_properties():
+                    output.append(self._get_object_telemetry(pprop))
+
+        return output
+
+    def run(
+            self,
+            start: int=1,
+            end: int=-1,
+            scenario: Set['Event']=set()) -> None:
         """
         :param int start:
         :param int end:
-        :param set scenario: not implemented
+        :param set scenario:
 
         runs the simulation in end-start+1 steps, where the end defaults to
         and is limited to ``self.num_steps``. Start is 1 or higher.
@@ -263,7 +312,7 @@ class Simulation(SimObject):
         for t in range(sim_start, sim_end+1):
             logging.info('Simulation step {0}'.format(t))
             self.current_step = t
-            self._run_senario_events()
+            self._run_senario_events(scenario)
             # get sim outputs
             for se in self.source_entities:
                 try:
@@ -295,12 +344,12 @@ class Output(SimObject):
         Todo: is there an expected minimum?
         """
         super(Output, self).__init__(name)
-        self.inputs = set()
-        self.current_time = None
+        self.inputs = set()  # type: Set[InputConnector]
+        self.current_time = None  # type: int
         self.processed = False
         self.type = unit_type
-        self.result = list()
-        self.sim = None
+        self.result = list()  # type: MutableSequence[float]
+        self.sim = None  # type: Union[Simulation, None]
 
     def tick(self, time):
         if self.current_time and time < self.current_time:
@@ -321,6 +370,7 @@ class Output(SimObject):
                 for i in self.inputs:
                     o += i.value
                 self.result.append(o)
+                self.set_telemetry_value('result', o)
 
 
 class Entity(SimObject):
@@ -338,11 +388,11 @@ class Entity(SimObject):
         self._processes = dict()
         self.sim = simulation
         self.attributes = attributes
-        self.inputs = set()
-        self.outputs = set()
-        self.parent = None
-        self._children = set()
-        self.current_time = None
+        self.inputs = set()  # type: Set[InputConnector]
+        self.outputs = set()  # type: Set[OutputConnector]
+        self.parent = None  # type: Union[None, Entity]
+        self._children = set()  # type: MutableSet[Entity]
+        self.current_time = None  # type: int
         self.processed = False
 
     def __str__(self):
@@ -409,10 +459,20 @@ class Entity(SimObject):
         run, (i.e. executing the ``tick`` method several times in sequence
         governed by the connector network.
         """
+        for i in self.inputs:
+            i.reset_telemetry()
+
+        for o in self.outputs:
+            o.reset_telemetry()
+
+        self.reset_telemetry()
         procs = self._processes.values()
         for ps in procs:
             for p in ps:
+                p.reset_telemetry()
                 p.reset()
+                for pprop in p.get_properties():
+                    pprop.reset_telemetry()
 
     def add_process(self, proc):
         """
@@ -535,6 +595,14 @@ class Entity(SimObject):
                     "Entity {0} inputs are all refreshed, processing..".format(
                         self.name))
                 self._process()
+                self._update_process_telemetry()
+
+    def _update_process_telemetry(self):
+        if self._processes.keys():
+            for i in self._processes.keys():
+                for proc in self._processes[i]:
+                    for pprop in proc.get_properties():
+                        pprop.set_telemetry_value('value', pprop.get_value())
 
     def _process(self):
         self.processed = True
@@ -820,6 +888,7 @@ class OutputConnector(Connector):
                     ep.connector.parent.tick(self.time)
 
     def write(self, value):
+        self.set_telemetry_value('value', value)
         logging.debug(
             "WRITING to Output {1} value: {0} ***".format(value, self))
         self.time = self.parent.current_time
@@ -935,6 +1004,7 @@ class InputConnector(Connector):
 
     def write(self, value):
         self.value = self.value + value if self.additive_write else value
+        self.set_telemetry_value('value', self.value)
 
 
 class Action(SimObject):
@@ -954,14 +1024,19 @@ class Action(SimObject):
 
 class Event(SimObject):
     """
-    An event is a pairing of a time and an action.
+    An event is a pairing of a time and a list of actions
+    to be executed at that time.
 
     A collection of events make up a :class:`pymerlin.Simulation` senario.
     """
 
-    def __init__(self, action, time, name=''):
+    def __init__(
+            self,
+            actions: Iterable[Action],
+            time: int,
+            name: str='') -> None:
         super(Event, self).__init__(name)
-        self.action = action
+        self.actions = actions
         self.time = time
 
 
@@ -979,11 +1054,8 @@ class Ruleset:
     product or application or written by hand.
     """
 
-    def validate(self, action):
-        return False
+    pass
 
-    def core_validate(self, action):
-        self.validate(action)
 
 # Core package exceptions
 

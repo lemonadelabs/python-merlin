@@ -49,6 +49,7 @@ class RemoveEntityAction(merlin.Action):
         self.entity_id = entity_id
 
     def execute(self, simulation):
+        entity_to_remove = None
         for ent in simulation.get_entities():
             if ent.id == self.entity_id:
                 entity_to_remove = ent

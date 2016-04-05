@@ -342,6 +342,24 @@ class TestIntegration:
 
 class TestSimulation:
 
+    def test_telemetry_output(self, computation_test_harness):
+        sim = computation_test_harness # type: merlin.Simulation
+        sim.run()
+        tel = sim.get_sim_telemetry()
+
+        for to in tel:
+            print(to)
+            if 'result' in to['data']:
+                assert len(to['data']['result']) == sim.num_steps
+            if 'value' in to['data']:
+                assert len(to['data']['value']) == sim.num_steps
+
+    def test_source_entities(self, computation_test_harness):
+        sim = computation_test_harness
+        e = sim.get_entity_by_name('Budget')
+        assert len(sim.source_entities) == 1
+        assert e in sim.source_entities
+
     def test_add_attribute(self, sim):
         sim.add_attributes(['attr'])
         assert sim.is_attribute('attr')
