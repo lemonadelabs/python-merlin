@@ -781,6 +781,8 @@ class OutputConnector(Connector):
 
         :param .apportioningRules apportioning: the rule how an output value
                  is split on the inputs, the default is ``weighted``.
+        :param iterable of .InputConnector endpoints: or None to create an
+                 empty set.
         """
 
         super(OutputConnector, self).__init__(unit_type, parent, name)
@@ -813,7 +815,7 @@ class OutputConnector(Connector):
         The :py:attr:`.bias` allows for a weighted distribution of the values
         written to the :py:class:`.OutputConnector` instance.
 
-        On connecting or removing endpoints, the biases are recalculated to
+        On connecting or removing end-points, the biases are recalculated to
         equal weight.
         """
         def __init__(self, connector=None, bias=0.0):
@@ -844,14 +846,29 @@ class OutputConnector(Connector):
 
     def write(self, value):
         """
-        distribute or copy value to the :py:class:`.Endpoint`s.
+        distribute or copy value to the :py:attr:`.Endpoint.connector`.
 
-        The distribution is governed by :py:class:`.apportioningRules`.
+        The distribution is governed by :py:class:`.apportioningRules`, using
+        the values of :py:attr:`.Endpoint.connector.bias`.
 
-        This hands over the control flow to what is behind each endpoint,
-        resulting in a depth first like iteration.
+        This method hands over the control flow to what is behind each
+        end-point, resulting in a depth first like iteration.
 
-        Describe apportioning rules.
+        Describe apportioning rules:
+
+        *copy_write*: The value written is copied to all end-points
+
+        *weighted*: The bias values are used to apportion the value according
+        to the weights. If all weights are 0, the value is split up in even
+        parts over the end-points.
+
+        *absolute*: The bias values are used as absolute values, i.e. in the
+        simple case, these values are written to the outputs if their sum is
+        not larger than the value parameter. In more general terms: The
+        end-points are apportioned in to order of decreasing bias. Each
+        endpoint gets the value of bias, if the sum of the values already
+        apportioned is allowing for it. Otherwise it gets the remainder value
+        or 0.
         """
 
         logging.debug(
