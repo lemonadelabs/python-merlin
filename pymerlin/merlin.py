@@ -21,7 +21,7 @@ class SimObject:
     Basic properties of all sim objects.
     """
     def __init__(self, name: str=''):
-        self.id = uuid.uuid4()
+        self.id = uuid.uuid4()  # type: Union[uuid.UUID, int]
         """auto-generated UUID"""
 
         self.name = name or str(self.id)
@@ -405,7 +405,7 @@ class Entity(SimObject):
 
     def __str__(self):
         return """
-        <Entity>
+        <Entity: {7}>
          name: {0},
          attributes: {1},
          inputs: {2},
@@ -420,7 +420,8 @@ class Entity(SimObject):
             self.outputs,
             self.parent,
             self._children,
-            self._processes)
+            self._processes,
+            id(self))
 
     def add_child(self, entity):
         if entity not in self._children:
@@ -523,7 +524,7 @@ class Entity(SimObject):
                 i_con = InputConnector(
                     pi.type,
                     self,
-                    name='{0}_output'.format(pi.type))
+                    name='{0}_input'.format(pi.type))
                 self.add_input(i_con)
 
             pi.connector = i_con
