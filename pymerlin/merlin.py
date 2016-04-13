@@ -276,15 +276,37 @@ class Simulation(SimObject):
             output.append(self._get_object_telemetry(o))
 
         for e in self.get_entities():
-            for i in e.inputs:
-                output.append(self._get_object_telemetry(i))
 
-            for o in e.outputs:
-                output.append(self._get_object_telemetry(o))
+            connector_to_pinput = dict()
 
             for p in e.get_processes():
                 for pprop in p.get_properties():
                     output.append(self._get_object_telemetry(pprop))
+
+                for pinput in p.inputs.values():
+                    if pinput.connector.id not in connector_to_pinput:
+                        connector_to_pinput[pinput.connector.id] = list()
+                    connector_to_pinput[pinput.connector.id].append(pinput)
+
+            for i in e.inputs:
+
+                # coalese all consumers of this import into a single time series
+                if i.id in connector_to_pinput:
+                    master_consume = list()
+                    master_consume += [0.0] * (self.num_steps - len(master_consume))
+                    pinputs = connector_to_pinput[i.id]
+                    for pi in pinputs:
+                        td = pi.get_telemetry_data()['consume']
+                        for x in range(0, len(td)):
+                            master_consume[x] += td[x]
+
+                    for x in master_consume:
+                        i.set_telemetry_value('consume', x)
+
+                output.append(self._get_object_telemetry(i))
+
+            for o in e.outputs:
+                output.append(self._get_object_telemetry(o))
 
         return output
 
@@ -480,6 +502,13 @@ class Entity(SimObject):
             for p in ps:
                 p.reset_telemetry()
                 p.reset()
+
+                for p_inputs in p.inputs.values():
+                    p_inputs.reset_telemetry()
+
+                for p_output in p.outputs:
+                    p.reset_telemetry()
+
                 for pprop in p.get_properties():
                     pprop.reset_telemetry()
 
@@ -745,6 +774,7 @@ class ProcessInput(SimObject):
         self.connector = connector
 
     def consume(self, value):
+        self.set_telemetry_value('consume', value)
         self.connector.value -= value
 
 
