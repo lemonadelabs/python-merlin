@@ -546,7 +546,7 @@ class Entity(SimObject):
             po.connector = o_con
 
         # Connect process inputs to entity inputs
-        # Create enity inputs if thet dont exist
+        # Create entity inputs if they don't exist
         for pi in proc.inputs.values():
             i_con = self.get_input_by_type(pi.type)
             if not i_con:

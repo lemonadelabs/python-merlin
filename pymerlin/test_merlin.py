@@ -36,7 +36,7 @@ def computation_test_harness(sim):
     sim.add_entities([e_budget, e_call_center, e_office])
     sim.set_source_entities([e_budget])
 
-    # Create Entity Connectons
+    # Create Entity Connections
     # Budget connections
     sim.connect_entities(e_budget, e_call_center, '$')
     sim.connect_entities(e_budget, e_office, '$')
@@ -146,7 +146,7 @@ class TestIntegration:
     def test_input_requirement_exception(self, computation_test_harness):
         sim = computation_test_harness
         ccs = sim.get_process_by_name('Call Center Staff')
-        salary_prop = ccs.get_prop('staff_salary')
+        salary_prop = ccs.get_prop('staff salary')
         salary_prop.set_value(6.00)
         sim.run()
         errors = sim.get_last_run_errors()
