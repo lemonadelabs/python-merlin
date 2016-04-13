@@ -292,7 +292,8 @@ class Simulation(SimObject):
                 # coalese all consumers of this import into a single time series
                 if i.id in connector_to_pinput:
                     master_consume = list()
-                    master_consume += [0.0] * (self.num_steps - len(master_consume))
+                    master_consume += [0.0] * (self.num_steps -
+                                               len(master_consume))
                     pinputs = connector_to_pinput[i.id]
                     for pi in pinputs:
                         td = pi.get_telemetry_data()['consume']

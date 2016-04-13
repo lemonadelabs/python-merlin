@@ -8,7 +8,7 @@ A printer with minimal staff required.
 
 import logging
 from pymerlin import merlin
-from pymerlin.test_merlin import BudgetProcess
+from pymerlin.processes import BudgetProcess
 
 # Global logging settings
 logging_level = logging.DEBUG
