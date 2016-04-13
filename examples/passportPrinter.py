@@ -26,18 +26,16 @@ class ppStaff(merlin.Process):
         super(ppStaff, self).__init__(name)
 
         # set up the properties
-        propStaffNo = merlin.ProcessProperty(
+        self.add_property(
                     'staff Numbers',
-                    property_type=merlin.ProcessProperty.PropertyType.int_type,
-                    default=5,
-                    parent=self)
-        propAvgPay = merlin.ProcessProperty(
+                    'staff Numbers',
+                    merlin.ProcessProperty.PropertyType.int_type,
+                    5)
+        self.add_property(
                 'Avg Staff Pay',
-                property_type=merlin.ProcessProperty.PropertyType.number_type,
-                default=50000,
-                parent=self)
-        self.props = {"staffNo": propStaffNo,
-                      "staffPay": propAvgPay}
+                'Avg Staff Pay',
+                merlin.ProcessProperty.PropertyType.number_type,
+                50000)
 
         # set up the output/s
         outStaffBW = merlin.ProcessOutput('out_staffBW',
@@ -51,44 +49,39 @@ class ppStaff(merlin.Process):
 
     def compute(self, tick):
 
-        budget_available = self.inputs["budget"].connector.value
-        staff_no = self.props["staffNo"].get_value()
+        budget_available = self.get_input_available("budget")
+        staff_no = self.get_prop_value("staff Numbers")
         # convert annual figure to monthly pay
-        staff_pay = self.props["staffPay"].get_value()/12
+        staff_pay = self.get_prop_value("Avg Staff Pay")/12
         budget_required = staff_no * staff_pay
         if budget_available < budget_required:
             # not enough money there
-            self.inputs["budget"].consume(budget_available)
-            self.outputs["staff bandwidth"].connector.write(staff_no)
-            raise merlin.InputRequirementException(
-                        self,
-                        self.inputs["budget"],
-                        budget_available,
-                        budget_required)
+            self.consume_input("budget", budget_available)
+            self.provide_output("staff bandwidth", staff_no)
+            self.notify_insufficient_input("budget",
+                                           budget_available,
+                                           budget_required)
 
         # enough money there
-        self.inputs["budget"].consume(budget_required)
-        self.outputs["staff bandwidth"].connector.write(staff_no)
+        self.consume_input("budget", budget_required)
+        self.provide_output("staff bandwidth", staff_no)
 
 
 class ppPrinter(merlin.Process):
 
     def __init__(self, name="ppPrinter"):
         super(ppPrinter, self).__init__(name)
-        propStaffNo = merlin.ProcessProperty(
+        self.add_property(
                     'staff Numbers',
-                    property_type=merlin.ProcessProperty.PropertyType.int_type,
-                    default=5,
-                    parent=self)
+                    'staffRequired',
+                    merlin.ProcessProperty.PropertyType.int_type,
+                    5)
 
-        propCostPerPP = merlin.ProcessProperty(
-                'cost per print',
-                property_type=merlin.ProcessProperty.PropertyType.number_type,
-                default=20.0,
-                parent=self)
-
-        self.props = {"staffRequired": propStaffNo,
-                      "costPerPrint": propCostPerPP}
+        self.add_property(
+                    'cost per print',
+                    'costPerPrint',
+                    merlin.ProcessProperty.PropertyType.number_type,
+                    20.0)
 
         outPP = merlin.ProcessOutput("out_PassportsPrinted",
                                      "count")
@@ -104,8 +97,8 @@ class ppPrinter(merlin.Process):
 
     def compute(self, tick):
 
-        staff_available = self.inputs["staff"].connector.value
-        staff_required = self.props["staffRequired"].get_value()
+        staff_available = self.get_input_available("staff")
+        staff_required = self.get_prop_value("staffRequired")
 
         if staff_available < staff_required:
             self.outputs["passportsPrinted"].connector.write(0)
@@ -179,7 +172,7 @@ def IPSbranch():
         # if entity not in the apportioning, then just give no funds
         new_biases.append((ic,
                            budget_apportioning.get(ic.parent, 0.0)))
-    # set the endpoint biases
+    # set the end-point biases
     budget_out_con.set_endpoint_biases(new_biases)
 
     return sim

@@ -11,9 +11,8 @@ import uuid
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Iterable, Set, Mapping, Any, MutableMapping, MutableSet
+from typing import Iterable, Set, Mapping, Any
 from typing import MutableSequence
-from typing import Union
 
 
 class SimObject:
@@ -721,7 +720,74 @@ class Process(SimObject):
             return None
 
     def get_properties(self):
+        """
+        :returns: an iterable of all :py:class:`.ProcessProperty` objects
+        """
         return self.props.values()
+
+    # create interface to self.inputs and self outputs to hide the
+    # implementation details of the connectors
+
+    def add_input(self, name, unit, connector=None):
+        """
+        :param str name: to identify within :py:class:`.Process`
+        :param str unit: unit of this output, used for connecting the
+           :py:class:`.ProcessInput` with the :py:class:`.Entity`s connectors.
+        """
+        inp = ProcessInput(name, unit, connector)
+        self.inputs[name] = inp
+
+    def add_output(self, name, unit, connector=None):
+        """
+        :param str name: to identify within :py:class:`.Process`
+        :param str unit: unit of this output, used for connecting the
+           :py:class:`.ProcessInput` with the :py:class:`.Entity`s connectors.
+        """
+        out = ProcessOutput(name, unit)
+        self.outputs[name] = out
+
+    def add_property(self,
+                     display_name,
+                     name,
+                     property_type,
+                     default_value):
+        """
+        :param str display_name: will be exposed to front-end and is more
+            expressive than name
+        :param str name: to identify within :py:class:`.Process`
+        """
+        if name in self.props:
+            raise KeyError("property %s already exists" % (name,))
+
+        prop = ProcessProperty(
+                    display_name,
+                    property_type=property_type,
+                    default=default_value,
+                    parent=self)
+        self.props[name] = prop
+
+    def remove_property(self, name):
+        self.props[name].parent = None
+        del self.props[name]
+
+    def provide_output(self, name, value):
+        self.outputs[name].connector.write(value)
+
+    def get_input_available(self, name):
+        return self.inputs[name].connector.value
+
+    def consume_input(self, name, value):
+        assert self.get_input_available(name) >= value, \
+                "consuming more input than available"
+        self.inputs[name].consume(value)
+
+    def notify_insufficient_input(self, name, available, required):
+        assert name in self.inputs
+        raise InputRequirementException(
+                                  self,
+                                  self.inputs[name],
+                                  available,
+                                  required)
 
     def compute(self, tick):
         """
@@ -737,6 +803,11 @@ class Process(SimObject):
         dependent processes to be executed, so even if nothing is produced,
         a ``write(0)`` is expected.
 
+        .. code-block:: python3
+
+            self.outputs["licensesPrinted"].connector.write(licenseNo)
+
+
         Use the :py:class:`pymerlin.merlin.InputConnector` to access the
         inputs available:
 
@@ -747,18 +818,20 @@ class Process(SimObject):
 
         If a processes input requirement isn't met, raise an
         :py:exc:`pymerlin.merlin.InputRequirementException`.
-        To allow the processes "downstream" to be executed, use a ``write(0)``.
+        To allow the processes "downstream" to be executed, use a ``write(0)``
+        before raising the exception
 
-        It is safe to assume that :py:meth:`reset`, is called before this
-        method.
+        .. note::
+            It is safe to assume that :py:meth:`reset`, is called before this
+            method.
         """
         print("This process does absolutely nothing")
 
     def reset(self):
         """
         Called at the start of a simulation run on each
-        process so the process can init itself if necessary.
-        override with your custom init code.
+        process so the process can initialize itself if necessary.
+        override with your custom reset code.
 
         This method is called for all entities by
         :py:meth:`pymerlin.merlin.Simulation.run`.
@@ -767,6 +840,17 @@ class Process(SimObject):
 
 
 class ProcessInput(SimObject):
+    """
+    :param str name: name for :py:attr:`pymerlin.merlin.SimObject.name`
+    :param str unit_type: string identifying the unit of the output value
+    :param object connector: saved, but not used right now
+
+    The outputs and inputs are connected via the entities using
+    :py:meth:`pymerlin.merlin.Simulation.connect_entites` matching up the unit
+    types.
+
+    The name on the front-end is the :py:attr:`.InputConnector.name`.
+    """
 
     def __init__(self, name, unit_type, connector=None):
         super(ProcessInput, self).__init__(name)
@@ -784,15 +868,18 @@ class ProcessOutput(SimObject):
         """
         :param str name: name for :py:attr:`pymerlin.merlin.SimObject.name`
         :param str unit_type: string identifying the unit of the output value
-        :param object connector: not used right now
+        :param object connector: saved, but not used right now
 
         Used to define the outputs of a :py:class:`pymerlin.merlin.Process`.
 
         The outputs and inputs are connected via the entities using
-        :py:meth:`pymerlin.merlin.Simulation.connect_entites`.
+        :py:meth:`pymerlin.merlin.Simulation.connect_entites` matching up the
+        unit types.
 
         The unit needs to be registered with
         :py:meth:`pymerlin.Simuation.add_unit_types`
+
+        The name on the front-end is the :py:attr:`.OutputConnector.name`.
         """
         super(ProcessOutput, self).__init__(name)
         self.type = unit_type
@@ -803,6 +890,8 @@ class ProcessProperty(SimObject):
     """
     allows for parameterization of a process, e.g. productivity or
     cost per piece.
+
+    the :attr:`.name` appears in the front-end graphics.
     """
 
     class PropertyType(Enum):
@@ -944,7 +1033,6 @@ class OutputConnector(Connector):
                     ep.connector.parent.tick(self.time)
 
     def write(self, value):
-        self.set_telemetry_value('value', value)
         """
         distribute or copy value to the :py:attr:`.Endpoint.connector`.
 
@@ -954,22 +1042,26 @@ class OutputConnector(Connector):
         This method hands over the control flow to what is behind each
         end-point, resulting in a depth first like iteration.
 
-        Describe apportioning rules:
+        The apportioning rules are:
 
-        *copy_write*: The value written is copied to all end-points
+        ``copy_write``
+            The value written is copied to all end-points.
 
-        *weighted*: The bias values are used to apportion the value according
-        to the weights. If all weights are 0, the value is split up in even
-        parts over the end-points.
+        ``weighted``
+            The bias values are used to apportion the value according
+            to the weights. If all weights are 0, the value is split up in even
+            parts over the end-points.
 
-        *absolute*: The bias values are used as absolute values, i.e. in the
-        simple case, these values are written to the outputs if their sum is
-        not larger than the value parameter. In more general terms: The
-        end-points are apportioned in to order of decreasing bias. Each
-        endpoint gets the value of bias, if the sum of the values already
-        apportioned is allowing for it. Otherwise it gets the remainder value
-        or 0.
+        ``absolute``
+            The bias values are used as absolute values, i.e. in the
+            simple case, these values are written to the outputs if their sum
+            is not larger than the value parameter. In more general terms: The
+            end-points are apportioned in to order of decreasing bias. Each
+            endpoint gets the value of bias, if the sum of the values already
+            apportioned is allowing for it. Otherwise it gets the remainder
+            value or 0.
         """
+        self.set_telemetry_value('value', value)
 
         logging.debug(
             "WRITING to Output {1} value: {0} ***".format(value, self))
@@ -1117,7 +1209,7 @@ class InputConnector(Connector):
             self.source)
 
     def write(self, value):
-        self.value = self.value + value if self.additive_write else value
+        self.value = (self.value + value) if self.additive_write else value
         self.set_telemetry_value('value', self.value)
 
 
@@ -1125,7 +1217,7 @@ class Action(SimObject):
     """
     Represents a creation or modification act for a :class:`.Simulation`
 
-    Action is considered and abstract class and should be subclassed to create
+    Action is considered and abstract class and should be sub-classed to create
     a specific Action.
     """
 
@@ -1141,7 +1233,7 @@ class Event(SimObject):
     An event is a pairing of a time and a list of actions
     to be executed at that time.
 
-    A collection of events make up a :class:`pymerlin.Simulation` senario.
+    A collection of events make up a :class:`pymerlin.Simulation` scenario.
     """
 
     def __init__(
@@ -1161,7 +1253,7 @@ class Ruleset:
 
     This is an abstract class that must be overridden by a specific ruleset for
     your simulation. In other words, each simulation will have it's own
-    sublcass of Ruleset.
+    sub-class of Ruleset.
 
     In a future version of pymerlin, it would be desirable to have the rulset
     be desribed by a configuration file that could be generated from another
