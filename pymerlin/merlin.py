@@ -684,12 +684,18 @@ class Process(SimObject):
     def __init__(self, name=''):
         super(Process, self).__init__(name)
         self.parent = None
-        self.priority = 0
+        self.priority = 1000
         """
-        this number influences the execution order of the compute methods.
+        This number influences the execution order of the compute methods.
         The lower the number the earlier the compute method of this process
         will be executed. Processes with the same priority will be executed
         in an arbitrary order.
+
+        To easily assign higher or lower priorities than the standard, the
+        default is set to 1000.
+
+        The priority needs to be an integer between 0 and +32767 incl. (this
+        restriction comes from django's model implementation).
         """
         self.inputs = dict()
         self.outputs = dict()
