@@ -5,10 +5,196 @@
 
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
-
+from typing import List, Dict, Any
 from pymerlin import merlin
 import importlib
 
+
+def create(script: str) -> List[merlin.Action]:
+    """
+    Parses a MerlinScript string and returns a
+    newly created list of action objects for the
+    supplied merlin simulation.
+    """
+    output = list()
+
+    script = script.strip()
+    lines = script.splitlines()
+    # break into tokens
+    for l in lines:
+        tokens = l.split()
+        output.append(_generate_action(_parse_action(tokens)))
+    return output
+
+
+def _generate_action(a: Dict[str, Any]) -> merlin.Action:
+    # work out type of action based on ast
+    # Unary expressions
+    if a['operand_2'] is None:
+        if a['op'] == '+':
+
+            if a['operand_1']['type'] == 'Attribute':
+                try:
+                    return AddAttributesAction(
+                        [str(p) for p in a['operand_1']['params']])
+                except Exception:
+                    raise merlin.MerlinScriptException(
+                        "Invalid parameters for AddAttributeAction")
+
+            elif a['operand_1']['type'] == 'Entity':
+                try:
+                    return AddEntityAction(
+                        a['operand_1']['params'][0],
+                        attributes=a['operand_1']['params'][1:])
+                except Exception:
+                    raise merlin.MerlinScriptException(
+                        "Invalid parameters for AddEntityAction")
+
+            elif a['operand_1']['type'] == 'Process':
+                try:
+                    # convert priority to a number
+                    if len(a['operand_1']['params']) >= 3:
+                        a['operand_1']['params'][2] = \
+                            int(a['operand_1']['params'][2])
+                    return AddProcessAction(*a['operand_1']['params'])
+                except:
+                    raise merlin.MerlinScriptException(
+                        "Invalid parameters for AddEntityAction")
+
+            elif a['operand_1']['type'] == 'UnitType':
+                try:
+                    return UnitTypeAction(
+                        [str(p) for p in a['operand_1']['params']])
+                except Exception:
+                    raise merlin.MerlinScriptException(
+                        "Invalid parameters for AddUnitTypeAction")
+        elif a['op'] == '-':
+
+            if a['operand_1']['type'] == 'Attribute':
+                raise merlin.MerlinScriptException(
+                    "Operation RemoveAttribute not supported")
+
+            elif a['operand_1']['type'] == 'Entity':
+                try:
+                    return RemoveEntityAction(a['operand_1']['params'][0])
+                except Exception:
+                    raise merlin.MerlinScriptException(
+                        "Invalid parameters for RemoveEntityAction")
+
+            elif a['operand_1']['type'] == 'Process':
+                try:
+                    return RemoveProcessAction(*a['operand_1']['params'])
+                except Exception:
+                    raise merlin.MerlinScriptException(
+                        "Invalid parameters for RemoveProcessAction")
+
+            elif a['operand_1']['type'] == 'UnitType':
+                raise merlin.MerlinScriptException(
+                    "Operation RemoveUnitType not supported")
+        else:
+            raise merlin.MerlinScriptException(
+                "Invalid operator for unary expression, must be + or -")
+    else:
+        # Binary expressions
+        if a['op'] in ['/', '^', '>']:
+
+            if a['op'] == '/':
+                # Disconnect operator
+                return RemoveConnectionAction(
+                    *(a['operand_1']['params'] + a['operand_2']['params']))
+                pass
+
+            elif a['op'] == '^':
+                raise NotImplementedError
+                pass
+
+            elif a['op'] == '>':
+                return AddConnectionAction(
+                    *(a['operand_1']['params'] + a['operand_2']['params']))
+                pass
+        else:
+            raise merlin.MerlinScriptException(
+                "Invalid operator for binary expression, must be /, ^ or >")
+
+
+def _parse_action(tokens) -> Dict[str, Any]:
+    op = _parse_op(tokens[0])
+    if op:
+        # this is a single operand command
+        tokens = tokens[1:]
+        # now look for a type
+        type1 = _parse_type(tokens[0])
+        if type1:
+            # parse type 1 params
+            type1_params = tokens
+            return {
+                'op': op,
+                'operand_1': {
+                    'type': type1,
+                    'params': type1_params},
+                'operand_2': None}
+        else:
+            raise merlin.MerlinScriptException(
+                "Syntax Error: {0} is not a valid type".format(tokens[0]))
+    else:
+        type1 = _parse_type(tokens[0])
+        if type1:
+            tokens = tokens[1:]
+            type1_params = _parse_params(tokens)
+            tokens = tokens[len(type1_params):]
+            op = _parse_op(tokens[0])
+            if op:
+                tokens = tokens[1:]
+                type2 = _parse_type(tokens[0])
+                if type2:
+                    tokens = tokens[1:]
+                    type2_params = _parse_params(tokens)
+                    return {
+                        'op': op,
+                        'operand_1': {
+                            'type': type1,
+                            'params': type1_params},
+                        'operand_2': {
+                            'type': type2,
+                            'params': type2_params}}
+                else:
+                    raise merlin.MerlinScriptException(
+                        "Syntax Error: {0} is not a valid type".format(
+                            tokens[0]))
+            else:
+                raise merlin.MerlinScriptException(
+                    "Syntax Error: Expected an operator, got {0}".format(
+                        tokens[0]))
+        else:
+            raise merlin.MerlinScriptException(
+                "Syntax Error: {0} is not a valid type".format(
+                    tokens[0]))
+
+
+def _parse_params(tokens):
+    params = list()
+    for t in tokens:
+        tt = _parse_type(t)
+        to = _parse_op(t)
+        if tt or to:
+            return params
+        else:
+            params.append(t)
+    return params
+
+
+def _parse_type(token):
+    if token in ['Entity', 'Attribute', 'UnitType', 'Process']:
+        return token
+    else:
+        return None
+
+
+def _parse_op(token):
+    if token in ['+', '-', '>', '/']:
+        return token
+    else:
+        return None
 
 # Simulation Actions
 
@@ -49,14 +235,15 @@ class RemoveEntityAction(merlin.Action):
         self.entity_id = entity_id
 
     def execute(self, simulation):
-        entity_to_remove = None
-        for ent in simulation.get_entities():
-            if ent.id == self.entity_id:
-                entity_to_remove = ent
-                break
-
+        entity_to_remove = simulation.get_entity_by_id(self.entity_id)
         if entity_to_remove:
             self._remove_entity(entity_to_remove)
+        else:
+            # try name lookup
+            entity_to_remove = simulation.get_entity_by_name(self.entity_id)
+            if entity_to_remove:
+                self._remove_entity(entity_to_remove)
+
 
     def _remove_entity(self, ent):
         # remove output connections
@@ -84,7 +271,7 @@ class AddEntityAction(merlin.Action):
     def __init__(
             self,
             entity_name,
-            attributes=[],
+            attributes=list(),
             parent=None):
 
         super(AddEntityAction, self).__init__()
@@ -188,7 +375,6 @@ class AddConnectionAction(merlin.Action):
 
 
 # Process Actions
-# TODO: Refactor process actions
 
 class RemoveProcessAction(merlin.Action):
     """
@@ -196,7 +382,7 @@ class RemoveProcessAction(merlin.Action):
     """
 
     def __init__(self, entity_id, process_id):
-        super(RemoveProcessAction, self)._init__()
+        super(RemoveProcessAction, self).__init__()
         self.entity_id = entity_id
         self.process_id = process_id
 
@@ -205,7 +391,7 @@ class RemoveProcessAction(merlin.Action):
         if entity:
             entity.remove_process(self.process_id)
         else:
-            raise merlin.EntityNotFoundException(self.entity_name)
+            raise merlin.EntityNotFoundException(self.entity_id)
 
 
 class AddProcessAction(merlin.Action):
@@ -217,16 +403,14 @@ class AddProcessAction(merlin.Action):
             self,
             entity_name,
             process_class,
-            property_config,
+            priority=100,
             process_name='',
-            process_module='__main__',
-            priority=0):
+            process_module='__main__'):
 
         super(AddProcessAction, self).__init__()
         self.entity_name = entity_name
         self.process_module = process_module
         self.process_class = process_class
-        self.property_config = property_config
         self.priority = priority
         self.process_name = process_name
 
@@ -234,11 +418,9 @@ class AddProcessAction(merlin.Action):
         entity = simulation.get_entity_by_name(self.entity_name)
         if entity:
             module = importlib.import_module(self.process_module)
-            PClass = getattr(module, self.process_class)
-            p_instance = PClass(self.process_name)
+            p_class = getattr(module, self.process_class)
+            p_instance = p_class(self.process_name)
             p_instance.priority = self.priority
-            for prop in self.property_config.keys:
-                setattr(p_instance, prop, self.property_config[prop])
             entity.add_process(p_instance)
         else:
             raise merlin.EntityNotFoundException(self.entity_name)

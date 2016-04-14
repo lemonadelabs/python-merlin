@@ -519,6 +519,49 @@ class TestOutputConnector:
                 npt.assert_almost_equal(e[1], 0.1)
 
 
+class TestScenarios:
+
+    def test_simple_scenario(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = merlin.Event.create(1, '+ Attribute foo bar baz')
+        s = merlin.Scenario({e})
+        assert sim.is_attribute('foo') == False
+        assert sim.is_attribute('bar') == False
+        assert sim.is_attribute('baz') == False
+        sim.run(scenarios=[s])
+        assert sim.is_attribute('foo')
+        assert sim.is_attribute('bar')
+        assert sim.is_attribute('baz')
+
+
+
+class TestEvents:
+
+    def test_add_attribute_event(self):
+        e = merlin.Event.create(1, '+ Attribute foo bar baz')
+        assert len(e.actions) == 1
+        assert isinstance(e.actions[0], actions.AddAttributesAction)
+
+    def test_multiple_actions(self):
+        e = merlin.Event.create(
+            1,
+            """
+            + Attribute foo
+            + Attribute bar
+            + Attribute baz
+            """)
+        assert len(e.actions) == 3
+
+    def test_add_unit_type_event(self):
+        e = merlin.Event.create(
+            1,
+            """
+            + UnitType desks $
+            """)
+        assert len(e.actions) == 1
+        assert isinstance(e.actions[0], actions.UnitTypeAction)
+
+
 class TestCoreActions:
 
     def test_add_attributes_action(self, sim):

@@ -7,12 +7,14 @@ the system as well as some bootstrap and helper functions.
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
 
-import uuid
 import logging
+# noinspection PyUnresolvedReferences
+import pymerlin
+import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Iterable, Set, Mapping, Any
-from typing import MutableSequence
+from typing import Iterable, Set, Mapping, Any, MutableMapping, List
+from typing import MutableSequence, Union, MutableSet
 
 
 class SimObject:
@@ -20,7 +22,7 @@ class SimObject:
     Basic properties of all sim objects.
     """
     def __init__(self, name: str=''):
-        self.id = uuid.uuid4()  # type: Union[uuid.UUID, int]
+        self.id = int(uuid.uuid4())  # type: int
         """auto-generated UUID"""
 
         self.name = name or str(self.id)
@@ -69,8 +71,12 @@ class Simulation(SimObject):
         self.run_errors = list()
         self.verbose = True
 
-    def _run_senario_events(self, scenario: Set['Event']) -> None:
-        pass
+    def _run_senario_events(self, scenarios: List['Scenario']) -> None:
+        for s in scenarios:
+            for e in s.events:
+                if e.time == self.current_step:
+                    for a in e.actions:
+                        a.execute(self)
 
     def _get_object_telemetry(self, so: SimObject) -> Mapping[str, Any]:
         return {
@@ -289,10 +295,12 @@ class Simulation(SimObject):
 
             for i in e.inputs:
 
-                # coalese all consumers of this import into a single time series
+                # coalese all consumers of this import
+                # into a single time series
                 if i.id in connector_to_pinput:
                     master_consume = list()
-                    master_consume += [0.0] * (self.num_steps - len(master_consume))
+                    master_consume += \
+                        [0.0] * (self.num_steps - len(master_consume))
                     pinputs = connector_to_pinput[i.id]
                     for pi in pinputs:
                         td = pi.get_telemetry_data()['consume']
@@ -313,11 +321,11 @@ class Simulation(SimObject):
             self,
             start: int=1,
             end: int=-1,
-            scenario: Set['Event']=set()) -> None:
+            scenarios: List['Scenario']=set()) -> None:
         """
         :param int start:
         :param int end:
-        :param set scenario:
+        :param List[Scenario] scenarios:
 
         runs the simulation in end-start+1 steps, where the end defaults to
         and is limited to ``self.num_steps``. Start is 1 or higher.
@@ -341,7 +349,7 @@ class Simulation(SimObject):
         for t in range(sim_start, sim_end+1):
             logging.info('Simulation step {0}'.format(t))
             self.current_step = t
-            self._run_senario_events(scenario)
+            self._run_senario_events(scenarios)
             # get sim outputs
             for se in self.source_entities:
                 try:
@@ -505,8 +513,8 @@ class Entity(SimObject):
                 for p_inputs in p.inputs.values():
                     p_inputs.reset_telemetry()
 
-                for p_output in p.outputs:
-                    p.reset_telemetry()
+                for p_output in p.outputs.values():
+                    p_output.reset_telemetry()
 
                 for pprop in p.get_properties():
                     pprop.reset_telemetry()
@@ -731,13 +739,14 @@ class Process(SimObject):
     def add_input(self, name, unit, connector=None):
         """
         :param str name: to identify within :py:class:`.Process`
+        :param InputConnector connector: An optional input connector to bind to
         :param str unit: unit of this output, used for connecting the
            :py:class:`.ProcessInput` with the :py:class:`.Entity`s connectors.
         """
         inp = ProcessInput(name, unit, connector)
         self.inputs[name] = inp
 
-    def add_output(self, name, unit, connector=None):
+    def add_output(self, name, unit):
         """
         :param str name: to identify within :py:class:`.Process`
         :param str unit: unit of this output, used for connecting the
@@ -752,9 +761,12 @@ class Process(SimObject):
                      property_type,
                      default_value):
         """
+        :param
         :param str display_name: will be exposed to front-end and is more
             expressive than name
         :param str name: to identify within :py:class:`.Process`
+        :param PropertyType property_type: the representation of the value
+        :param float default_value: the default value
         """
         if name in self.props:
             raise KeyError("property %s already exists" % (name,))
@@ -854,8 +866,8 @@ class ProcessInput(SimObject):
 
     def __init__(self, name, unit_type, connector=None):
         super(ProcessInput, self).__init__(name)
-        self.type = unit_type
-        self.connector = connector
+        self.type = unit_type  # type: str
+        self.connector = connector  # type: InputConnector
 
     def consume(self, value):
         self.set_telemetry_value('consume', value)
@@ -1238,12 +1250,24 @@ class Event(SimObject):
 
     def __init__(
             self,
-            actions: Iterable[Action],
+            actions: List[Action],
             time: int,
             name: str='') -> None:
         super(Event, self).__init__(name)
         self.actions = actions
         self.time = time
+
+    @classmethod
+    def create(cls, time: int, script: str) -> 'Event':
+        instance = cls(globals()['pymerlin'].actions.create(script), time)
+        return instance
+
+
+class Scenario(SimObject):
+
+    def __init__(self, events: Set[Event], name: str=''):
+        super(Scenario, self).__init__(name)
+        self.events = events
 
 
 class Ruleset:
@@ -1325,3 +1349,9 @@ class EntityNotFoundException(MerlinException):
 
     def __init__(self, value):
         super(EntityNotFoundException, self).__init__(value)
+
+
+class MerlinScriptException(MerlinException):
+
+    def __init__(self, value):
+        super(MerlinException, self).__init__(value)
