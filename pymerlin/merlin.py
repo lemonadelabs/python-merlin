@@ -204,6 +204,9 @@ class Simulation(SimObject):
         return ut in self._unit_types
 
     def set_source_entities(self, entities):
+        """
+        these entities are set as source entities, i.e. started first
+        """
         for e in entities:
             if e in self._entities and e not in self.source_entities:
                 self.source_entities.add(e)
@@ -212,6 +215,10 @@ class Simulation(SimObject):
         return self._entities
 
     def add_entities(self, es):
+        """
+        adds entities ``es`` to the simulation, but does not nest them
+        into any :py:class:`.Entity`s
+        """
         for e in es:
             self.add_entity(e)
 
@@ -221,6 +228,15 @@ class Simulation(SimObject):
             o.sim = self
 
     def add_entity(self, e, is_source_entity=False, parent=None):
+        """
+        :param bool is_source_entity: a process containing entity, which has
+            no inputs, so it is "naturally" a start of processing.
+        :param .Entity parent: the parent entity,
+            None if contained in simulation
+
+        if not, the parent is the entity containing ``e`` and
+        ``parent.add_child(e)`` needs to be called as well.
+        """
         if e not in self._entities:
             self._entities.add(e)
             e.parent = parent
@@ -229,6 +245,11 @@ class Simulation(SimObject):
                 self.source_entities.add(e)
 
     def remove_entity(self, e):
+        """
+        :param .Entity e: entity to be removed
+
+        removes an entity if existing
+        """
         if e in self._entities:
             self._entities.remove(e)
 
