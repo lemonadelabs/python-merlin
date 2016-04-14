@@ -8,7 +8,7 @@ A printer with minimal staff required.
 
 import logging
 from pymerlin import merlin
-from pymerlin.test_merlin import BudgetProcess
+from pymerlin.processes import BudgetProcess
 
 # Global logging settings
 logging_level = logging.DEBUG
@@ -160,7 +160,7 @@ def IPSbranch():
     e_budget.add_process(BudgetProcess("passportPrintingBudget",
                                        start_amount=400000))
     the_staff_process = ppStaff()
-    the_staff_process.priority = -1  # pay the people first!
+    the_staff_process.priority = 10  # pay the people first!
     e_staff.add_process(the_staff_process)
     e_printer.add_process(ppPrinter())
 

@@ -210,6 +210,9 @@ class Simulation(SimObject):
         return ut in self._unit_types
 
     def set_source_entities(self, entities):
+        """
+        these entities are set as source entities, i.e. started first
+        """
         for e in entities:
             if e in self._entities and e not in self.source_entities:
                 self.source_entities.add(e)
@@ -218,6 +221,10 @@ class Simulation(SimObject):
         return self._entities
 
     def add_entities(self, es):
+        """
+        adds entities ``es`` to the simulation, but does not nest them
+        into any :py:class:`.Entity`s
+        """
         for e in es:
             self.add_entity(e)
 
@@ -227,6 +234,15 @@ class Simulation(SimObject):
             o.sim = self
 
     def add_entity(self, e, is_source_entity=False, parent=None):
+        """
+        :param bool is_source_entity: a process containing entity, which has
+            no inputs, so it is "naturally" a start of processing.
+        :param .Entity parent: the parent entity,
+            None if contained in simulation
+
+        if not, the parent is the entity containing ``e`` and
+        ``parent.add_child(e)`` needs to be called as well.
+        """
         if e not in self._entities:
             self._entities.add(e)
             e.parent = parent
@@ -235,6 +251,11 @@ class Simulation(SimObject):
                 self.source_entities.add(e)
 
     def remove_entity(self, e):
+        """
+        :param .Entity e: entity to be removed
+
+        removes an entity if existing
+        """
         if e in self._entities:
             self._entities.remove(e)
 
@@ -299,8 +320,8 @@ class Simulation(SimObject):
                 # into a single time series
                 if i.id in connector_to_pinput:
                     master_consume = list()
-                    master_consume += \
-                        [0.0] * (self.num_steps - len(master_consume))
+                    master_consume += [0.0] * (self.num_steps -
+                                               len(master_consume))
                     pinputs = connector_to_pinput[i.id]
                     for pi in pinputs:
                         td = pi.get_telemetry_data()['consume']
@@ -378,7 +399,8 @@ class Output(SimObject):
         ``unit_type`` needs to be added to the simulation with
         :py:meth:`pymerlin.merlin.add_unit_types`.
 
-        Todo: is there an expected minimum?
+        :attr:`.expected_minimum` sets an expectation to the output value,
+           which needs to be met and can be over-fulfilled.
         """
         super(Output, self).__init__(name)
         self.inputs = set()  # type: Set[InputConnector]
@@ -387,6 +409,7 @@ class Output(SimObject):
         self.type = unit_type
         self.result = list()  # type: MutableSequence[float]
         self.sim = None  # type: Union[Simulation, None]
+        self.expected_minimum = None
 
     def tick(self, time):
         if self.current_time and time < self.current_time:
@@ -553,7 +576,7 @@ class Entity(SimObject):
             po.connector = o_con
 
         # Connect process inputs to entity inputs
-        # Create enity inputs if thet dont exist
+        # Create entity inputs if they don't exist
         for pi in proc.inputs.values():
             i_con = self.get_input_by_type(pi.type)
             if not i_con:
@@ -692,12 +715,18 @@ class Process(SimObject):
     def __init__(self, name=''):
         super(Process, self).__init__(name)
         self.parent = None
-        self.priority = 0
+        self.priority = 1000
         """
-        this number influences the execution order of the compute methods.
+        This number influences the execution order of the compute methods.
         The lower the number the earlier the compute method of this process
         will be executed. Processes with the same priority will be executed
         in an arbitrary order.
+
+        To easily assign higher or lower priorities than the standard, the
+        default is set to 1000.
+
+        The priority needs to be an integer between 0 and +32767 incl. (this
+        restriction comes from django's model implementation).
         """
         self.inputs = dict()
         self.outputs = dict()
