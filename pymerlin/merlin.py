@@ -371,7 +371,8 @@ class Output(SimObject):
         ``unit_type`` needs to be added to the simulation with
         :py:meth:`pymerlin.merlin.add_unit_types`.
 
-        Todo: is there an expected minimum?
+        :attr:`.expected_minimum` sets an expectation to the output value,
+           which needs to be met and can be over-fulfilled.
         """
         super(Output, self).__init__(name)
         self.inputs = set()  # type: Set[InputConnector]
@@ -380,6 +381,7 @@ class Output(SimObject):
         self.type = unit_type
         self.result = list()  # type: MutableSequence[float]
         self.sim = None  # type: Union[Simulation, None]
+        self.expected_minimum = None
 
     def tick(self, time):
         if self.current_time and time < self.current_time:
