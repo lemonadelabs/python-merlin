@@ -46,7 +46,7 @@ class StorageFacilityProcess(merlin.Process):
         inLineStaff = merlin.ProcessInput('in_LineStaffBW',
                                           'FTE')
         inOHStaff = merlin.ProcessInput('in_OverheadStaffBW',
-                                        'FTE')
+                                        'staff no')
 
         inRent = merlin.ProcessInput('in_Rent',
                                      '$')
@@ -78,7 +78,7 @@ class FileLogisticsProcess(merlin.Process):
         opCosts = merlin.ProcessInput("in_ContractCosts",
                                       "$")
         inOHStaff = merlin.ProcessInput('in_OverheadStaffBW',
-                                        'FTE')
+                                        'ohFTE')
         self.inputs = {"overhead staff bandwidth": inOHStaff,
                        "contract costs": opCosts}
 
@@ -86,7 +86,8 @@ class FileLogisticsProcess(merlin.Process):
 def govRecordStorage():
 
     sim = merlin.Simulation()
-    sim.add_unit_types(["file count", "staff no", "$", "FTE"])
+    sim.add_unit_types(["file count", "staff no", "$",
+                        "ohFTE", "FTE"])
 
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
@@ -114,25 +115,26 @@ def govRecordStorage():
     maintenanceCosts = merlin.InputConnector("$",
                                              storage_e,
                                              "storage maintenance costs")
-
     # add entities and their processes
+
     FileLogistics = merlin.Entity(sim, "file logistics")
     storage_e.add_child(FileLogistics)
-    sim.connect_entities(opCosts, FileLogistics, "$")
-    sim.connect_entities(overheadStaff, FileLogistics, "ohFTE")
+    sim.connect_input(opCosts, FileLogistics, "$")
+    sim.connect_input(overheadStaff, FileLogistics, "ohFTE")
 
     LineStaffRes = merlin.Entity(sim, "line staff resource")
     storage_e.add_child(LineStaffRes)
-    sim.connect_entities(lineStaff, LineStaffRes, "staff no")
+    sim.connect_input(lineStaff, LineStaffRes, "staff no")
+    sim.connect_input(overheadStaff, LineStaffRes, "ohFTE")
 
     StorageFacility = merlin.Entity(sim, "storage facility")
     storage_e.add_child(StorageFacility)
     sim.connect_entities(FileLogistics, StorageFacility, "file count")
-    sim.connect_entities(overheadStaff, StorageFacility, "ohFTE")
+    sim.connect_input(overheadStaff, StorageFacility, "ohFTE")
     sim.connect_entities(LineStaffRes, StorageFacility, "FTE")
-    sim.connect_entities(opCosts, StorageFacility, "$")
-    sim.connect_entities(rent, StorageFacility, "$")
-    sim.connect_entities(maintenanceCosts, StorageFacility, "$")
+    sim.connect_input(opCosts, StorageFacility, "$")
+    sim.connect_input(rent, StorageFacility, "$")
+    sim.connect_input(maintenanceCosts, StorageFacility, "$")
 
     # do these outputs go into a capability or branch?
     # need an expectation
@@ -148,6 +150,15 @@ def govRecordStorage():
     storage_e.add_child(filesAccessed)
     sim.outputs.add(filesAccessed)
     sim.connect_output(StorageFacility, filesAccessed)
+
+    the_line_staff_process = LineStaffProcess()
+    LineStaffRes.add_process(the_line_staff_process)
+
+    the_stor_fac_process = StorageFacilityProcess()
+    StorageFacility.add_process(the_stor_fac_process)
+
+    the_file_log_process = FileLogisticsProcess()
+    FileLogistics.add_process(the_file_log_process)
 
     # todo add another capability
     # add the govRecordStorage capability
