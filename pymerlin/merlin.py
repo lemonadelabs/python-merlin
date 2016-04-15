@@ -13,7 +13,7 @@ import pymerlin
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Iterable, Set, Mapping, Any, MutableMapping, List
+from typing import Iterable, Set, Mapping, Any, MutableMapping, List, Dict
 from typing import MutableSequence, Union, MutableSet
 
 
@@ -84,6 +84,33 @@ class Simulation(SimObject):
             'id': so.id,
             'name': so.name,
             'data': so.get_telemetry_data()}
+
+    def parent_entity(
+            self,
+            parent_entity: 'Entity',
+            child_entity: 'Entity') -> None:
+
+        child_entity.parent = parent_entity
+        parent_entity.add_child(child_entity)
+
+    def disconnect_entities(
+            self,
+            from_entity: 'Entity',
+            to_entity: 'Entity',
+            unit_type: str) -> None:
+        """
+        Disconnects the connector of unit_type between
+        from_entity and to_entity
+        :param Entity from_entity:
+        :param Entity to_entity:
+        :param str unit_type:
+        """
+        i_con = to_entity.get_input_by_type(unit_type)
+        o_con = from_entity.get_output_by_type(unit_type)
+
+        if i_con and o_con:
+            o_con.remove_input(i_con)
+            to_entity.inputs.remove(i_con)
 
     def connect_entities(
             self,
@@ -235,6 +262,7 @@ class Simulation(SimObject):
 
     def add_entity(self, e, is_source_entity=False, parent=None):
         """
+        :param Entity e: The entity to add
         :param bool is_source_entity: a process containing entity, which has
             no inputs, so it is "naturally" a start of processing.
         :param .Entity parent: the parent entity,
@@ -598,7 +626,7 @@ class Entity(SimObject):
                 pi.connector = None
             self._processes[proc.priority].remove(proc)
 
-    def get_processes(self):
+    def get_processes(self) -> List['Process']:
         procs = self._processes.values()
         output = []
         for ps in procs:
@@ -629,13 +657,13 @@ class Entity(SimObject):
                 return c
         return None
 
-    def get_output_by_type(self, unit_type):
+    def get_output_by_type(self, unit_type) -> 'OutputConnector':
         for o in self.outputs:
             if o.type == unit_type:
                 return o
         return None
 
-    def get_input_by_type(self, unit_type):
+    def get_input_by_type(self, unit_type) -> 'InputConnector':
         for o in self.inputs:
             if o.type == unit_type:
                 return o
@@ -756,7 +784,7 @@ class Process(SimObject):
         else:
             return None
 
-    def get_properties(self):
+    def get_properties(self) -> List['ProcessProperty']:
         """
         :returns: an iterable of all :py:class:`.ProcessProperty` objects
         """
@@ -1265,8 +1293,11 @@ class Action(SimObject):
     def __init__(self):
         super(Action, self).__init__(name='')
 
-    def execute(self, simulation):
+    def execute(self, simulation: Simulation):
         pass
+
+    def serialize(self) -> Dict[str, Any]:
+        return dict()
 
 
 class Event(SimObject):
@@ -1283,13 +1314,19 @@ class Event(SimObject):
             time: int,
             name: str='') -> None:
         super(Event, self).__init__(name)
-        self.actions = actions
+        self.actions = actions  # type: List[Action]
         self.time = time
 
     @classmethod
     def create(cls, time: int, script: str) -> 'Event':
         instance = cls(globals()['pymerlin'].actions.create(script), time)
         return instance
+
+    def get_serialized_event_actions(self) -> List[Dict[str, Any]]:
+        output = list()
+        for a in self.actions:
+            output.append(a.serialize())
+        return output
 
 
 class Scenario(SimObject):

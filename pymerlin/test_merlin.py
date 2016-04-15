@@ -351,9 +351,59 @@ class TestScenarios:
         assert sim.is_attribute('bar')
         assert sim.is_attribute('baz')
 
+    def test_multiple_action_scenario(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = merlin.Event.create(
+            1,
+            """
+            + Attribute foo
+            + UnitType cheese
+            """)
+        s = merlin.Scenario({e})
+        assert sim.is_attribute('foo') == False
+        assert sim.is_unit_type('cheese') == False
+        sim.run(scenarios=[s])
+        assert sim.is_attribute('foo') == True
+        assert sim.is_unit_type('cheese') == True
+
+    def test_event_time(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = merlin.Event.create(5, '+ Attribute foo')
+        s = merlin.Scenario({e})
+        assert sim.is_attribute('foo') == False
+        sim.run(end=4, scenarios=[s])
+        assert sim.is_attribute('foo') == False
+        sim.run(end=6, scenarios=[s])
+        assert sim.is_attribute('foo') == True
+
+
+    def test_multiple_scenarios(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = merlin.Event.create(5, '+ Attribute foo')
+        e2 = merlin.Event.create(7, '+ UnitType bar')
+        s1 = merlin.Scenario({e})
+        s2 = merlin.Scenario({e2})
+        assert sim.is_attribute('foo') == False
+        assert sim.is_unit_type('bar') == False
+        sim.run(scenarios=[s1, s2])
+        assert sim.is_attribute('foo') == True
+        assert sim.is_unit_type('bar') == True
 
 
 class TestEvents:
+
+    def test_add_json_events(self):
+        e = merlin.Event.create(
+            1,
+            """
+            [
+                {
+                    'op' : '+',
+                    'operand_1' : {
+                    }
+                }
+            ]
+            """)
 
     def test_add_attribute_event(self):
         e = merlin.Event.create(1, '+ Attribute foo bar baz')
@@ -378,6 +428,68 @@ class TestEvents:
             """)
         assert len(e.actions) == 1
         assert isinstance(e.actions[0], actions.UnitTypeAction)
+
+    def test_whitespace(self):
+        e = merlin.Event.create(
+            1,
+            """
+              +   UnitType   desks   $
+            """
+        )
+        assert len(e.actions) == 1
+        assert isinstance(e.actions[0], actions.UnitTypeAction)
+
+    def test_invalid_type(self):
+        with pytest.raises(merlin.MerlinScriptException):
+            merlin.Event.create(
+                1,
+                """
+                + FooBar desks
+                """)
+
+    def test_invalid_operator(self):
+        with pytest.raises(merlin.MerlinScriptException):
+            merlin.Event.create(
+                1,
+                """
+                * UnitType
+                """)
+
+    def test_invalid_params(self):
+        with pytest.raises(merlin.MerlinScriptException):
+            merlin.Event.create(
+                1,
+                """
+                + UnitType
+                """)
+
+    def test_remove_entity_event(self):
+        # TODO: write test
+        pass
+
+    def test_add_entity_event(self):
+        # TODO: write test
+        pass
+
+    def test_add_connection_event(self):
+        # TODO: write test
+        pass
+
+    def test_remove_connection_event(self):
+        # TODO: write test
+        pass
+
+    def test_add_process_event(self):
+        # TODO: write test
+        pass
+
+    def test_modify_process_property_event(self):
+        # TODO: write test
+        pass
+
+    def test_parent_entity_event(self):
+        # TODO: write test
+        pass
 
 
 class TestCoreActions:
@@ -447,4 +559,10 @@ class TestCoreActions:
         assert len(sink.outputs) == 0
         assert input_con in [ep[0] for ep in output_con.get_endpoints()]
 
-        # TODO Create tests for process actions.
+    def test_parent_entity_action(self, sim):
+        # TODO: Write test
+        pass
+
+    def test_modify_process_property_action(self, sim):
+        # TODO: Write test
+        pass
