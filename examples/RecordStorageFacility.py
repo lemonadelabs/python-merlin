@@ -15,14 +15,14 @@ class LineStaffProcess(merlin.Process):
 
         # set up the output/s
         outStaffBW = merlin.ProcessOutput('out_LineStaffBW',
-                                          'FTE')
+                                          'lineFTE')
         self.outputs = {"line staff bandwidth": outStaffBW}
 
         # set up the input/s
         inLineStaff = merlin.ProcessInput("line staff pool",
-                                          "staff no")
+                                          "lineStaffNo")
         inOHStaff = merlin.ProcessInput("overhead staff pool",
-                                        "staff no")
+                                        "ohFTE")
 
         self.inputs = {"line staff no": inLineStaff,
                        "overhead staff no": inOHStaff}
@@ -35,6 +35,9 @@ class LineStaffProcess(merlin.Process):
                           merlin.ProcessProperty.PropertyType.number_type,
                           "0.8")
 
+    def compute(self):
+        staff_available = self.get_input_available("line staff no")
+
 
 class StorageFacilityProcess(merlin.Process):
 
@@ -43,18 +46,18 @@ class StorageFacilityProcess(merlin.Process):
 
         # set up the output/s
         outFilesHandled = merlin.ProcessOutput('out_FilesHandled',
-                                               'file count')
+                                               'files handled')
         outFilesStored = merlin.ProcessOutput('out_FilesStored',
-                                              'file count')
+                                              'files stored')
 
         self.outputs = {"files stored": outFilesStored,
                         "files handled": outFilesHandled}
 
         # set up the input/s
         inLineStaff = merlin.ProcessInput('in_LineStaffBW',
-                                          'FTE')
+                                          'lineFTE')
         inOHStaff = merlin.ProcessInput('in_OverheadStaffBW',
-                                        'staff no')
+                                        'ohFTE')
 
         inRent = merlin.ProcessInput('in_Rent',
                                      '$')
@@ -144,8 +147,8 @@ def govRecordStorage():
     sim = merlin.Simulation()
     sim.add_attributes(["branch", "capability", "deliverable",
                         "", ])
-    sim.add_unit_types(["file count", "staff no", "$",
-                        "ohFTE", "FTE"])
+    sim.add_unit_types(["file count", "lineStaffNo", "$", "files handled",
+                        "files stored", "ohFTE", "lineFTE"])
 
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
@@ -178,7 +181,7 @@ def govRecordStorage():
     sim.add_entity(StorageFacility)
     storage_e.add_child(StorageFacility)
     sim.connect_entities(FileLogistics, StorageFacility, "file count")
-    sim.connect_entities(LineStaffRes, StorageFacility, "FTE")
+    sim.connect_entities(LineStaffRes, StorageFacility, "lineFTE")
     the_stor_fac_process = StorageFacilityProcess("storage facility process")
     StorageFacility.add_process(the_stor_fac_process)
     StorageFacility.attributes.add("asset")
@@ -189,10 +192,10 @@ def govRecordStorage():
     sim.add_entity(TheLineStaff, is_source_entity=True)
     storage_e.add_child(TheLineStaff)
     lineStaff_proc = processes.ConstantProvider(name="line staff no",
-                                                unit="staff no",
+                                                unit="lineStaffNo",
                                                 amount=20)
     TheLineStaff.add_process(lineStaff_proc)
-    sim.connect_entities(TheLineStaff, LineStaffRes, "staff no")
+    sim.connect_entities(TheLineStaff, LineStaffRes, "lineStaffNo")
 
     TheOverheadStaff = merlin.Entity(sim, "overhead staff")
     sim.add_entity(TheOverheadStaff, is_source_entity=True)
@@ -232,13 +235,13 @@ def govRecordStorage():
 
     # do these outputs go into a capability or branch?
     # need an expectation
-    filesStored = merlin.Output("file count",
+    filesStored = merlin.Output("files stored",
                                 name="files stored")
     sim.outputs.add(filesStored)
     sim.connect_output(StorageFacility, filesStored)
 
     # need an expectation
-    filesAccessed = merlin.Output("file count",
+    filesAccessed = merlin.Output("files handled",
                                   name="files accessed")
     sim.outputs.add(filesAccessed)
     sim.connect_output(StorageFacility, filesAccessed)
