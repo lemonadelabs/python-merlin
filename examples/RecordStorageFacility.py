@@ -27,6 +27,14 @@ class LineStaffProcess(merlin.Process):
         self.inputs = {"line staff no": inLineStaff,
                        "overhead staff no": inOHStaff}
 
+        self.add_property("Training time",
+                          "trainingTime",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          1)
+        self.add_property("max utilisation", "maxUtil",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          "0.8")
+
 
 class StorageFacilityProcess(merlin.Process):
 
@@ -57,6 +65,41 @@ class StorageFacilityProcess(merlin.Process):
         fileLog = merlin.ProcessInput("in_FileLogistic",
                                       "file count")
 
+        self.add_property("monthly rent", "rent",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          100000)
+        self.add_property("monthly maintenance", "maintenance",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          100000)
+        self.add_property("cost per access",
+                          "costPerAccess",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+        self.add_property("cost per storage",
+                          "costPerStorage",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+        self.add_property("staff time per access",
+                          "timePerAccess",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+        self.add_property("staff time per storage",
+                          "timePerStorage",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+        self.add_property("ratio storage to access",
+                          "rStorageAccess",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+        self.add_property("minimum line staff",
+                          "min line staff",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+        self.add_property("ratio line to overhead staff",
+                          "rLineOverheadStaff",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          10)
+
         self.inputs = {"line staff bandwidth": inLineStaff,
                        "overhead staff bandwidth": inOHStaff,
                        "rent": inRent,
@@ -82,22 +125,38 @@ class FileLogisticsProcess(merlin.Process):
         self.inputs = {"overhead staff bandwidth": inOHStaff,
                        "contract costs": opCosts}
 
+        self.add_property("min contract costs", "minCosts",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          1e6)
+        self.add_property("contracted handling no",
+                          "baseHandling",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          1e6)
+        self.add_property("additional costs per file",
+                          "addHandlingCosts",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          20)
+
 
 def govRecordStorage():
     # this is the capability, right now
 
     sim = merlin.Simulation()
+    sim.add_attributes(["branch", "capability", "deliverable",
+                        "", ])
     sim.add_unit_types(["file count", "staff no", "$",
                         "ohFTE", "FTE"])
 
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
     sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
 
     # add the govRecordStorage capability
-    storage_e = merlin.Entity("the storage")
+    storage_e = merlin.Entity(sim, "the storage")
     sim.add_entity(storage_e, parent=branch_e)
     branch_e.add_child(storage_e)
+    branch_e.attributes.add("capability")
 
     # add entities and their processes
 
@@ -105,11 +164,13 @@ def govRecordStorage():
     storage_e.add_child(FileLogistics)
     the_file_log_process = FileLogisticsProcess("file logistics process")
     FileLogistics.add_process(the_file_log_process)
+    FileLogistics.attributes.add("external capability")
 
     LineStaffRes = merlin.Entity(sim, "line staff resource")
     storage_e.add_child(LineStaffRes)
     the_line_staff_process = LineStaffProcess("line staff resource process")
     LineStaffRes.add_process(the_line_staff_process)
+    LineStaffRes.attributes.add("resource")
 
     StorageFacility = merlin.Entity(sim, "storage facility")
     storage_e.add_child(StorageFacility)
@@ -117,6 +178,7 @@ def govRecordStorage():
     sim.connect_entities(LineStaffRes, StorageFacility, "FTE")
     the_stor_fac_process = StorageFacilityProcess("storage facility process")
     StorageFacility.add_process(the_stor_fac_process)
+    StorageFacility.attributes.add("asset")
 
     # these are the Entities providing budget and staff numbers
     # they are replaced by connections in the agency wide model
@@ -160,11 +222,13 @@ def govRecordStorage():
     TheRent = merlin.Entity(sim, "rent costs")
     sim.add_entity(TheRent)
     storage_e.add_child(TheRent)
-    sim.connect_entities(TheOperationalCosts, StorageFacility, "$")
-    sim.connect_entities(TheOperationalCosts, FileLogistics, "$")
+    sim.connect_entities(TheRent, StorageFacility, "$")
     rent_proc = processes.BudgetProcess(name="rent budget",
                                         start_amount=100000)
     TheRent.add_process(rent_proc)
+
+    sim.set_source_entities([TheOperationalCosts, TheRent, TheLineStaff,
+                             TheMaintenance, TheOverheadStaff])
 
     # do these outputs go into a capability or branch?
     # need an expectation
