@@ -10,7 +10,7 @@ from pymerlin.processes import (BudgetProcess,
 
 
 @pytest.fixture()
-def computation_test_harness(sim):
+def computation_test_harness(sim) -> merlin.Simulation:
 
     # Configure sim properties
     sim.set_time_span(10)
@@ -58,7 +58,7 @@ def computation_test_harness(sim):
 
 
 @pytest.fixture()
-def sim():
+def sim() -> merlin.Simulation:
     """ Returns a simulation object """
     return merlin.Simulation(
         ruleset=None,
@@ -238,6 +238,17 @@ class TestSimulation:
         assert len(o_con.get_endpoints()) == 1
         assert i_con.source == o_con
 
+    def test_disconnect_entities(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e1 = sim.get_entity_by_name("Budget")
+        e2 = sim.get_entity_by_name("office building")
+        assert len(e1.get_output_by_type('$').get_endpoints()) == 2
+        assert len(e2.inputs) == 1
+        sim.disconnect_entities(e1, e2, '$')
+        assert len(e1.get_output_by_type('$').get_endpoints()) == 1
+        assert len(e2.inputs) == 0
+
+
     def test_add_output(self, sim):
         o = merlin.Output('unit_type', name='output')
         sim.add_output(o)
@@ -392,18 +403,34 @@ class TestScenarios:
 
 class TestEvents:
 
-    def test_add_json_events(self):
+    def test_add_json_events(self, simple_entity_graph):
         e = merlin.Event.create(
             1,
             """
             [
                 {
-                    'op' : '+',
-                    'operand_1' : {
-                    }
+                    \"op\" : \"+\",
+                    \"operand_1\" : {
+                        \"type\" : \"Attribute\",
+                        \"params\" : \"foo\"
+                    },
+                    \"operand_2\" : null
+                },
+
+                {
+                    \"op\" : \"+\",
+                    \"operand_1\" : {
+                        \"type\" : \"UnitType\",
+                        \"params\" : \"bar\"
+                    },
+                    \"operand_2\" : null
                 }
             ]
             """)
+        assert len(e.actions) == 2
+        assert isinstance(e.actions[0], actions.AddAttributesAction)
+        assert isinstance(e.actions[1], actions.UnitTypeAction)
+
 
     def test_add_attribute_event(self):
         e = merlin.Event.create(1, '+ Attribute foo bar baz')
@@ -463,33 +490,56 @@ class TestEvents:
                 + UnitType
                 """)
 
-    def test_remove_entity_event(self):
-        # TODO: write test
-        pass
+    def test_remove_entity_event(self, computation_test_harness):
+        sim = computation_test_harness
+        b_entity = sim.get_entity_by_name('Budget')
+        a = actions.create("- Entity {0}".format(b_entity.id))
+        a[0].execute(sim)
+        assert sim.get_entity_by_name('Budget') is None
 
-    def test_add_entity_event(self):
-        # TODO: write test
-        pass
 
-    def test_add_connection_event(self):
-        # TODO: write test
-        pass
+    def test_add_entity_event(self, computation_test_harness):
+        sim = computation_test_harness
+        a = actions.create("+ Entity Budget_2")
+        a[0].execute(sim)
+        assert sim.get_entity_by_name("Budget_2") is not None
 
-    def test_remove_connection_event(self):
-        # TODO: write test
-        pass
+    def test_add_connection_event(self, sim):
+        source = merlin.Entity(simulation=sim, name='source', attributes=set())
+        sink = merlin.Entity(simulation=sim, name='sink', attributes=set())
+        sim.add_entity(source)
+        sim.add_entity(sink)
+        axs = actions.create("Entity {0} > Entity {1} shoes 1 True".format(
+            source.id, sink.id))
+        assert len(axs) == 1
+        a = axs[0]
+        a.execute(sim)
+        assert source.get_output_by_type('shoes')
+        assert sink.get_input_by_type('shoes')
+
+
+    def test_remove_connection_event(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e1 = sim.get_entity_by_name("Budget")
+        e2 = sim.get_entity_by_name("office building")
+        axs = actions.create("Entity {0} / Entity {1} $".format(e1.id, e2.id))
+        assert len(axs) == 1
+        axs[0].execute(sim)
+        assert len(e1.get_output_by_type('$').get_endpoints()) == 1
+        assert len(e2.inputs) == 0
+
 
     def test_add_process_event(self):
-        # TODO: write test
-        pass
+
+        assert False
 
     def test_modify_process_property_event(self):
         # TODO: write test
-        pass
+        assert False
 
     def test_parent_entity_event(self):
         # TODO: write test
-        pass
+        assert False
 
 
 class TestCoreActions:
@@ -528,7 +578,7 @@ class TestCoreActions:
         seg = simple_entity_graph
         sim.add_entity(seg[0])
         sim.add_entity(seg[1])
-        rca = actions.RemoveConnectionAction(seg[0].id, seg[3].id, seg[2].id)
+        rca = actions.RemoveConnectionAction(seg[0].id, seg[1].id, seg[2].type)
         rca.execute(sim)
         assert seg[2] not in seg[0].outputs
         assert seg[3] not in seg[1].inputs
@@ -539,12 +589,11 @@ class TestCoreActions:
         sim.add_entity(source)
         sim.add_entity(sink)
         aca = actions.AddConnectionAction(
-            'new_unit_type',
             source.id,
-            [sink.id],
-            apportioning=None,
-            additive_write=True,
-            connector_name='new_con')
+            sink.id,
+            'new_unit_type',
+            apportioning=2,
+            additive_write=True)
         aca.execute(sim)
 
         output_con = source.get_output_by_type('new_unit_type')
@@ -559,10 +608,50 @@ class TestCoreActions:
         assert len(sink.outputs) == 0
         assert input_con in [ep[0] for ep in output_con.get_endpoints()]
 
-    def test_parent_entity_action(self, sim):
-        # TODO: Write test
-        pass
+    def test_add_process_action(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e1 = sim.get_entity_by_name('Budget')
+        a = actions.AddProcessAction(
+            e1.id,
+            'BuildingMaintainenceProcess',
+            200,
+            process_module='pymerlin.processes',
+            process_name='b_maintainance')
+        assert len(e1.get_processes()) == 1
+        a.execute(sim)
+        assert len(e1.get_processes()) == 2
+        p = e1.get_process_by_name('b_maintainance')
+        assert p
 
-    def test_modify_process_property_action(self, sim):
-        # TODO: Write test
-        pass
+
+    def test_remove_process_action(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e1 = sim.get_entity_by_name("office building")
+        p1 = e1.get_process_by_name('Building Maintenance')
+        assert e1.get_process_by_name('Building Maintenance') is not None
+        a = actions.RemoveProcessAction(e1.id, p1.id)
+        a.execute(sim)
+        assert e1.get_process_by_name('Building Maintenance') is None
+
+    def test_parent_entity_action(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        child_ent = merlin.Entity(name="child_ent")
+        parent_ent = sim.get_entity_by_name("Budget")
+        sim.add_entity(child_ent)
+        assert child_ent not in parent_ent.get_children()
+        assert child_ent.parent is None
+        a = actions.ParentEntityAction(parent_ent.id, child_ent.id)
+        a.execute(sim)
+        assert child_ent in parent_ent.get_children()
+        assert child_ent.parent == parent_ent
+
+    def test_modify_process_property_action(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = sim.get_entity_by_name('call center')
+        p = e.get_process_by_name('Call Center Staff')
+        prop = p.get_prop('staff salary')
+        assert prop.get_value() == 5.0
+        a = actions.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
+        a.execute(sim)
+        assert prop.get_value() == 2.0
+

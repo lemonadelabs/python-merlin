@@ -266,7 +266,7 @@ class RemoveEntityAction(merlin.Action):
 
     def __init__(self, entity_id):
         super(RemoveEntityAction, self).__init__()
-        self.entity_id = entity_id
+        self.entity_id = int(entity_id)
 
     def execute(self, simulation):
         entity_to_remove = simulation.get_entity_by_id(self.entity_id)
@@ -356,8 +356,8 @@ class RemoveConnectionAction(merlin.Action):
             unit_type):
 
         super(RemoveConnectionAction, self).__init__()
-        self.from_entity_id = from_entity_id
-        self.to_entity_id = to_entity_id
+        self.from_entity_id = int(from_entity_id)
+        self.to_entity_id = int(to_entity_id)
         self.unit_type = unit_type
 
     def execute(self, simulation: merlin.Simulation):
@@ -392,19 +392,19 @@ class AddConnectionAction(merlin.Action):
 
     def __init__(
             self,
-            unit_type,
             output_entity_id,
             input_entity_id,
-            apportioning=None,
+            unit_type,
+            apportioning=2,
             additive_write=False):
 
         super(AddConnectionAction, self).__init__()
 
         self.unit_type = unit_type
-        self.output_entity_id = output_entity_id
-        self.input_entity_id = input_entity_id
-        self.apportioning = apportioning
-        self.additive_write = additive_write
+        self.output_entity_id = int(output_entity_id)
+        self.input_entity_id = int(input_entity_id)
+        self.apportioning = merlin.OutputConnector.ApportioningRules(int(apportioning))
+        self.additive_write = bool(additive_write)
 
     def execute(self, simulation: merlin.Simulation):
         from_entity = simulation.get_entity_by_id(self.output_entity_id)
@@ -481,10 +481,10 @@ class AddProcessAction(merlin.Action):
             process_name=''):
 
         super(AddProcessAction, self).__init__()
-        self.entity_id = entity_id
+        self.entity_id = int(entity_id)
         self.process_module = process_module
         self.process_class = process_class
-        self.priority = priority
+        self.priority = int(priority)
         self.process_name = process_name
 
     def execute(self, simulation):
@@ -526,9 +526,9 @@ class ModifyProcessPropertyAction(merlin.Action):
             property_id,
             value):
         super(ModifyProcessPropertyAction, self).__init__()
-        self.entity_id = entity_id
-        self.property_id = property_id
-        self.value = value
+        self.entity_id = int(entity_id)
+        self.property_id = int(property_id)
+        self.value = float(value)
 
     def execute(self, simulation: merlin.Simulation):
         e = simulation.get_entity_by_id(self.entity_id)
@@ -560,8 +560,8 @@ class ParentEntityAction(merlin.Action):
             parent_entity_id,
             child_entity_id):
         super(ParentEntityAction, self).__init__()
-        self.parent_entity_id = parent_entity_id
-        self.child_entity_id = child_entity_id
+        self.parent_entity_id = int(parent_entity_id)
+        self.child_entity_id = int(child_entity_id)
 
     def serialize(self) -> Dict[str, Any]:
         return {

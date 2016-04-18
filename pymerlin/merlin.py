@@ -11,6 +11,7 @@ import logging
 # noinspection PyUnresolvedReferences
 import pymerlin
 import uuid
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Iterable, Set, Mapping, Any, MutableMapping, List, Dict
@@ -581,7 +582,7 @@ class Entity(SimObject):
         """
 
         # first check to see if the proc has already been added.
-        if proc.id in [p.id for p in self._processes.values()]:
+        if proc.id in [p.id for p in self.get_processes()]:
             return
 
         if proc.priority in self._processes.keys():
@@ -633,7 +634,7 @@ class Entity(SimObject):
             output += ps
         return output
 
-    def get_process_by_name(self, proc_name):
+    def get_process_by_name(self, proc_name) -> 'Process':
         procs = self._processes.values()
         for ps in procs:
             for p in ps:
@@ -760,7 +761,7 @@ class Process(SimObject):
         self.outputs = dict()
         self.props = dict()
 
-    def get_prop(self, name):
+    def get_prop(self, name) -> 'ProcessProperty':
         """
         :return: the property with this name, None otherwise
         :rtype: :py:class:`pymerlin.merlin.ProcessProperty`
@@ -1319,7 +1320,15 @@ class Event(SimObject):
 
     @classmethod
     def create(cls, time: int, script: str) -> 'Event':
-        instance = cls(globals()['pymerlin'].actions.create(script), time)
+        try:
+            json.loads(script)
+            instance = cls(
+                globals()['pymerlin'].actions.create_from_json(script),
+                time)
+        except Exception:
+            instance = cls(
+                globals()['pymerlin'].actions.create(script),
+                time)
         return instance
 
     def get_serialized_event_actions(self) -> List[Dict[str, Any]]:
