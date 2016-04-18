@@ -12,7 +12,7 @@ import uuid
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Iterable, Set, Mapping, Any, List, MutableSequence
+from typing import Iterable, Set, Mapping, Any, List, MutableSequence, Dict
 
 # noinspection PyUnresolvedReferences
 import pymerlin  # @UnusedImport
@@ -508,6 +508,7 @@ class Entity(SimObject):
         if entity not in self._children:
             self._children.add(entity)
             entity.parent = self
+            entity.sim = self.sim
 
     def remove_child(self, entity_id):
         child_to_remove = None
