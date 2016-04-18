@@ -161,18 +161,21 @@ def govRecordStorage():
     # add entities and their processes
 
     FileLogistics = merlin.Entity(sim, "file logistics")
+    sim.add_entity(FileLogistics)
     storage_e.add_child(FileLogistics)
     the_file_log_process = FileLogisticsProcess("file logistics process")
     FileLogistics.add_process(the_file_log_process)
     FileLogistics.attributes.add("external capability")
 
     LineStaffRes = merlin.Entity(sim, "line staff resource")
+    sim.add_entity(LineStaffRes)
     storage_e.add_child(LineStaffRes)
     the_line_staff_process = LineStaffProcess("line staff resource process")
     LineStaffRes.add_process(the_line_staff_process)
     LineStaffRes.attributes.add("resource")
 
     StorageFacility = merlin.Entity(sim, "storage facility")
+    sim.add_entity(StorageFacility)
     storage_e.add_child(StorageFacility)
     sim.connect_entities(FileLogistics, StorageFacility, "file count")
     sim.connect_entities(LineStaffRes, StorageFacility, "FTE")
@@ -183,7 +186,7 @@ def govRecordStorage():
     # these are the Entities providing budget and staff numbers
     # they are replaced by connections in the agency wide model
     TheLineStaff = merlin.Entity(sim, "line staff")
-    sim.add_entity(TheLineStaff)
+    sim.add_entity(TheLineStaff, is_source_entity=True)
     storage_e.add_child(TheLineStaff)
     lineStaff_proc = processes.ConstantProvider(name="line staff no",
                                                 unit="staff no",
@@ -192,7 +195,7 @@ def govRecordStorage():
     sim.connect_entities(TheLineStaff, LineStaffRes, "staff no")
 
     TheOverheadStaff = merlin.Entity(sim, "overhead staff")
-    sim.add_entity(TheOverheadStaff)
+    sim.add_entity(TheOverheadStaff, is_source_entity=True)
     storage_e.add_child(TheOverheadStaff)
     overheadStaff_proc = processes.ConstantProvider(name="overhead staff no",
                                                     unit="ohFTE",
@@ -203,7 +206,7 @@ def govRecordStorage():
     sim.connect_entities(TheOverheadStaff, StorageFacility, "ohFTE")
 
     TheMaintenance = merlin.Entity(sim, "maintenance budget")
-    sim.add_entity(TheMaintenance)
+    sim.add_entity(TheMaintenance, is_source_entity=True)
     storage_e.add_child(TheMaintenance)
     sim.connect_entities(TheMaintenance, StorageFacility, "$")
     maint_proc = processes.BudgetProcess(name="maintenance budget",
@@ -211,7 +214,7 @@ def govRecordStorage():
     TheMaintenance.add_process(maint_proc)
 
     TheOperationalCosts = merlin.Entity(sim, "operational costs")
-    sim.add_entity(TheOperationalCosts)
+    sim.add_entity(TheOperationalCosts, is_source_entity=True)
     storage_e.add_child(TheOperationalCosts)
     sim.connect_entities(TheOperationalCosts, StorageFacility, "$")
     sim.connect_entities(TheOperationalCosts, FileLogistics, "$")
@@ -220,36 +223,31 @@ def govRecordStorage():
     TheOperationalCosts.add_process(opcost_proc)
 
     TheRent = merlin.Entity(sim, "rent costs")
-    sim.add_entity(TheRent)
+    sim.add_entity(TheRent, is_source_entity=True)
     storage_e.add_child(TheRent)
     sim.connect_entities(TheRent, StorageFacility, "$")
     rent_proc = processes.BudgetProcess(name="rent budget",
                                         start_amount=100000)
     TheRent.add_process(rent_proc)
 
-    sim.set_source_entities([TheOperationalCosts, TheRent, TheLineStaff,
-                             TheMaintenance, TheOverheadStaff])
-
     # do these outputs go into a capability or branch?
     # need an expectation
     filesStored = merlin.Output("file count",
                                 name="files stored")
-    storage_e.add_child(filesStored)
     sim.outputs.add(filesStored)
     sim.connect_output(StorageFacility, filesStored)
 
     # need an expectation
     filesAccessed = merlin.Output("file count",
                                   name="files accessed")
-    storage_e.add_child(filesAccessed)
     sim.outputs.add(filesAccessed)
     sim.connect_output(StorageFacility, filesAccessed)
 
     # todo add another capability
     # add the govRecordStorage capability
-    printer_e = merlin.Entity("the printer")
-    sim.add_entity(printer_e, parent=branch_e)
-    branch_e.add_child(printer_e)
+#     printer_e = merlin.Entity("the printer")
+#     sim.add_entity(printer_e, parent=branch_e)
+#     branch_e.add_child(printer_e)
 
     return sim
 
