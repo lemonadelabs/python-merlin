@@ -8,6 +8,7 @@
 from typing import List, Dict, Any
 from pymerlin import merlin
 import importlib
+import json
 
 
 def create(script: str) -> List[merlin.Action]:
@@ -27,10 +28,26 @@ def create(script: str) -> List[merlin.Action]:
     return output
 
 
+def create_from_json(json_string: str) -> List[merlin.Action]:
+    """
+    Parses a list of actions from a json serilaised string
+    :param str json_string:
+    """
+    output = list()
+    j = json.loads(json_string)
+    for a in j:
+        output.append(_generate_action(a))
+    return output
+
+
 def _generate_action(a: Dict[str, Any]) -> merlin.Action:
     # work out type of action based on ast
     # Unary expressions
     if a['operand_2'] is None:
+        if len(a['operand_1']['params']) == 0:
+            raise merlin.MerlinScriptException(
+                        "Invalid parameter size")
+
         if a['op'] == '+':
 
             if a['operand_1']['type'] == 'Attribute':
@@ -47,17 +64,6 @@ def _generate_action(a: Dict[str, Any]) -> merlin.Action:
                         a['operand_1']['params'][0],
                         attributes=a['operand_1']['params'][1:])
                 except Exception:
-                    raise merlin.MerlinScriptException(
-                        "Invalid parameters for AddEntityAction")
-
-            elif a['operand_1']['type'] == 'Process':
-                try:
-                    # convert priority to a number
-                    if len(a['operand_1']['params']) >= 3:
-                        a['operand_1']['params'][2] = \
-                            int(a['operand_1']['params'][2])
-                    return AddProcessAction(*a['operand_1']['params'])
-                except:
                     raise merlin.MerlinScriptException(
                         "Invalid parameters for AddEntityAction")
 
@@ -81,13 +87,6 @@ def _generate_action(a: Dict[str, Any]) -> merlin.Action:
                     raise merlin.MerlinScriptException(
                         "Invalid parameters for RemoveEntityAction")
 
-            elif a['operand_1']['type'] == 'Process':
-                try:
-                    return RemoveProcessAction(*a['operand_1']['params'])
-                except Exception:
-                    raise merlin.MerlinScriptException(
-                        "Invalid parameters for RemoveProcessAction")
-
             elif a['operand_1']['type'] == 'UnitType':
                 raise merlin.MerlinScriptException(
                     "Operation RemoveUnitType not supported")
@@ -95,26 +94,39 @@ def _generate_action(a: Dict[str, Any]) -> merlin.Action:
             raise merlin.MerlinScriptException(
                 "Invalid operator for unary expression, must be + or -")
     else:
-        # Binary expressions
-        if a['op'] in ['/', '^', '>']:
 
-            if a['op'] == '/':
-                # Disconnect operator
-                return RemoveConnectionAction(
-                    *(a['operand_1']['params'] + a['operand_2']['params']))
-                pass
-
-            elif a['op'] == '^':
-                raise NotImplementedError
-                pass
-
-            elif a['op'] == '>':
-                return AddConnectionAction(
-                    *(a['operand_1']['params'] + a['operand_2']['params']))
-                pass
-        else:
+        if len(a['operand_1']['params']) == 0 \
+                or len(a['operand_2']['params']) == 0:
             raise merlin.MerlinScriptException(
-                "Invalid operator for binary expression, must be /, ^ or >")
+                "Invalid parameter size")
+
+        if a['op'] == '+':
+            return AddProcessAction(
+                *(a['operand_1']['params'] + a['operand_2']['params']))
+
+        if a['op'] == '-':
+            return RemoveProcessAction(
+                *(a['operand_1']['params'] + a['operand_2']['params']))
+
+        if a['op'] == '=':
+            # modify process property
+            return ModifyProcessPropertyAction(
+                *(a['operand_1']['params'] + a['operand_2']['params']))
+
+        if a['op'] == '/':
+            # Disconnect operator
+            return RemoveConnectionAction(
+                *(a['operand_1']['params'] + a['operand_2']['params']))
+
+        if a['op'] == '^':
+            # Parent operator
+            return ParentEntityAction(
+                *(a['operand_1']['params'] + a['operand_2']['params']))
+
+        if a['op'] == '>':
+            # Connect operator
+            return AddConnectionAction(
+                *(a['operand_1']['params'] + a['operand_2']['params']))
 
 
 def _parse_action(tokens) -> Dict[str, Any]:
@@ -126,7 +138,7 @@ def _parse_action(tokens) -> Dict[str, Any]:
         type1 = _parse_type(tokens[0])
         if type1:
             # parse type 1 params
-            type1_params = tokens
+            type1_params = tokens[1:]
             return {
                 'op': op,
                 'operand_1': {
@@ -211,6 +223,17 @@ class AddAttributesAction(merlin.Action):
     def execute(self, simulation):
         simulation.add_attributes(self.attributes)
 
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '+',
+            'operand_1':
+                {
+                    'type': 'Attribute',
+                    'params': self.attributes
+                },
+            'operand_2': None
+        }
+
 
 class UnitTypeAction(merlin.Action):
     """
@@ -224,6 +247,17 @@ class UnitTypeAction(merlin.Action):
     def execute(self, simulation):
         simulation.add_unit_types(self.unit_types)
 
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '+',
+            'operand_1':
+                {
+                    'type': 'UnitType',
+                    'params': self.unit_types
+                },
+            'operand_2': None
+        }
+
 
 # Entity Actions
 
@@ -232,7 +266,7 @@ class RemoveEntityAction(merlin.Action):
 
     def __init__(self, entity_id):
         super(RemoveEntityAction, self).__init__()
-        self.entity_id = entity_id
+        self.entity_id = int(entity_id)
 
     def execute(self, simulation):
         entity_to_remove = simulation.get_entity_by_id(self.entity_id)
@@ -243,7 +277,6 @@ class RemoveEntityAction(merlin.Action):
             entity_to_remove = simulation.get_entity_by_name(self.entity_id)
             if entity_to_remove:
                 self._remove_entity(entity_to_remove)
-
 
     def _remove_entity(self, ent):
         # remove output connections
@@ -264,6 +297,17 @@ class RemoveEntityAction(merlin.Action):
         for child in ent.get_children():
             self._remove_entity(child)
         ent.sim.remove_entity(ent)
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '-',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.entity_id]
+                },
+            'operand_2': None
+        }
 
 
 class AddEntityAction(merlin.Action):
@@ -286,6 +330,16 @@ class AddEntityAction(merlin.Action):
         else:
             self.parent.add_child(e)
 
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '+',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.entity_name]
+                },
+            'operand_2': None
+        }
 
 # Connection Actions
 
@@ -297,27 +351,38 @@ class RemoveConnectionAction(merlin.Action):
 
     def __init__(
             self,
-            source_entity_id,
-            input_connector_id,
-            output_connector_id):
+            from_entity_id,
+            to_entity_id,
+            unit_type):
 
         super(RemoveConnectionAction, self).__init__()
-        self.source_entity_id = source_entity_id
-        self.input_connector_id = input_connector_id
-        self.output_connector_id = output_connector_id
+        self.from_entity_id = int(from_entity_id)
+        self.to_entity_id = int(to_entity_id)
+        self.unit_type = unit_type
 
-    def execute(self, simulation):
-        entity = simulation.get_entity_by_id(self.source_entity_id)
-        output_con = entity.get_connector_by_id(self.output_connector_id)
-        if isinstance(output_con, merlin.OutputConnector):
-            for ep in output_con.get_endpoints():
-                if ep[0].id == self.input_connector_id:
-                    ep[0].parent.inputs.remove(ep[0])
-                    output_con.remove_input(ep[0])
-        else:
-            raise merlin.MerlinException(
-                "{0} is not an output  connector id.".format(
-                    self.output_connector_id))
+    def execute(self, simulation: merlin.Simulation):
+        from_entity = simulation.get_entity_by_id(self.from_entity_id)
+        to_entity = simulation.get_entity_by_id(self.to_entity_id)
+        if from_entity and to_entity:
+            simulation.disconnect_entities(
+                from_entity,
+                to_entity,
+                self.unit_type)
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '/',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.from_entity_id]
+                },
+            'operand_2':
+                {
+                    'type': 'Entity',
+                    'params': [self.to_entity_id, self.unit_type]
+                }
+        }
 
 
 class AddConnectionAction(merlin.Action):
@@ -327,51 +392,47 @@ class AddConnectionAction(merlin.Action):
 
     def __init__(
             self,
-            unit_type,
             output_entity_id,
-            input_entity_ids,
-            apportioning=None,
-            additive_write=False,
-            connector_name=''):
+            input_entity_id,
+            unit_type,
+            apportioning=2,
+            additive_write=False):
 
         super(AddConnectionAction, self).__init__()
 
         self.unit_type = unit_type
-        self.output_entity_id = output_entity_id
-        self.input_entity_ids = input_entity_ids
-        self.apportioning = apportioning
-        self.additive_write = additive_write
-        self.connector_name = connector_name
+        self.output_entity_id = int(output_entity_id)
+        self.input_entity_id = int(input_entity_id)
+        self.apportioning = merlin.OutputConnector.ApportioningRules(int(apportioning))
+        self.additive_write = bool(additive_write)
 
-    def execute(self, simulation):
-        # Gather entities involved
-        output_entity = simulation.get_entity_by_id(self.output_entity_id)
-
-        input_entities = \
-            [simulation.get_entity_by_id(eid)
-                for eid in self.input_entity_ids]
-
-        # Create the output connector
-        output_con = merlin.OutputConnector(
+    def execute(self, simulation: merlin.Simulation):
+        from_entity = simulation.get_entity_by_id(self.output_entity_id)
+        to_entity = simulation.get_entity_by_id(self.input_entity_id)
+        simulation.connect_entities(
+            from_entity,
+            to_entity,
             self.unit_type,
-            output_entity,
-            name='{0}_output'.format(self.connector_name),
+            input_additive_write=self.additive_write,
             apportioning=self.apportioning)
-        output_entity.outputs.add(output_con)
 
-        # Create the input connector(s)
-        input_cons = \
-            [merlin.InputConnector(
-                self.unit_type,
-                p,
-                name='{0}_input'.format(self.connector_name),
-                source=output_con,
-                additive_write=self.additive_write) for p in input_entities]
-
-        # Connect output endpoint(s)
-        for ic in input_cons:
-            ic.parent.add_input(ic)
-            output_con.add_input(ic)
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '>',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.output_entity_id, self.apportioning]
+                },
+            'operand_2':
+                {
+                    'type': 'Entity',
+                    'params': [
+                        self.input_entity_id,
+                        self.unit_type,
+                        self.additive_write]
+                }
+        }
 
 
 # Process Actions
@@ -383,15 +444,27 @@ class RemoveProcessAction(merlin.Action):
 
     def __init__(self, entity_id, process_id):
         super(RemoveProcessAction, self).__init__()
-        self.entity_id = entity_id
         self.process_id = process_id
+        self.entity_id = entity_id
 
-    def execute(self, simulation):
-        entity = simulation.get_entity_by_id(self.entity_id)
-        if entity:
-            entity.remove_process(self.process_id)
-        else:
-            raise merlin.EntityNotFoundException(self.entity_id)
+    def execute(self, simulation: merlin.Simulation):
+        e = simulation.get_entity_by_id(self.entity_id)
+        e.remove_process(self.process_id)
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '-',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.entity_id]
+                },
+            'operand_2':
+                {
+                    'type': 'Process',
+                    'params': [self.process_id]
+                }
+        }
 
 
 class AddProcessAction(merlin.Action):
@@ -401,21 +474,21 @@ class AddProcessAction(merlin.Action):
 
     def __init__(
             self,
-            entity_name,
+            entity_id,
             process_class,
             priority=100,
-            process_name='',
-            process_module='__main__'):
+            process_module='__main__',
+            process_name=''):
 
         super(AddProcessAction, self).__init__()
-        self.entity_name = entity_name
+        self.entity_id = int(entity_id)
         self.process_module = process_module
         self.process_class = process_class
-        self.priority = priority
+        self.priority = int(priority)
         self.process_name = process_name
 
     def execute(self, simulation):
-        entity = simulation.get_entity_by_name(self.entity_name)
+        entity = simulation.get_entity_by_id(self.entity_id)
         if entity:
             module = importlib.import_module(self.process_module)
             p_class = getattr(module, self.process_class)
@@ -423,4 +496,90 @@ class AddProcessAction(merlin.Action):
             p_instance.priority = self.priority
             entity.add_process(p_instance)
         else:
-            raise merlin.EntityNotFoundException(self.entity_name)
+            raise merlin.EntityNotFoundException(self.entity_id)
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '+',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.entity_id]
+                },
+            'operand_2':
+                {
+                    'type': 'Process',
+                    'params': [
+                        self.process_class,
+                        self.priority,
+                        self.process_module,
+                        self.name]
+                }
+        }
+
+
+class ModifyProcessPropertyAction(merlin.Action):
+
+    def __init__(
+            self,
+            entity_id,
+            property_id,
+            value):
+        super(ModifyProcessPropertyAction, self).__init__()
+        self.entity_id = int(entity_id)
+        self.property_id = int(property_id)
+        self.value = float(value)
+
+    def execute(self, simulation: merlin.Simulation):
+        e = simulation.get_entity_by_id(self.entity_id)
+        for p in e.get_processes():
+            for prop in p.get_properties():
+                if prop.id == self.property_id:
+                    prop.set_value(self.value)
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '=',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.entity_id]
+                },
+            'operand_2':
+                {
+                    'type': 'Property',
+                    'params': [self.property_id, self.value]
+                }
+        }
+
+
+class ParentEntityAction(merlin.Action):
+
+    def __init__(
+            self,
+            parent_entity_id,
+            child_entity_id):
+        super(ParentEntityAction, self).__init__()
+        self.parent_entity_id = int(parent_entity_id)
+        self.child_entity_id = int(child_entity_id)
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': '^',
+            'operand_1':
+                {
+                    'type': 'Entity',
+                    'params': [self.child_entity_id]
+                },
+            'operand_2':
+                {
+                    'type': 'Entity',
+                    'params': [self.parent_entity_id]
+                }
+        }
+
+    def execute(self, simulation: merlin.Simulation):
+        parent_entity = simulation.get_entity_by_id(self.parent_entity_id)
+        child_entity = simulation.get_entity_by_id(self.child_entity_id)
+        if parent_entity and child_entity:
+            simulation.parent_entity(parent_entity, child_entity)
