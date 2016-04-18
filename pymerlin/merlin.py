@@ -8,13 +8,13 @@ the system as well as some bootstrap and helper functions.
 """
 
 import logging
-# noinspection PyUnresolvedReferences
-import pymerlin
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Iterable, Set, Mapping, Any, MutableMapping, List
-from typing import MutableSequence, Union, MutableSet
+from typing import Iterable, Set, Mapping, Any, List, MutableSequence
+
+# noinspection PyUnresolvedReferences
+import pymerlin  # @UnusedImport
 
 
 class SimObject:
@@ -143,7 +143,7 @@ class Simulation(SimObject):
         if output not in self.outputs:
             return
 
-        o_con = entity.get_input_by_type(output.type)
+        o_con = entity.get_output_by_type(output.type)
 
         if not o_con:
             o_con = OutputConnector(

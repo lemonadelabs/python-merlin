@@ -1,7 +1,35 @@
 from pymerlin import merlin
 
 
+class ConstantProvider(merlin.Process):
+    """
+    always return the same number
+    """
+
+    def __init__(self, name='resource', unit='', amount=1.0):
+
+        super(ConstantProvider, self).__init__(name)
+        # Define outputs
+        p_output = merlin.ProcessOutput('output_'+name,
+                                        unit,
+                                        connector=None)
+        self.outputs = {"%s_%s" % (name, unit): p_output}
+        # Define properties
+        self.add_property("amount",
+                          "amount",
+                          merlin.ProcessProperty.PropertyType.number_type,
+                          amount)
+
+    def compute(self, tick):
+        a = self.get_prop_value("amount")
+        self.provide_output("amount", a)
+
+
 class BudgetProcess(merlin.Process):
+    """
+    split the budget amount into even parts and provide this amount,
+    keep track of the amount spent.
+    """
 
     def __init__(self, name='Budget', start_amount=10000.00):
         super(BudgetProcess, self).__init__(name)
