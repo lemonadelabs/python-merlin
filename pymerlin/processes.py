@@ -27,11 +27,22 @@ class ConstantProvider(merlin.Process):
 
 class BudgetProcess(merlin.Process):
     """
-    split the budget amount into even parts and provide this amount,
-    keep track of the amount spent.
+    Split the budget amount into even parts over a year and provide this
+    amount, keep track of the amount spent.
+
+    Assumes, a tick being 1 month, so the annual budget is divided by 12.
+
+    Every 12 month this amount is renewed, the "old" amount is discarded.
+    (This could be changed, introducing another option.)
     """
 
     def __init__(self, name='Budget', start_amount=10000.00, budget_type="$"):
+        """
+        :param str name:
+        :param float start_amount: the annually budgeted amount
+        :param str budget_type: to keep track of different moneys, names can
+            be assigned to the output dollar figures.
+        """
         super(BudgetProcess, self).__init__(name)
 
         # Define outputs
@@ -50,7 +61,8 @@ class BudgetProcess(merlin.Process):
     def reset(self):
         # define internal instance variables on init
         self.current_amount = self.get_prop_value("amount")
-        self.amount_per_step = self.current_amount / self.parent.sim.num_steps
+        self.amount_per_step = (self.current_amount /
+                                min(self.parent.sim.num_steps, 12))
 
     def compute(self, tick):
         if self.current_amount > 0.00:
@@ -61,6 +73,9 @@ class BudgetProcess(merlin.Process):
             self.provide_output('$', output)
         else:
             self.provide_output('$', 0.0)
+
+        if tick % 12 == 0:
+            self.current_amount = self.get_prop_value("amount")
 
 
 class CallCenterStaffProcess(merlin.Process):
