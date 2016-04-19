@@ -13,7 +13,7 @@ class ConstantProvider(merlin.Process):
         p_output = merlin.ProcessOutput('output_'+name,
                                         unit,
                                         connector=None)
-        self.outputs = {"%s_%s" % (name, unit): p_output}
+        self.outputs = {"amount": p_output}
         # Define properties
         self.add_property("amount",
                           "amount",
