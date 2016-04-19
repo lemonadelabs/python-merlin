@@ -289,7 +289,7 @@ class Simulation(SimObject):
         if e in self._entities:
             self._entities.remove(e)
 
-    def get_entity_by_name(self, name):
+    def get_entity_by_name(self, name) -> 'Entity':
         for e in self._entities:
             if e.name == name:
                 return e

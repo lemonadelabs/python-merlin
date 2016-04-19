@@ -196,14 +196,14 @@ def _parse_params(tokens):
 
 
 def _parse_type(token):
-    if token in ['Entity', 'Attribute', 'UnitType', 'Process']:
+    if token in ['Entity', 'Attribute', 'UnitType', 'Process', 'Property']:
         return token
     else:
         return None
 
 
 def _parse_op(token):
-    if token in ['+', '-', '>', '/']:
+    if token in ['+', '-', '>', '/', '=', '^']:
         return token
     else:
         return None
@@ -557,8 +557,9 @@ class ParentEntityAction(merlin.Action):
 
     def __init__(
             self,
-            parent_entity_id,
-            child_entity_id):
+            child_entity_id,
+            parent_entity_id
+            ):
         super(ParentEntityAction, self).__init__()
         self.parent_entity_id = int(parent_entity_id)
         self.child_entity_id = int(child_entity_id)

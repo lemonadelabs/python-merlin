@@ -529,18 +529,45 @@ class TestEvents:
         assert len(e2.inputs) == 0
 
 
-    def test_add_process_event(self):
-
-        assert False
-
-    def test_modify_process_property_event(self):
+    def test_add_process_event(self, computation_test_harness):
         # TODO: write test
-        assert False
+        sim = computation_test_harness  # type: merlin.Simulation
+        e1 = sim.get_entity_by_name('Budget')
+        a = actions.create("""
+            Entity {0} + Process BuildingMaintainenceProcess 200 pymerlin.processes b_maintainance
+            """.format(e1.id))
+        assert len(e1.get_processes()) == 1
+        a[0].execute(sim)
+        assert len(e1.get_processes()) == 2
+        p = e1.get_process_by_name('b_maintainance')
+        assert p
+        assert p.priority == 200
 
-    def test_parent_entity_event(self):
-        # TODO: write test
-        assert False
+    def test_modify_process_property_event(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = sim.get_entity_by_name('call center')
+        p = e.get_process_by_name('Call Center Staff')
+        prop = p.get_prop('staff salary')
+        assert prop.get_value() == 5.0
+        # a = actions.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
+        a = actions.create("Entity {0} = Property {1} 2.0".format(e.id, prop.id))
+        assert len(a) == 1
+        a[0].execute(sim)
+        assert prop.get_value() == 2.0
 
+
+    def test_parent_entity_event(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        child_ent = merlin.Entity(name="child_ent")
+        parent_ent = sim.get_entity_by_name("Budget")
+        sim.add_entity(child_ent)
+        assert child_ent not in parent_ent.get_children()
+        assert child_ent.parent is None
+        a = actions.create("Entity {0} ^ Entity {1}".format(child_ent.id, parent_ent.id))
+        assert len(a) == 1
+        a[0].execute(sim)
+        assert child_ent in parent_ent.get_children()
+        assert child_ent.parent == parent_ent
 
 class TestCoreActions:
 
@@ -622,6 +649,7 @@ class TestCoreActions:
         assert len(e1.get_processes()) == 2
         p = e1.get_process_by_name('b_maintainance')
         assert p
+        assert p.priority == 200
 
 
     def test_remove_process_action(self, computation_test_harness):
@@ -640,7 +668,7 @@ class TestCoreActions:
         sim.add_entity(child_ent)
         assert child_ent not in parent_ent.get_children()
         assert child_ent.parent is None
-        a = actions.ParentEntityAction(parent_ent.id, child_ent.id)
+        a = actions.ParentEntityAction(child_ent.id, parent_ent.id)
         a.execute(sim)
         assert child_ent in parent_ent.get_children()
         assert child_ent.parent == parent_ent
