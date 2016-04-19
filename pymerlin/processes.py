@@ -31,11 +31,13 @@ class BudgetProcess(merlin.Process):
     keep track of the amount spent.
     """
 
-    def __init__(self, name='Budget', start_amount=10000.00):
+    def __init__(self, name='Budget', start_amount=10000.00, budget_type="$"):
         super(BudgetProcess, self).__init__(name)
 
         # Define outputs
-        p_output = merlin.ProcessOutput('output_$', '$', connector=None)
+        p_output = merlin.ProcessOutput('output_$',
+                                        budget_type,
+                                        connector=None)
 
         # Define properties
         self.add_property("amount",

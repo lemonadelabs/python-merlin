@@ -84,11 +84,11 @@ class StorageFacilityProcess(merlin.Process):
                                         'ohFTE')
 
         inRent = merlin.ProcessInput('in_Rent',
-                                     '$')
+                                     'rent$')
         inMaintenance = merlin.ProcessInput('in_Maintenance',
-                                            '$')
+                                            'maint$')
         opCosts = merlin.ProcessInput("in_OpCosts",
-                                      "$")
+                                      "op$")
         fileLog = merlin.ProcessInput("in_FileLogistic",
                                       "file count")
 
@@ -219,7 +219,7 @@ class FileLogisticsProcess(merlin.Process):
         self.outputs = {"files handled": outFilesHandled}
 
         opCosts = merlin.ProcessInput("in_ContractCosts",
-                                      "$")
+                                      "op$")
         inOHStaff = merlin.ProcessInput('in_OverheadStaffBW',
                                         'ohFTE')
         self.inputs = {"overhead staff bandwidth": inOHStaff,
@@ -259,8 +259,9 @@ def govRecordStorage():
     sim = merlin.Simulation()
     sim.add_attributes(["branch", "capability", "deliverable", "budget",
                         "asset", "resource", "external capability"])
-    sim.add_unit_types(["file count", "lineStaffNo", "$", "files handled",
-                        "files stored", "ohFTE", "lineFTE"])
+    sim.add_unit_types(["file count", "lineStaffNo", "files handled",
+                        "files stored", "ohFTE", "lineFTE",
+                        "rent$", "maint$", "op$"])
 
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
@@ -324,28 +325,31 @@ def govRecordStorage():
     sim.add_entity(TheMaintenance, is_source_entity=True)
     storage_e.add_child(TheMaintenance)
     TheMaintenance.attributes.add("budget")
-    sim.connect_entities(TheMaintenance, StorageFacility, "$")
+    sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
     maint_proc = processes.BudgetProcess(name="maintenance budget",
-                                         start_amount=4000000)
+                                         start_amount=4000000,
+                                         budget_type="maint$")
     TheMaintenance.add_process(maint_proc)
 
     TheOperationalCosts = merlin.Entity(sim, "operational costs")
     sim.add_entity(TheOperationalCosts, is_source_entity=True)
     storage_e.add_child(TheOperationalCosts)
     TheOperationalCosts.attributes.add("budget")
-    sim.connect_entities(TheOperationalCosts, StorageFacility, "$")
-    sim.connect_entities(TheOperationalCosts, FileLogistics, "$")
+    sim.connect_entities(TheOperationalCosts, StorageFacility, "op$")
+    sim.connect_entities(TheOperationalCosts, FileLogistics, "op$")
     opcost_proc = processes.BudgetProcess(name="operational budget",
-                                          start_amount=4000000)
+                                          start_amount=4000000,
+                                          budget_type="op$")
     TheOperationalCosts.add_process(opcost_proc)
 
     TheRent = merlin.Entity(sim, "rent costs")
     sim.add_entity(TheRent, is_source_entity=True)
     TheRent.attributes.add("budget")
     storage_e.add_child(TheRent)
-    sim.connect_entities(TheRent, StorageFacility, "$")
+    sim.connect_entities(TheRent, StorageFacility, "rent$")
     rent_proc = processes.BudgetProcess(name="rent budget",
-                                        start_amount=4000000)
+                                        start_amount=4000000,
+                                        budget_type="rent$")
     TheRent.add_process(rent_proc)
 
     # do these outputs go into a capability or branch?
