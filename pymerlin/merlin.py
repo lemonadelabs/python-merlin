@@ -12,8 +12,10 @@ import uuid
 import json
 from datetime import datetime
 from enum import Enum
+from json.decoder import JSONDecodeError
 from typing import (Iterable, Set, Mapping, Any,
-                    List, MutableSequence, Dict)
+                    List, MutableSequence, Dict,
+                    Union, MutableSet, MutableMapping)
 
 # noinspection PyUnresolvedReferences
 import pymerlin  # @UnusedImport
@@ -76,7 +78,7 @@ class Simulation(SimObject):
     def _run_senario_events(self, scenarios: List['Scenario']) -> None:
         for s in scenarios:
             for e in s.events:
-                if e.time == self.current_step:
+                if (e.time + s.start_offset) == self.current_step:
                     for a in e.actions:
                         a.execute(self)
 
@@ -1327,7 +1329,7 @@ class Event(SimObject):
             instance = cls(
                 globals()['pymerlin'].actions.create_from_json(script),
                 time)
-        except Exception:
+        except JSONDecodeError:
             instance = cls(
                 globals()['pymerlin'].actions.create(script),
                 time)
@@ -1342,9 +1344,16 @@ class Event(SimObject):
 
 class Scenario(SimObject):
 
-    def __init__(self, events: Set[Event], name: str=''):
+    def __init__(
+            self,
+            sim: Simulation,
+            events: Set[Event],
+            start_offset: int= None,
+            name: str=''):
         super(Scenario, self).__init__(name)
         self.events = events
+        self.sim = sim
+        self.start_offset = start_offset or 0
 
 
 class Ruleset:
