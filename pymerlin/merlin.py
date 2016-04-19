@@ -12,7 +12,8 @@ import uuid
 import json
 from datetime import datetime
 from enum import Enum
-from typing import Iterable, Set, Mapping, Any, List, MutableSequence, Dict
+from typing import (Iterable, Set, Mapping, Any,
+                    List, MutableSequence, Dict)
 
 # noinspection PyUnresolvedReferences
 import pymerlin  # @UnusedImport
