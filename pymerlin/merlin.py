@@ -843,14 +843,29 @@ class Process(SimObject):
         del self.props[name]
 
     def provide_output(self, name, value):
+        """
+        :param str name: name of output
+        :param float value: the value made available/produced at
+             the actual tick
+        :returns: None
+        """
         self.outputs[name].connector.write(value)
 
     def get_input_available(self, name):
+        """
+        :param str name: the name of the input
+        :returns: the value provided/apportioned for the recent tick
+        """
         return self.inputs[name].connector.value
 
     def consume_input(self, name, value):
+        """
+        :param str name: name of input
+        :param float value: the value consumed at the actual tick
+        :returns: None
+        """
         assert self.get_input_available(name) >= value, \
-                "consuming more input than available"
+            "consuming more input than available"
         self.inputs[name].consume(value)
 
     def notify_insufficient_input(self, name, available, required):

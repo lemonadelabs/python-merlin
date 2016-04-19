@@ -43,12 +43,12 @@ class LineStaffProcess(merlin.Process):
                           1)
         self.add_property("max utilisation", "maxUtil",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          "0.8")
+                          0.8)
 
     def compute(self, tick):
-        oh_staff_req = 2
+        oh_staff_req = 1
 
-        if oh_staff_req > self.get_input_available("ohFTE"):
+        if oh_staff_req > self.get_input_available("overhead staff no"):
             self.provide_output("line staff bandwidth", 0.0)
             self.notify_insufficient_input("ohFTE",
                                            self.get_input_available("ohFTE"),
@@ -109,16 +109,16 @@ class StorageFacilityProcess(merlin.Process):
         self.add_property("staff time per access",
                           "timePerAccess",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          10)
+                          0.001)
         self.add_property("staff time per storage",
                           "timePerStorage",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          10)
+                          0.001)
         # this is no of access over no of storages
         self.add_property("ratio access to storage",
                           "rAccessStorage",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          10)
+                          0.1)
         self.add_property("minimum line staff",
                           "min line staff",
                           merlin.ProcessProperty.PropertyType.number_type,
@@ -126,7 +126,7 @@ class StorageFacilityProcess(merlin.Process):
         self.add_property("ratio overhead to line staff",
                           "rOverheadLineStaff",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          10)
+                          0.1)
 
         self.inputs = {"line staff bandwidth": inLineStaff,
                        "overhead staff bandwidth": inOHStaff,
@@ -225,17 +225,17 @@ class FileLogisticsProcess(merlin.Process):
         self.inputs = {"overhead staff bandwidth": inOHStaff,
                        "contract costs": opCosts}
 
-        self.add_property("min contract costs", "minCosts",
+        self.add_property("monthly contract costs", "minCosts",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          1e6)
+                          1e6/12)
         self.add_property("contracted handling no",
                           "baseHandling",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          1e6)
-        self.add_property("additional costs per file",
+                          1e5)
+        self.add_property("costs per additional file",
                           "addHandlingCosts",
                           merlin.ProcessProperty.PropertyType.number_type,
-                          20)
+                          13)
 
     def compute(self, tick):
 
@@ -314,7 +314,7 @@ def govRecordStorage():
     storage_e.add_child(TheOverheadStaff)
     overheadStaff_proc = processes.ConstantProvider(name="overhead staff no",
                                                     unit="ohFTE",
-                                                    amount=3)
+                                                    amount=5)
     TheOverheadStaff.add_process(overheadStaff_proc)
     sim.connect_entities(TheOverheadStaff, LineStaffRes, "ohFTE")
     sim.connect_entities(TheOverheadStaff, FileLogistics, "ohFTE")
@@ -326,7 +326,7 @@ def govRecordStorage():
     TheMaintenance.attributes.add("budget")
     sim.connect_entities(TheMaintenance, StorageFacility, "$")
     maint_proc = processes.BudgetProcess(name="maintenance budget",
-                                         start_amount=100000)
+                                         start_amount=4000000)
     TheMaintenance.add_process(maint_proc)
 
     TheOperationalCosts = merlin.Entity(sim, "operational costs")
@@ -336,7 +336,7 @@ def govRecordStorage():
     sim.connect_entities(TheOperationalCosts, StorageFacility, "$")
     sim.connect_entities(TheOperationalCosts, FileLogistics, "$")
     opcost_proc = processes.BudgetProcess(name="operational budget",
-                                          start_amount=100000)
+                                          start_amount=4000000)
     TheOperationalCosts.add_process(opcost_proc)
 
     TheRent = merlin.Entity(sim, "rent costs")
@@ -345,7 +345,7 @@ def govRecordStorage():
     storage_e.add_child(TheRent)
     sim.connect_entities(TheRent, StorageFacility, "$")
     rent_proc = processes.BudgetProcess(name="rent budget",
-                                        start_amount=100000)
+                                        start_amount=4000000)
     TheRent.add_process(rent_proc)
 
     # do these outputs go into a capability or branch?
@@ -374,5 +374,5 @@ if __name__ == "__main__":
     sim = govRecordStorage()
     sim.set_time_span(12)
     sim.run()
-    result = list(sim.outputs)[0].result
-    print(result)
+    result = list(sim.outputs)
+    print(result[0].result, result[1].result)
