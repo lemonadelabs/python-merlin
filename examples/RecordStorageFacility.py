@@ -210,8 +210,8 @@ class StorageFacilityProcess(merlin.Process):
 
 class FileLogisticsProcess(merlin.Process):
 
-    def __init__(self, name):
-        super(FileLogisticsProcess, self).__init__(name="FileLogisticsProcess")
+    def __init__(self, name="FileLogisticsProcess"):
+        super(FileLogisticsProcess, self).__init__(name)
 
         # set up the output/s
         outFilesHandled = merlin.ProcessOutput('out_FilesHandled',
