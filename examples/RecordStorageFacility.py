@@ -356,13 +356,13 @@ def govRecordStorage():
     # need an expectation
     filesStored = merlin.Output("files stored",
                                 name="files stored")
-    sim.outputs.add(filesStored)
+    sim.add_output(filesStored)
     sim.connect_output(StorageFacility, filesStored)
 
     # need an expectation
     filesAccessed = merlin.Output("files handled",
                                   name="files accessed")
-    sim.outputs.add(filesAccessed)
+    sim.add_output(filesAccessed)
     sim.connect_output(StorageFacility, filesAccessed)
 
     # todo add another capability
