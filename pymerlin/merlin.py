@@ -374,7 +374,7 @@ class Simulation(SimObject):
             self,
             start: int=1,
             end: int=-1,
-            scenarios: List['Scenario']=set()) -> None:
+            scenarios: List['Scenario']=list()) -> None:
         """
         :param int start:
         :param int end:
