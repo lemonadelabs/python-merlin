@@ -774,6 +774,10 @@ class Process(SimObject):
         if name in self.props:
             return self.props[name]
         else:
+            # check SimObject name prop
+            for pp in self.get_properties():
+                if pp.name == name:
+                    return pp
             return None
 
     def get_prop_value(self, name):
