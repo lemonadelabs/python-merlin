@@ -20,7 +20,7 @@ logging.basicConfig(
 
 class LineStaffProcess(merlin.Process):
 
-    def __init__(self, name):
+    def __init__(self, name="lineStaffProcess"):
         super(LineStaffProcess, self).__init__(name)
 
         # set up the output/s
@@ -65,7 +65,7 @@ class LineStaffProcess(merlin.Process):
 
 class StorageFacilityProcess(merlin.Process):
 
-    def __init__(self, name):
+    def __init__(self, name="StorageFacilityProcess"):
         super(StorageFacilityProcess, self).__init__(name)
 
         # set up the output/s
@@ -211,7 +211,7 @@ class StorageFacilityProcess(merlin.Process):
 class FileLogisticsProcess(merlin.Process):
 
     def __init__(self, name):
-        super(FileLogisticsProcess, self).__init__(name)
+        super(FileLogisticsProcess, self).__init__(name="FileLogisticsProcess")
 
         # set up the output/s
         outFilesHandled = merlin.ProcessOutput('out_FilesHandled',
@@ -376,7 +376,18 @@ def govRecordStorage():
 if __name__ == "__main__":
 
     sim = govRecordStorage()
-    sim.set_time_span(12)
-    sim.run()
-    result = list(sim.outputs)
-    print(result[0].result, result[1].result)
+
+    for e in sim.get_entities():
+        for p in e.get_processes():
+            proc_class = type(p).__name__
+            proc_module = type(p).__module__
+            if proc_module == "__main__":
+                #proc_module = type(p).__file__
+                pass
+            
+            print(proc_module)
+
+#     sim.set_time_span(48)
+#     sim.run()
+#     result = list(sim.outputs)
+#     print(result[0].result, result[1].result)
