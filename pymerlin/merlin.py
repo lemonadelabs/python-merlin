@@ -479,7 +479,7 @@ class Entity(SimObject):
         super(Entity, self).__init__(name)
         self._processes = dict()
         self.sim = simulation
-        self.attributes = attributes
+        self.attributes = set(attributes)  # shallow copy
         self.inputs = set()  # type: Set[InputConnector]
         self.outputs = set()  # type: Set[OutputConnector]
         self.parent = None  # type: Union[None, Entity]
