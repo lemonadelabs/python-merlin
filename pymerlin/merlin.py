@@ -605,7 +605,6 @@ class Entity(SimObject):
                     self,
                     name='{0}_output'.format(po.type))
                 self.add_output(o_con)
-
             po.connector = o_con
 
         # Connect process inputs to entity inputs
@@ -745,9 +744,9 @@ class Process(SimObject):
     entities are connected to each other.
     """
 
-    def __init__(self, name=''):
+    def __init__(self, name: str=''):
         super(Process, self).__init__(name)
-        self.parent = None
+        self.parent = None  # type: Entity
         self.priority = 1000
         """
         This number influences the execution order of the compute methods.
@@ -761,9 +760,9 @@ class Process(SimObject):
         The priority needs to be an integer between 0 and +32767 incl. (this
         restriction comes from django's model implementation).
         """
-        self.inputs = dict()
-        self.outputs = dict()
-        self.props = dict()
+        self.inputs = dict()  # type: Dict[str, 'ProcessInput']
+        self.outputs = dict()  # type: Dict[str, 'ProcessOutput']
+        self.props = dict()  # type: Dict[str, 'ProcessProperty']
 
     def get_prop(self, name) -> 'ProcessProperty':
         """
@@ -950,6 +949,12 @@ class ProcessInput(SimObject):
         self.type = unit_type  # type: str
         self.connector = connector  # type: InputConnector
 
+    def __str__(self):
+        return """
+        <ProcessInput {2}>
+            type: {0}
+            connector: {1}""".format(self.type, self.connector, id(self))
+
     def consume(self, value):
         self.set_telemetry_value('consume', value)
         self.connector.value -= value
@@ -977,6 +982,13 @@ class ProcessOutput(SimObject):
         super(ProcessOutput, self).__init__(name)
         self.type = unit_type
         self.connector = connector
+
+    def __str__(self):
+        return """
+        <Process Output {0}>
+            type: {1}
+            connector: {2}
+        """.format(id(self), self.type, self.connector)
 
 
 class ProcessProperty(SimObject):
