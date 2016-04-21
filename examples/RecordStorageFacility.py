@@ -304,6 +304,7 @@ def govRecordStorage():
     TheLineStaff = merlin.Entity(sim, "line staff")
     sim.add_entity(TheLineStaff, is_source_entity=True)
     storage_e.add_child(TheLineStaff)
+    TheLineStaff.attributes.add("resource")
     lineStaff_proc = processes.ConstantProvider(name="line staff no",
                                                 unit="lineStaffNo",
                                                 amount=20)
@@ -313,6 +314,7 @@ def govRecordStorage():
     TheOverheadStaff = merlin.Entity(sim, "overhead staff")
     sim.add_entity(TheOverheadStaff, is_source_entity=True)
     storage_e.add_child(TheOverheadStaff)
+    TheOverheadStaff.attributes.add("resource")
     overheadStaff_proc = processes.ConstantProvider(name="overhead staff no",
                                                     unit="ohFTE",
                                                     amount=5)
