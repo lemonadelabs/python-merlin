@@ -501,11 +501,35 @@ class Entity(SimObject):
             self.name,
             self.attributes,
             self.inputs,
-            self.outputs,
-            self.parent,
-            self._children,
+            [(id(o), o.type) for o in self.outputs],
+            "None" if self.parent is None else (
+                id(self.parent), self.parent.name),
+            [(id(c), c.name) for c in self._children],
             self._processes,
             id(self))
+
+    def create_process(
+            self,
+            process_class: type,
+            params: Dict[str, Any],
+            priority: int=100) -> 'Process':
+        """
+        Creates a new process inside the entity and wires up
+        the appropriate inputs and outputs afterward.
+
+        This is the proper way to create processes going forward.
+
+        :param process_class: the type of the process to create
+        :param params: the keyword arguments to the constructor of the process
+        :param priority: the priority of the process, lower = higher priority
+        :return: The newly created Process
+        """
+
+        new_proc = process_class(**params)  # type: Process
+        new_proc.default_params = params
+        new_proc.priority = priority
+        self._add_process(new_proc)
+        return new_proc
 
     def add_child(self, entity):
         if entity not in self._children:
@@ -574,51 +598,6 @@ class Entity(SimObject):
 
                 for pprop in p.get_properties():
                     pprop.reset_telemetry()
-
-    def add_process(self, proc):
-        """
-        adds a :py:class:`pymerlin.merlin.Process` to an entity.
-
-        If the Entity is already connected to other entities and the process
-        inputs/outputs are matching, they are connected accordingly.
-
-        This matching is done by ``type``!
-        """
-
-        # first check to see if the proc has already been added.
-        if proc.id in [p.id for p in self.get_processes()]:
-            return
-
-        if proc.priority in self._processes.keys():
-            self._processes[proc.priority].add(proc)
-        else:
-            self._processes[proc.priority] = {proc}
-        proc.parent = self
-
-        # Connect process outputs to entity outputs.
-        # Create entity outputs if they don't exist.
-        for po in proc.outputs.values():
-            o_con = self.get_output_by_type(po.type)
-            if not o_con:
-                o_con = OutputConnector(
-                    po.type,
-                    self,
-                    name='{0}_output'.format(po.type))
-                self.add_output(o_con)
-            po.connector = o_con
-
-        # Connect process inputs to entity inputs
-        # Create entity inputs if they don't exist
-        for pi in proc.inputs.values():
-            i_con = self.get_input_by_type(pi.type)
-            if not i_con:
-                i_con = InputConnector(
-                    pi.type,
-                    self,
-                    name='{0}_input'.format(pi.type))
-                self.add_input(i_con)
-
-            pi.connector = i_con
 
     def remove_process(self, proc_id):
         proc = self.get_process_by_id(proc_id)
@@ -704,6 +683,51 @@ class Entity(SimObject):
                 self._process()
                 self._update_process_telemetry()
 
+    def _add_process(self, proc):
+        """
+        adds a :py:class:`pymerlin.merlin.Process` to an entity.
+
+        If the Entity is already connected to other entities and the process
+        inputs/outputs are matching, they are connected accordingly.
+
+        This matching is done by ``type``!
+        """
+
+        # first check to see if the proc has already been added.
+        if proc.id in [p.id for p in self.get_processes()]:
+            return
+
+        if proc.priority in self._processes.keys():
+            self._processes[proc.priority].add(proc)
+        else:
+            self._processes[proc.priority] = {proc}
+        proc.parent = self
+
+        # Connect process outputs to entity outputs.
+        # Create entity outputs if they don't exist.
+        for po in proc.outputs.values():
+            o_con = self.get_output_by_type(po.type)
+            if not o_con:
+                o_con = OutputConnector(
+                    po.type,
+                    self,
+                    name='{0}_output'.format(po.type))
+                self.add_output(o_con)
+            po.connector = o_con
+
+        # Connect process inputs to entity inputs
+        # Create entity inputs if they don't exist
+        for pi in proc.inputs.values():
+            i_con = self.get_input_by_type(pi.type)
+            if not i_con:
+                i_con = InputConnector(
+                    pi.type,
+                    self,
+                    name='{0}_input'.format(pi.type))
+                self.add_input(i_con)
+
+            pi.connector = i_con
+
     def _update_process_telemetry(self):
         if self._processes.keys():
             for i in self._processes.keys():
@@ -763,6 +787,7 @@ class Process(SimObject):
         self.inputs = dict()  # type: Dict[str, 'ProcessInput']
         self.outputs = dict()  # type: Dict[str, 'ProcessOutput']
         self.props = dict()  # type: Dict[str, 'ProcessProperty']
+        self.default_params = dict()  # type: Dict[str, Any]
 
     def get_prop(self, name) -> 'ProcessProperty':
         """

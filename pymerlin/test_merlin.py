@@ -3,10 +3,10 @@ import numpy.testing as npt
 from datetime import datetime
 from pymerlin import merlin
 from pymerlin import actions
-
 from pymerlin.processes import (BudgetProcess,
                                 CallCenterStaffProcess,
-                                BuildingMaintainenceProcess)
+                                BuildingMaintainenceProcess,
+                                ConstantProvider)
 
 
 @pytest.fixture()
@@ -48,12 +48,9 @@ def computation_test_harness(sim) -> merlin.Simulation:
     sim.connect_entities(e_office, e_call_center, 'desks')
 
     # Add entity processes
-    p_budget = BudgetProcess(name='Budget')
-    p_staff = CallCenterStaffProcess(name='Call Center Staff')
-    p_building = BuildingMaintainenceProcess(name='Building Maintenance')
-    e_budget.add_process(p_budget)
-    e_call_center.add_process(p_staff)
-    e_office.add_process(p_building)
+    e_budget.create_process(BudgetProcess, {'name': 'Budget'})
+    e_call_center.create_process(CallCenterStaffProcess, {'name': 'Call Center Staff'})
+    e_office.create_process(BuildingMaintainenceProcess, {'name': 'Building Maintenance'})
     return sim
 
 
@@ -269,26 +266,42 @@ class TestSimulation:
 
 class TestEntity:
 
-    def test_add_process(self, entity, process):
-        entity.add_process(process)
-        p = entity.get_process_by_name('test_process')
-        assert p == process
+    def test_create_process(self, entity):
+        assert len(entity.get_processes()) == 0
+        assert len(entity.outputs) == 0
+        assert len(entity.inputs) == 0
+        entity.create_process(
+            ConstantProvider,
+            {
+                'name': 'test_resource',
+                'unit': 'snickers_bars',
+                'amount': 100
+            })
+        p = entity.get_process_by_name('test_resource')
+        assert p
+        assert isinstance(p, ConstantProvider)
+        assert len(entity.get_processes()) == 1
+        assert len(entity.outputs) == 1
+        assert len(entity.inputs) == 0
+        assert entity.get_output_by_type('snickers_bars')
+        assert p.get_prop('amount')
+        assert p.get_prop('amount').get_value() == 100
 
-    def test_get_process_by_id(self, entity, process):
-        entity.add_process(process)
-        p = entity.get_process_by_id(process.id)
-        assert p == process
+    def test_get_process_by_id(self, entity):
+        p1 = entity.create_process(BuildingMaintainenceProcess, {})
+        p2 = entity.get_process_by_id(p1.id)
+        assert p1 == p2
 
-    def test_get_processes(self, entity, process):
-        entity.add_process(process)
+    def test_get_processes(self, entity):
+        entity.create_process(BuildingMaintainenceProcess, {})
         ps = entity.get_processes()
         assert len(ps) == 1
-        assert ps[0].name == 'test_process'
+        assert ps[0].name == 'Building Maintenance'
 
-    def test_remove_process(self, entity, process):
-        entity.add_process(process)
-        entity.remove_process(process.id)
-        p = entity.get_process_by_id(process.id)
+    def test_remove_process(self, entity):
+        bmp = entity.create_process(BuildingMaintainenceProcess, {})
+        entity.remove_process(bmp.id)
+        p = entity.get_process_by_id(bmp.id)
         assert p is None
 
     def test_get_connector_by_id(self, simple_entity_graph):
@@ -352,7 +365,7 @@ class TestScenarios:
 
     def test_simple_scenario(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
-        e = merlin.Event.create(1, '+ Attribute foo bar baz')
+        e = merlin.Event.create(1, '+ Attribute foo, bar, baz')
         s = merlin.Scenario(sim, {e})
         assert sim.is_attribute('foo') == False
         assert sim.is_attribute('bar') == False
@@ -433,7 +446,7 @@ class TestEvents:
 
 
     def test_add_attribute_event(self):
-        e = merlin.Event.create(1, '+ Attribute foo bar baz')
+        e = merlin.Event.create(1, '+ Attribute foo, bar, baz')
         assert len(e.actions) == 1
         assert isinstance(e.actions[0], actions.AddAttributesAction)
 
@@ -451,7 +464,7 @@ class TestEvents:
         e = merlin.Event.create(
             1,
             """
-            + UnitType desks $
+            + UnitType desks, $
             """)
         assert len(e.actions) == 1
         assert isinstance(e.actions[0], actions.UnitTypeAction)
@@ -460,7 +473,7 @@ class TestEvents:
         e = merlin.Event.create(
             1,
             """
-              +   UnitType   desks   $
+              +   UnitType   desks,   $
             """
         )
         assert len(e.actions) == 1
@@ -509,7 +522,7 @@ class TestEvents:
         sink = merlin.Entity(simulation=sim, name='sink', attributes=set())
         sim.add_entity(source)
         sim.add_entity(sink)
-        axs = actions.create("Entity {0} > Entity {1} shoes 1 True".format(
+        axs = actions.create("Entity {0} > Entity {1}, shoes, 1, True".format(
             source.id, sink.id))
         assert len(axs) == 1
         a = axs[0]
@@ -522,26 +535,22 @@ class TestEvents:
         sim = computation_test_harness  # type: merlin.Simulation
         e1 = sim.get_entity_by_name("Budget")
         e2 = sim.get_entity_by_name("office building")
-        axs = actions.create("Entity {0} / Entity {1} $".format(e1.id, e2.id))
+        axs = actions.create("Entity {0} / Entity {1}, $".format(e1.id, e2.id))
         assert len(axs) == 1
         axs[0].execute(sim)
         assert len(e1.get_output_by_type('$').get_endpoints()) == 1
         assert len(e2.inputs) == 0
 
 
-    def test_add_process_event(self, computation_test_harness):
-        # TODO: write test
-        sim = computation_test_harness  # type: merlin.Simulation
-        e1 = sim.get_entity_by_name('Budget')
+    def test_add_process_event(self, sim, entity):
+        sim.add_entity(entity)
         a = actions.create("""
-            Entity {0} + Process BuildingMaintainenceProcess 200 pymerlin.processes b_maintainance
-            """.format(e1.id))
-        assert len(e1.get_processes()) == 1
+            Entity {0} + Process pymerlin.processes.ConstantProvider, 200, name:str = mr_foo, unit:str = snickers bars, amount:float = 1000
+            """.format(entity.id))
+        assert len(entity.get_processes()) == 0
         a[0].execute(sim)
-        assert len(e1.get_processes()) == 2
-        p = e1.get_process_by_name('b_maintainance')
-        assert p
-        assert p.priority == 200
+        assert len(entity.get_processes()) == 1
+
 
     def test_modify_process_property_event(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
@@ -550,7 +559,7 @@ class TestEvents:
         prop = p.get_prop('staff salary')
         assert prop.get_value() == 5.0
         # a = actions.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
-        a = actions.create("Entity {0} = Property {1} 2.0".format(e.id, prop.id))
+        a = actions.create("Entity {0} := Property {1}, 2.0".format(e.id, prop.id))
         assert len(a) == 1
         a[0].execute(sim)
         assert prop.get_value() == 2.0
@@ -640,10 +649,9 @@ class TestCoreActions:
         e1 = sim.get_entity_by_name('Budget')
         a = actions.AddProcessAction(
             e1.id,
-            'BuildingMaintainenceProcess',
+            'pymerlin.processes.BuildingMaintainenceProcess',
             200,
-            process_module='pymerlin.processes',
-            process_name='b_maintainance')
+            {'name': 'b_maintainance'})
         assert len(e1.get_processes()) == 1
         a.execute(sim)
         assert len(e1.get_processes()) == 2
