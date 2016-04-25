@@ -279,15 +279,27 @@ def govRecordStorage():
     FileLogistics = merlin.Entity(sim, "file logistics")
     sim.add_entity(FileLogistics)
     storage_e.add_child(FileLogistics)
-    the_file_log_process = FileLogisticsProcess("file logistics process")
-    FileLogistics.add_process(the_file_log_process)
+    # the_file_log_process = FileLogisticsProcess("file logistics process")
+    # FileLogistics.add_process(the_file_log_process)
+    FileLogistics.create_process(
+        FileLogisticsProcess,
+        {
+            'name': "file logistics process"
+        })
+
     FileLogistics.attributes.add("external capability")
 
     LineStaffRes = merlin.Entity(sim, "line staff resource")
     sim.add_entity(LineStaffRes)
     storage_e.add_child(LineStaffRes)
-    the_line_staff_process = LineStaffProcess("line staff resource process")
-    LineStaffRes.add_process(the_line_staff_process)
+    # the_line_staff_process = LineStaffProcess("line staff resource process")
+    # LineStaffRes.add_process(the_line_staff_process)
+    LineStaffRes.create_process(
+        LineStaffProcess,
+        {
+            'name': "line staff resource process"
+        })
+
     LineStaffRes.attributes.add("resource")
 
     StorageFacility = merlin.Entity(sim, "storage facility")
@@ -295,8 +307,14 @@ def govRecordStorage():
     storage_e.add_child(StorageFacility)
     sim.connect_entities(FileLogistics, StorageFacility, "file count")
     sim.connect_entities(LineStaffRes, StorageFacility, "lineFTE")
-    the_stor_fac_process = StorageFacilityProcess("storage facility process")
-    StorageFacility.add_process(the_stor_fac_process)
+    # the_stor_fac_process = StorageFacilityProcess("storage facility process")
+    # StorageFacility.add_process(the_stor_fac_process)
+    StorageFacility.create_process(
+        StorageFacilityProcess,
+        {
+            'name': "storage facility process"
+        })
+
     StorageFacility.attributes.add("asset")
 
     # these are the Entities providing budget and staff numbers
@@ -305,20 +323,36 @@ def govRecordStorage():
     sim.add_entity(TheLineStaff, is_source_entity=True)
     storage_e.add_child(TheLineStaff)
     TheLineStaff.attributes.add("resource")
-    lineStaff_proc = processes.ConstantProvider(name="line staff no",
-                                                unit="lineStaffNo",
-                                                amount=20)
-    TheLineStaff.add_process(lineStaff_proc)
+    # lineStaff_proc = processes.ConstantProvider(name="line staff no",
+    #                                             unit="lineStaffNo",
+    #                                             amount=20)
+    # TheLineStaff.add_process(lineStaff_proc)
+    TheLineStaff.create_process(
+        processes.ConstantProvider,
+        {
+            'name': "line staff no",
+            'unit': "lineStaffNo",
+            'amount': 20
+        })
+
     sim.connect_entities(TheLineStaff, LineStaffRes, "lineStaffNo")
 
     TheOverheadStaff = merlin.Entity(sim, "overhead staff")
     sim.add_entity(TheOverheadStaff, is_source_entity=True)
     storage_e.add_child(TheOverheadStaff)
     TheOverheadStaff.attributes.add("resource")
-    overheadStaff_proc = processes.ConstantProvider(name="overhead staff no",
-                                                    unit="ohFTE",
-                                                    amount=5)
-    TheOverheadStaff.add_process(overheadStaff_proc)
+    # overheadStaff_proc = processes.ConstantProvider(name="overhead staff no",
+    #                                                 unit="ohFTE",
+    #                                                 amount=5)
+    # TheOverheadStaff.add_process(overheadStaff_proc)
+    TheOverheadStaff.create_process(
+        processes.ConstantProvider,
+        {
+            'name': "overhead staff no",
+            'unit': "ohFTE",
+            'amount': 5
+        })
+
     sim.connect_entities(TheOverheadStaff, LineStaffRes, "ohFTE")
     sim.connect_entities(TheOverheadStaff, FileLogistics, "ohFTE")
     sim.connect_entities(TheOverheadStaff, StorageFacility, "ohFTE")
@@ -328,10 +362,17 @@ def govRecordStorage():
     storage_e.add_child(TheMaintenance)
     TheMaintenance.attributes.add("budget")
     sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
-    maint_proc = processes.BudgetProcess(name="maintenance budget",
-                                         start_amount=4000000,
-                                         budget_type="maint$")
-    TheMaintenance.add_process(maint_proc)
+    # maint_proc = processes.BudgetProcess(name="maintenance budget",
+    #                                      start_amount=4000000,
+    #                                      budget_type="maint$")
+    # TheMaintenance.add_process(maint_proc)
+    TheMaintenance.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "maintenance budget",
+            'start_amount': 4000000,
+            'budget_type': "maint$"
+        })
 
     TheOperationalCosts = merlin.Entity(sim, "operational costs")
     sim.add_entity(TheOperationalCosts, is_source_entity=True)
@@ -339,20 +380,35 @@ def govRecordStorage():
     TheOperationalCosts.attributes.add("budget")
     sim.connect_entities(TheOperationalCosts, StorageFacility, "op$")
     sim.connect_entities(TheOperationalCosts, FileLogistics, "op$")
-    opcost_proc = processes.BudgetProcess(name="operational budget",
-                                          start_amount=4000000,
-                                          budget_type="op$")
-    TheOperationalCosts.add_process(opcost_proc)
+    # opcost_proc = processes.BudgetProcess(name="operational budget",
+    #                                       start_amount=4000000,
+    #                                       budget_type="op$")
+    # TheOperationalCosts.add_process(opcost_proc)
+    TheOperationalCosts.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "operational budget",
+            'start_amount': 4000000,
+            'budget_type': "op$"
+        })
+
 
     TheRent = merlin.Entity(sim, "rent costs")
     sim.add_entity(TheRent, is_source_entity=True)
     TheRent.attributes.add("budget")
     storage_e.add_child(TheRent)
     sim.connect_entities(TheRent, StorageFacility, "rent$")
-    rent_proc = processes.BudgetProcess(name="rent budget",
-                                        start_amount=4000000,
-                                        budget_type="rent$")
-    TheRent.add_process(rent_proc)
+    # rent_proc = processes.BudgetProcess(name="rent budget",
+    #                                     start_amount=4000000,
+    #                                     budget_type="rent$")
+    # TheRent.add_process(rent_proc)
+    TheRent.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "rent budget",
+            'start_amount': 4000000,
+            'budget_type': "rent$"
+        })
 
     # do these outputs go into a capability or branch?
     # need an expectation
