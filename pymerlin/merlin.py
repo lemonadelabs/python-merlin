@@ -1376,7 +1376,7 @@ class Event(SimObject):
             name: str='') -> None:
         super(Event, self).__init__(name)
         self.actions = actions  # type: List[Action]
-        self.time = time
+        self.time = time  # type: int
 
     @classmethod
     def create(cls, time: int, script: str) -> 'Event':
@@ -1407,9 +1407,9 @@ class Scenario(SimObject):
             start_offset: int= None,
             name: str=''):
         super(Scenario, self).__init__(name)
-        self.events = events
-        self.sim = sim
-        self.start_offset = start_offset or 0
+        self.events = events  # type: Set[Event]
+        self.sim = sim  # type: Simulation
+        self.start_offset = start_offset or 0  # type: int
 
 
 class Ruleset:
