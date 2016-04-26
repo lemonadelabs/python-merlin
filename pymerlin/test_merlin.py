@@ -416,7 +416,37 @@ class TestScenarios:
 
 class TestEvents:
 
-    def test_add_json_events(self, simple_entity_graph):
+
+    def test_add_dict_events(self):
+        data = [
+            {
+                'op': '+',
+                'operand_1': {
+                    'type': "Attribute",
+                    'params': ["foo"],
+                    'props': None
+                },
+                'operand_2': None
+            },
+
+            {
+                'op': '+',
+                'operand_1': {
+                    'type': "UnitType",
+                    'params': ["bar"],
+                    'props': None
+                },
+                'operand_2': None
+            }
+        ]
+
+        e = merlin.Event.create_from_dict(1, data)
+        assert len(e.actions) == 2
+        assert isinstance(e.actions[0], actions.AddAttributesAction)
+        assert isinstance(e.actions[1], actions.UnitTypeAction)
+
+
+    def test_add_json_events(self):
         e = merlin.Event.create(
             1,
             """

@@ -1391,6 +1391,13 @@ class Event(SimObject):
                 time)
         return instance
 
+    @classmethod
+    def create_from_dict(
+            cls,
+            time: int,
+            data: List[Dict[str, Any]]) -> 'Event':
+        return cls(globals()['pymerlin'].actions.create_from_dict(data), time)
+
     def get_serialized_event_actions(self) -> List[Dict[str, Any]]:
         output = list()
         for a in self.actions:

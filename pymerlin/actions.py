@@ -11,6 +11,13 @@ from pymerlin import merlin
 import json
 
 
+def create_from_dict(actions: List[Dict[str, Any]]) -> List[merlin.Action]:
+    output = list()
+    for a in actions:
+        output.append(_generate_action(a))
+    return output
+
+
 def create(script: str) -> List[merlin.Action]:
     """
     Parses a MerlinScript string and returns a
