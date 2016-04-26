@@ -18,6 +18,41 @@ logging.basicConfig(
     format='%(asctime)s: [%(levelname)s] %(message)s')
 
 
+class SubBudgetProcess(merlin.Process):
+
+    def __init__(self, name="subBudgetProcess", **inputOutputs):
+        super(SubBudgetProcess, self).__init__(name)
+
+        # expecting 1 input, many outputs
+        # each output can be qualified with some rules
+        # there might be some global rules
+
+        in_unit = inputOutputs["in_unit"]
+        inBudget = merlin.ProcessInput("in_budget",
+                                       in_unit)
+        self.inputs = {"in_budget": inBudget}
+
+        # set up the output/s
+        for out_name, out_unit in inputOutputs.items():
+            if out_name.startswith("out_"):
+                # set up the input/s
+                outBudget = merlin.ProcessOutput(out_name,
+                                                 out_unit)
+
+                self.outputs[out_name] = outBudget
+
+    def compute(self, tick):
+
+        # right now: split things evenly across budgets
+        inputBudget = self.get_input_available("in_budget")
+        no_outputs = len(self.outputs)
+
+        for o in self.outputs.keys():
+            self.provide_output(o, inputBudget/no_outputs)
+
+        self.consume_input("in_budget", inputBudget)
+
+
 class LineStaffProcess(merlin.Process):
 
     def __init__(self, name="lineStaffProcess"):
@@ -253,7 +288,7 @@ class FileLogisticsProcess(merlin.Process):
         # todo: implement addHandlingCosts
 
 
-def govRecordStorage():
+def govRecordStorageCore():
     # this is the capability, right now
 
     sim = merlin.Simulation()
@@ -275,7 +310,6 @@ def govRecordStorage():
     branch_e.attributes.add("capability")
 
     # add entities and their processes
-
     FileLogistics = merlin.Entity(sim, "file logistics")
     sim.add_entity(FileLogistics)
     storage_e.add_child(FileLogistics)
@@ -317,6 +351,89 @@ def govRecordStorage():
 
     StorageFacility.attributes.add("asset")
 
+    # do these outputs go into a capability or branch?
+    # need an expectation
+    filesStored = merlin.Output("files stored",
+                                name="files stored")
+    sim.add_output(filesStored)
+    sim.connect_output(StorageFacility, filesStored)
+
+    # need an expectation
+    filesAccessed = merlin.Output("files handled",
+                                  name="files accessed")
+    sim.add_output(filesAccessed)
+    sim.connect_output(StorageFacility, filesAccessed)
+
+    return sim
+
+
+def manyBudgetModel():
+
+    sim = govRecordStorageCore()
+    branch_e = sim.get_entity_by_name("the branch")
+    storage_e = branch_e.get_child_by_name("the storage")
+    StorageFacility = storage_e.get_child_by_name("storage facility")
+    FileLogistics = storage_e.get_child_by_name("file logistics")
+    LineStaffRes = storage_e.get_child_by_name("line staff resource")
+
+    TheMaintenance = merlin.Entity(sim, "maintenance budget")
+    sim.add_entity(TheMaintenance, is_source_entity=True)
+    storage_e.add_child(TheMaintenance)
+    TheMaintenance.attributes.add("budget")
+    sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
+    # maint_proc = processes.BudgetProcess(name="maintenance budget",
+    #                                      start_amount=4000000,
+    #                                      budget_type="maint$")
+    # TheMaintenance.add_process(maint_proc)
+    TheMaintenance.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "maintenance budget",
+            'start_amount': 4000000,
+            'budget_type': "maint$"
+        })
+
+    TheOperationalCosts = merlin.Entity(sim, "operational costs")
+    sim.add_entity(TheOperationalCosts, is_source_entity=True)
+    storage_e.add_child(TheOperationalCosts)
+    TheOperationalCosts.attributes.add("budget")
+    sim.connect_entities(TheOperationalCosts, StorageFacility, "op$")
+    sim.connect_entities(TheOperationalCosts, FileLogistics, "op$")
+    # opcost_proc = processes.BudgetProcess(name="operational budget",
+    #                                       start_amount=4000000,
+    #                                       budget_type="op$")
+    # TheOperationalCosts.add_process(opcost_proc)
+    TheOperationalCosts.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "operational budget",
+            'start_amount': 4000000,
+            'budget_type': "op$"
+        })
+
+    TheRent = merlin.Entity(sim, "rent costs")
+    sim.add_entity(TheRent, is_source_entity=True)
+    TheRent.attributes.add("budget")
+    storage_e.add_child(TheRent)
+    sim.connect_entities(TheRent, StorageFacility, "rent$")
+    # rent_proc = processes.BudgetProcess(name="rent budget",
+    #                                     start_amount=4000000,
+    #                                     budget_type="rent$")
+    # TheRent.add_process(rent_proc)
+    TheRent.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "rent budget",
+            'start_amount': 4000000,
+            'budget_type': "rent$"
+        })
+
+    # todo add another capability
+    # add the govRecordStorage capability
+#     printer_e = merlin.Entity("the printer")
+#     sim.add_entity(printer_e, parent=branch_e)
+#     branch_e.add_child(printer_e)
+
     # these are the Entities providing budget and staff numbers
     # they are replaced by connections in the agency wide model
     TheLineStaff = merlin.Entity(sim, "line staff")
@@ -357,95 +474,139 @@ def govRecordStorage():
     sim.connect_entities(TheOverheadStaff, FileLogistics, "ohFTE")
     sim.connect_entities(TheOverheadStaff, StorageFacility, "ohFTE")
 
+    return sim
+
+
+def big_one_with_sub_budgets():
+    sim = govRecordStorageCore()
+    sim.add_unit_types(["$"])
+
+    branch_e = sim.get_entity_by_name("the branch")
+    storage_e = branch_e.get_child_by_name("the storage")
+    StorageFacility = storage_e.get_child_by_name("storage facility")
+    FileLogistics = storage_e.get_child_by_name("file logistics")
+    LineStaffRes = storage_e.get_child_by_name("line staff resource")
+
+    # add a big budget
+
     TheMaintenance = merlin.Entity(sim, "maintenance budget")
-    sim.add_entity(TheMaintenance, is_source_entity=True)
+    sim.add_entity(TheMaintenance)
     storage_e.add_child(TheMaintenance)
     TheMaintenance.attributes.add("budget")
     sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
-    # maint_proc = processes.BudgetProcess(name="maintenance budget",
-    #                                      start_amount=4000000,
-    #                                      budget_type="maint$")
-    # TheMaintenance.add_process(maint_proc)
     TheMaintenance.create_process(
-        processes.BudgetProcess,
+        SubBudgetProcess,
         {
             'name': "maintenance budget",
-            'start_amount': 4000000,
-            'budget_type': "maint$"
+            'out_maintenance': "maint$",
+            'in_unit': "$"
         })
 
     TheOperationalCosts = merlin.Entity(sim, "operational costs")
-    sim.add_entity(TheOperationalCosts, is_source_entity=True)
+    sim.add_entity(TheOperationalCosts)
     storage_e.add_child(TheOperationalCosts)
     TheOperationalCosts.attributes.add("budget")
     sim.connect_entities(TheOperationalCosts, StorageFacility, "op$")
     sim.connect_entities(TheOperationalCosts, FileLogistics, "op$")
-    # opcost_proc = processes.BudgetProcess(name="operational budget",
-    #                                       start_amount=4000000,
-    #                                       budget_type="op$")
-    # TheOperationalCosts.add_process(opcost_proc)
     TheOperationalCosts.create_process(
-        processes.BudgetProcess,
+        SubBudgetProcess,
         {
             'name': "operational budget",
-            'start_amount': 4000000,
-            'budget_type': "op$"
+            "out_operational": "op$",
+            'in_unit': "$"
         })
 
-
     TheRent = merlin.Entity(sim, "rent costs")
-    sim.add_entity(TheRent, is_source_entity=True)
+    sim.add_entity(TheRent)
     TheRent.attributes.add("budget")
     storage_e.add_child(TheRent)
     sim.connect_entities(TheRent, StorageFacility, "rent$")
-    # rent_proc = processes.BudgetProcess(name="rent budget",
-    #                                     start_amount=4000000,
-    #                                     budget_type="rent$")
-    # TheRent.add_process(rent_proc)
     TheRent.create_process(
-        processes.BudgetProcess,
+        SubBudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 4000000,
-            'budget_type': "rent$"
+            "out_rent": "rent$",
+            'in_unit': "$"
         })
 
-    # do these outputs go into a capability or branch?
-    # need an expectation
-    filesStored = merlin.Output("files stored",
-                                name="files stored")
-    sim.add_output(filesStored)
-    sim.connect_output(StorageFacility, filesStored)
+    # these are the Entities providing budget and staff numbers
+    # they are replaced by connections in the agency wide model
+    TheLineStaff = merlin.Entity(sim, "line staff")
+    sim.add_entity(TheLineStaff, is_source_entity=True)
+    branch_e.add_child(TheLineStaff)
+    TheLineStaff.attributes.add("resource")
+    # lineStaff_proc = processes.ConstantProvider(name="line staff no",
+    #                                             unit="lineStaffNo",
+    #                                             amount=20)
+    # TheLineStaff.add_process(lineStaff_proc)
+    TheLineStaff.create_process(
+        processes.ConstantProvider,
+        {
+            'name': "line staff no",
+            'unit': "lineStaffNo",
+            'amount': 20
+        })
 
-    # need an expectation
-    filesAccessed = merlin.Output("files handled",
-                                  name="files accessed")
-    sim.add_output(filesAccessed)
-    sim.connect_output(StorageFacility, filesAccessed)
+    sim.connect_entities(TheLineStaff, LineStaffRes, "lineStaffNo")
 
-    # todo add another capability
-    # add the govRecordStorage capability
-#     printer_e = merlin.Entity("the printer")
-#     sim.add_entity(printer_e, parent=branch_e)
-#     branch_e.add_child(printer_e)
+    TheOverheadStaff = merlin.Entity(sim, "overhead staff")
+    sim.add_entity(TheOverheadStaff, is_source_entity=True)
+    branch_e.add_child(TheOverheadStaff)
+    TheOverheadStaff.attributes.add("resource")
+    # overheadStaff_proc = processes.ConstantProvider(name="overhead staff no",
+    #                                                 unit="ohFTE",
+    #                                                 amount=5)
+    # TheOverheadStaff.add_process(overheadStaff_proc)
+    TheOverheadStaff.create_process(
+        processes.ConstantProvider,
+        {
+            'name': "overhead staff no",
+            'unit': "ohFTE",
+            'amount': 5
+        })
+
+    sim.connect_entities(TheOverheadStaff, LineStaffRes, "ohFTE")
+    sim.connect_entities(TheOverheadStaff, FileLogistics, "ohFTE")
+    sim.connect_entities(TheOverheadStaff, StorageFacility, "ohFTE")
+
+    # now create a branch budget
+    branchBudget = merlin.Entity(sim, "branch budget")
+    sim.add_entity(branchBudget)
+    branch_e.add_child(branchBudget)
+    branchBudget.create_process(
+        SubBudgetProcess,
+        {
+            'name': "branch budget",
+            "in_unit": "$",
+            'out_cap1': "$"
+        })
+    sim.connect_entities(branchBudget, TheOperationalCosts, "$")
+    sim.connect_entities(branchBudget, TheMaintenance, "$")
+    sim.connect_entities(branchBudget, TheRent, "$")
+
+    departmentBudget = merlin.Entity(sim, "department staff")
+    sim.add_entity(departmentBudget, is_source_entity=True)
+    # and for the sake of it a department budget
+    departmentBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "department budget",
+            'start_amount': 12000000,
+            'budget_type': "$"
+        })
+    sim.connect_entities(departmentBudget, branchBudget, "$")
 
     return sim
 
+# legacy name
+govRecordStorage = manyBudgetModel
+
 if __name__ == "__main__":
 
-    sim = govRecordStorage()
+    sim = big_one_with_sub_budgets()
+    #sim = manyBudgetModel()
 
-    for e in sim.get_entities():
-        for p in e.get_processes():
-            proc_class = type(p).__name__
-            proc_module = type(p).__module__
-            if proc_module == "__main__":
-                #proc_module = type(p).__file__
-                pass
-            
-            print(proc_module)
-
-#     sim.set_time_span(48)
-#     sim.run()
-#     result = list(sim.outputs)
-#     print(result[0].result, result[1].result)
+    sim.set_time_span(48)
+    sim.run()
+    result = list(sim.outputs)
+    print(result[0].result, result[1].result)
