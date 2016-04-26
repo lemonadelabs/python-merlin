@@ -462,7 +462,7 @@ class Output(SimObject):
                 for i in self.inputs:
                     o += i.value
                 self.result.append(o)
-                self.set_telemetry_value('result', o)
+                self.set_telemetry_value('value', o)
 
 
 class Entity(SimObject):
