@@ -366,7 +366,7 @@ class TestScenarios:
     def test_simple_scenario(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
         e = merlin.Event.create(1, '+ Attribute foo, bar, baz')
-        s = merlin.Scenario(sim, {e})
+        s = merlin.Scenario({e}, sim=sim)
         assert sim.is_attribute('foo') == False
         assert sim.is_attribute('bar') == False
         assert sim.is_attribute('baz') == False
@@ -383,7 +383,7 @@ class TestScenarios:
             + Attribute foo
             + UnitType cheese
             """)
-        s = merlin.Scenario(sim, {e})
+        s = merlin.Scenario({e}, sim=sim)
         assert sim.is_attribute('foo') == False
         assert sim.is_unit_type('cheese') == False
         sim.run(scenarios=[s])
@@ -393,7 +393,7 @@ class TestScenarios:
     def test_event_time(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
         e = merlin.Event.create(5, '+ Attribute foo')
-        s = merlin.Scenario(sim, {e})
+        s = merlin.Scenario({e}, sim=sim)
         assert sim.is_attribute('foo') == False
         sim.run(end=4, scenarios=[s])
         assert sim.is_attribute('foo') == False
@@ -405,8 +405,8 @@ class TestScenarios:
         sim = computation_test_harness  # type: merlin.Simulation
         e = merlin.Event.create(5, '+ Attribute foo')
         e2 = merlin.Event.create(7, '+ UnitType bar')
-        s1 = merlin.Scenario(sim, {e})
-        s2 = merlin.Scenario(sim, {e2})
+        s1 = merlin.Scenario({e}, sim=sim)
+        s2 = merlin.Scenario({e2}, sim=sim)
         assert sim.is_attribute('foo') == False
         assert sim.is_unit_type('bar') == False
         sim.run(scenarios=[s1, s2])

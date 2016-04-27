@@ -1409,13 +1409,13 @@ class Scenario(SimObject):
 
     def __init__(
             self,
-            sim: Simulation,
             events: Set[Event],
+            sim: Simulation= None,
             start_offset: int= None,
             name: str=''):
         super(Scenario, self).__init__(name)
         self.events = events  # type: Set[Event]
-        self.sim = sim  # type: Simulation
+        self.sim = sim   # type: Simulation
         self.start_offset = start_offset or 0  # type: int
 
 
