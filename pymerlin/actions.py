@@ -183,6 +183,8 @@ def _generate_action(a: Dict[str, Any]) -> merlin.Action:
             return AddConnectionAction(
                 *(a['operand_1']['params'] + a['operand_2']['params']))
 
+        raise merlin.MerlinScriptException("No Process match!")
+
 
 def _parse_action(tokens) -> Dict[str, Any]:
     op = _parse_op(tokens[0])
@@ -699,7 +701,7 @@ class ModifyProcessPropertyAction(merlin.Action):
 
     def serialize(self) -> Dict[str, Any]:
         return {
-            'op': '=',
+            'op': ':=',
             'operand_1':
                 {
                     'type': 'Entity',
