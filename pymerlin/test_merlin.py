@@ -7,6 +7,12 @@ from pymerlin.processes import (BudgetProcess,
                                 CallCenterStaffProcess,
                                 BuildingMaintainenceProcess,
                                 ConstantProvider)
+from examples import RecordStorageFacility
+
+
+@pytest.fixture()
+def record_storage_example() -> merlin.Simulation:
+    return RecordStorageFacility.govRecordStorageCore()
 
 
 @pytest.fixture()
@@ -157,14 +163,12 @@ class TestIntegration:
 
 class TestSimulation:
 
-    def test_telemetry_output(self, computation_test_harness):
-        sim = computation_test_harness # type: merlin.Simulation
+    def test_telemetry_output(self, record_storage_example):
+        sim = record_storage_example # type: merlin.Simulation
         sim.run()
         tel = sim.get_sim_telemetry()
 
         for to in tel:
-            if 'result' in to['data']:
-                assert len(to['data']['result']) == sim.num_steps
             if 'value' in to['data']:
                 assert len(to['data']['value']) == sim.num_steps
 

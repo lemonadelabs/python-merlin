@@ -328,7 +328,7 @@ class Simulation(SimObject):
         # TODO: Write basic validation function for sim
         return True
 
-    def get_sim_telemetry(self) -> MutableSequence[Mapping[str, Any]]:
+    def get_sim_telemetry(self) -> List[Dict[str, Any]]:
         output = list()
         for o in self.outputs:
             output.append(self._get_object_telemetry(o))
@@ -356,9 +356,10 @@ class Simulation(SimObject):
                                                len(master_consume))
                     pinputs = connector_to_pinput[i.id]
                     for pi in pinputs:
-                        td = pi.get_telemetry_data()['consume']
-                        for x in range(0, len(td)):
-                            master_consume[x] += td[x]
+                        if 'consume' in pi.get_telemetry_data():
+                            td = pi.get_telemetry_data()['consume']
+                            for x in range(0, len(td)):
+                                master_consume[x] += td[x]
 
                     for x in master_consume:
                         i.set_telemetry_value('consume', x)
