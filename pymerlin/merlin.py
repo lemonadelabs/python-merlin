@@ -388,6 +388,9 @@ class Simulation(SimObject):
         logging.info("Merlin simulation {0} started".format(self.name))
         self.run_errors = list()
 
+        if end > self.num_steps:
+            self.num_steps = end
+
         sim_start = start if start > 1 else 1
         sim_end = end if (0 < end < self.num_steps) else self.num_steps
 

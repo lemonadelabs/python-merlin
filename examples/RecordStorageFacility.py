@@ -10,7 +10,7 @@ import logging
 from pymerlin import merlin, processes
 
 # Global logging settings
-logging_level = logging.DEBUG
+logging_level = logging.INFO
 log_to_file = ''
 logging.basicConfig(
     filename=log_to_file,
