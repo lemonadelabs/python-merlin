@@ -2,7 +2,6 @@ import pytest
 import numpy.testing as npt
 from datetime import datetime
 from pymerlin import merlin
-from pymerlin import actions
 from pymerlin.processes import (BudgetProcess,
                                 CallCenterStaffProcess,
                                 BuildingMaintainenceProcess,
@@ -446,8 +445,8 @@ class TestEvents:
 
         e = merlin.Event.create_from_dict(1, data)
         assert len(e.actions) == 2
-        assert isinstance(e.actions[0], actions.AddAttributesAction)
-        assert isinstance(e.actions[1], actions.UnitTypeAction)
+        assert isinstance(e.actions[0], merlin.AddAttributesAction)
+        assert isinstance(e.actions[1], merlin.UnitTypeAction)
 
 
     def test_add_json_events(self):
@@ -475,14 +474,14 @@ class TestEvents:
             ]
             """)
         assert len(e.actions) == 2
-        assert isinstance(e.actions[0], actions.AddAttributesAction)
-        assert isinstance(e.actions[1], actions.UnitTypeAction)
+        assert isinstance(e.actions[0], merlin.AddAttributesAction)
+        assert isinstance(e.actions[1], merlin.UnitTypeAction)
 
 
     def test_add_attribute_event(self):
         e = merlin.Event.create(1, '+ Attribute foo, bar, baz')
         assert len(e.actions) == 1
-        assert isinstance(e.actions[0], actions.AddAttributesAction)
+        assert isinstance(e.actions[0], merlin.AddAttributesAction)
 
     def test_multiple_actions(self):
         e = merlin.Event.create(
@@ -501,7 +500,7 @@ class TestEvents:
             + UnitType desks, $
             """)
         assert len(e.actions) == 1
-        assert isinstance(e.actions[0], actions.UnitTypeAction)
+        assert isinstance(e.actions[0], merlin.UnitTypeAction)
 
     def test_whitespace(self):
         e = merlin.Event.create(
@@ -511,7 +510,7 @@ class TestEvents:
             """
         )
         assert len(e.actions) == 1
-        assert isinstance(e.actions[0], actions.UnitTypeAction)
+        assert isinstance(e.actions[0], merlin.UnitTypeAction)
 
     def test_invalid_type(self):
         with pytest.raises(merlin.MerlinScriptException):
@@ -540,14 +539,14 @@ class TestEvents:
     def test_remove_entity_event(self, computation_test_harness):
         sim = computation_test_harness
         b_entity = sim.get_entity_by_name('Budget')
-        a = actions.create("- Entity {0}".format(b_entity.id))
+        a = merlin.Action.create("- Entity {0}".format(b_entity.id))
         a[0].execute(sim)
         assert sim.get_entity_by_name('Budget') is None
 
 
     def test_add_entity_event(self, computation_test_harness):
         sim = computation_test_harness
-        a = actions.create("+ Entity Budget_2")
+        a = merlin.Action.create("+ Entity Budget_2")
         a[0].execute(sim)
         assert sim.get_entity_by_name("Budget_2") is not None
 
@@ -556,7 +555,7 @@ class TestEvents:
         sink = merlin.Entity(simulation=sim, name='sink', attributes=set())
         sim.add_entity(source)
         sim.add_entity(sink)
-        axs = actions.create("Entity {0} > Entity {1}, shoes, 1, True".format(
+        axs = merlin.Action.create("Entity {0} > Entity {1}, shoes, 1, True".format(
             source.id, sink.id))
         assert len(axs) == 1
         a = axs[0]
@@ -569,7 +568,7 @@ class TestEvents:
         sim = computation_test_harness  # type: merlin.Simulation
         e1 = sim.get_entity_by_name("Budget")
         e2 = sim.get_entity_by_name("office building")
-        axs = actions.create("Entity {0} / Entity {1}, $".format(e1.id, e2.id))
+        axs = merlin.Action.create("Entity {0} / Entity {1}, $".format(e1.id, e2.id))
         assert len(axs) == 1
         axs[0].execute(sim)
         assert len(e1.get_output_by_type('$').get_endpoints()) == 1
@@ -578,7 +577,7 @@ class TestEvents:
 
     def test_add_process_event(self, sim, entity):
         sim.add_entity(entity)
-        a = actions.create("""
+        a = merlin.Action.create("""
             Entity {0} + Process pymerlin.processes.ConstantProvider, 200, name:str = mr_foo, unit:str = snickers bars, amount:float = 1000
             """.format(entity.id))
         assert len(entity.get_processes()) == 0
@@ -593,7 +592,7 @@ class TestEvents:
         prop = p.get_prop('staff salary')
         assert prop.get_value() == 5.0
         # a = actions.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
-        a = actions.create("Entity {0} := Property {1}, 2.0".format(e.id, prop.id))
+        a = merlin.Action.create("Entity {0} := Property {1}, 2.0".format(e.id, prop.id))
         assert len(a) == 1
         a[0].execute(sim)
         assert prop.get_value() == 2.0
@@ -606,7 +605,7 @@ class TestEvents:
         sim.add_entity(child_ent)
         assert child_ent not in parent_ent.get_children()
         assert child_ent.parent is None
-        a = actions.create("Entity {0} ^ Entity {1}".format(child_ent.id, parent_ent.id))
+        a = merlin.Action.create("Entity {0} ^ Entity {1}".format(child_ent.id, parent_ent.id))
         assert len(a) == 1
         a[0].execute(sim)
         assert child_ent in parent_ent.get_children()
@@ -615,12 +614,12 @@ class TestEvents:
 class TestCoreActions:
 
     def test_add_attributes_action(self, sim):
-        a = actions.AddAttributesAction(['attr'])
+        a = merlin.AddAttributesAction(['attr'])
         a.execute(sim)
         assert sim.is_attribute('attr')
 
     def test_add_unit_type_action(self, sim):
-        a = actions.UnitTypeAction(['unit_type'])
+        a = merlin.UnitTypeAction(['unit_type'])
         a.execute(sim)
         assert sim.is_unit_type('unit_type')
 
@@ -628,16 +627,16 @@ class TestCoreActions:
         seg = simple_entity_graph
         sim.add_entity(seg[0])
         sim.add_entity(seg[1])
-        a = actions.RemoveEntityAction(seg[1].id)
+        a = merlin.RemoveEntityAction(seg[1].id)
         a.execute(sim)
         assert seg[1] not in sim.get_entities()
         assert seg[2] not in seg[0].outputs
 
     def test_add_entity_action(self, sim, simple_entity_graph):
         seg = simple_entity_graph
-        e1a = actions.AddEntityAction(
+        e1a = merlin.AddEntityAction(
             'new_entity1', parent=seg[0])
-        e2a = actions.AddEntityAction(
+        e2a = merlin.AddEntityAction(
             'new_entity2', attributes=[], parent=None)
         e1a.execute(sim)
         e2a.execute(sim)
@@ -648,7 +647,7 @@ class TestCoreActions:
         seg = simple_entity_graph
         sim.add_entity(seg[0])
         sim.add_entity(seg[1])
-        rca = actions.RemoveConnectionAction(seg[0].id, seg[1].id, seg[2].type)
+        rca = merlin.RemoveConnectionAction(seg[0].id, seg[1].id, seg[2].type)
         rca.execute(sim)
         assert seg[2] not in seg[0].outputs
         assert seg[3] not in seg[1].inputs
@@ -658,7 +657,7 @@ class TestCoreActions:
         sink = merlin.Entity(simulation=sim, name='sink', attributes=set())
         sim.add_entity(source)
         sim.add_entity(sink)
-        aca = actions.AddConnectionAction(
+        aca = merlin.AddConnectionAction(
             source.id,
             sink.id,
             'new_unit_type',
@@ -681,7 +680,7 @@ class TestCoreActions:
     def test_add_process_action(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
         e1 = sim.get_entity_by_name('Budget')
-        a = actions.AddProcessAction(
+        a = merlin.AddProcessAction(
             e1.id,
             'pymerlin.processes.BuildingMaintainenceProcess',
             200,
@@ -699,7 +698,7 @@ class TestCoreActions:
         e1 = sim.get_entity_by_name("office building")
         p1 = e1.get_process_by_name('Building Maintenance')
         assert e1.get_process_by_name('Building Maintenance') is not None
-        a = actions.RemoveProcessAction(e1.id, p1.id)
+        a = merlin.RemoveProcessAction(e1.id, p1.id)
         a.execute(sim)
         assert e1.get_process_by_name('Building Maintenance') is None
 
@@ -710,7 +709,7 @@ class TestCoreActions:
         sim.add_entity(child_ent)
         assert child_ent not in parent_ent.get_children()
         assert child_ent.parent is None
-        a = actions.ParentEntityAction(child_ent.id, parent_ent.id)
+        a = merlin.ParentEntityAction(child_ent.id, parent_ent.id)
         a.execute(sim)
         assert child_ent in parent_ent.get_children()
         assert child_ent.parent == parent_ent
@@ -721,7 +720,7 @@ class TestCoreActions:
         p = e.get_process_by_name('Call Center Staff')
         prop = p.get_prop('staff salary')
         assert prop.get_value() == 5.0
-        a = actions.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
+        a = merlin.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
         a.execute(sim)
         assert prop.get_value() == 2.0
 
