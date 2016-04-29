@@ -545,10 +545,13 @@ class TestEvents:
 
 
     def test_add_entity_event(self, computation_test_harness):
-        sim = computation_test_harness
-        a = merlin.Action.create("+ Entity Budget_2")
+        sim = computation_test_harness  # type: merlin.Simulation
+        a = merlin.Action.create("+ Entity Budget_2, attr1, attr2")
         a[0].execute(sim)
-        assert sim.get_entity_by_name("Budget_2") is not None
+        e = sim.get_entity_by_name("Budget_2")
+        assert e is not None
+        assert 'attr1' in e.attributes
+        assert 'attr2' in e.attributes
 
     def test_add_connection_event(self, sim):
         source = merlin.Entity(simulation=sim, name='source', attributes=set())
