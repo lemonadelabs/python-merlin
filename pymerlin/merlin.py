@@ -2163,7 +2163,8 @@ class AddProcessAction(Action):
             'operand_1':
                 {
                     'type': 'Entity',
-                    'params': [self.entity_id]
+                    'params': [self.entity_id],
+                    'props': None
                 },
             'operand_2':
                 {
@@ -2173,7 +2174,7 @@ class AddProcessAction(Action):
                             self.process_class),
                         self.priority
                     ],
-                    'data': self.process_params
+                    'props': self.process_params
                 }
         }
 
