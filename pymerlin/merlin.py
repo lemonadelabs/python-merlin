@@ -939,8 +939,8 @@ class Process(SimObject):
             MerlinMessage.MessageType.warn,
             self,
             "{0}_{1}_insufficent_input".format(self.name, name),
-            "There is not enough {{{0}} provided as an input. "
-            "We needed {1} but got {2}".format(
+            ("There is not enough {{{{{0}}}}} provided as an input. " +
+            "We needed {1} but got {2}").format(
                 self.inputs[name].type,
                 required,
                 available),

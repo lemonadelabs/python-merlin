@@ -82,11 +82,12 @@ class LineStaffProcess(merlin.Process):
 
     def compute(self, tick):
         oh_staff_req = 1
+        print(self.get_input_available("overhead staff no"))
 
         if oh_staff_req > self.get_input_available("overhead staff no"):
             self.provide_output("line staff bandwidth", 0.0)
-            self.notify_insufficient_input("ohFTE",
-                                           self.get_input_available("ohFTE"),
+            self.notify_insufficient_input("overhead staff no",
+                                           self.get_input_available("overhead staff no"),
                                            oh_staff_req)
 
         staff_available = self.get_input_available("line staff no")
