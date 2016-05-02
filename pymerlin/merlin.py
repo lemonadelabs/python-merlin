@@ -934,11 +934,23 @@ class Process(SimObject):
 
     def notify_insufficient_input(self, name, available, required):
         assert name in self.inputs
-        raise InputRequirementException(
-                                  self,
-                                  self.inputs[name],
-                                  available,
-                                  required)
+
+        self.parent.sim.log_message(
+            MerlinMessage.MessageType.warn,
+            self,
+            "{0}_{1}_insufficent_input".format(self.name, name),
+            "There is not enough {{{0}} provided as an input. "
+            "We needed {1} but got {2}".format(
+                self.inputs[name].type,
+                required,
+                available),
+            context=[
+                {
+                    'id': self.inputs[name].id,
+                    'type': self.inputs[name].__class__.__name__
+                }
+            ]
+        )
 
     def compute(self, tick):
         """
