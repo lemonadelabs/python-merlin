@@ -139,15 +139,10 @@ class CallCenterStaffProcess(merlin.Process):
                 merlin.MerlinMessage.MessageType.warn,
                 self,
                 msg="There are not enough {{desks provided}}, "
-                    "call center currently needs {0} desks".format(self.desks_required),
+                    "call center currently needs {0} desks".format(
+                    self.desks_required),
                 msg_id="call_center_required_desks",
-                context=
-                [
-                    {
-                        'id': self.inputs['desks'].id,
-                        'type': self.inputs['desks'].__class__.__name__
-                    }
-                ]
+                context=[self.inputs['desks']]
             )
             raise merlin.InputRequirementException(
                 self,
@@ -162,13 +157,7 @@ class CallCenterStaffProcess(merlin.Process):
                     "call center currently needs ${0}".format(
                     self.funds_required),
                 msg_id="call_center_required_salary",
-                context=
-                [
-                    {
-                        'id': self.inputs['$'].id,
-                        'type': self.inputs['$'].__class__.__name__
-                    }
-                ]
+                context=[self.inputs['$']]
             )
 
             raise merlin.InputRequirementException(
@@ -228,6 +217,21 @@ class BuildingMaintainenceProcess(merlin.Process):
         # logging.debug(self.inputs['$'].connector.value)
         if (self.get_input_available('$') <
                 self.get_prop_value('monthly maintenance cost')):
+
+            self.parent.sim.log_message(
+                merlin.MerlinMessage.MessageType.warn,
+                self,
+                msg_id="building_maint_underfund",
+                msg=("Building maint is underfunded. {{{{It needs {0}}}}} but" +
+                     " is {{{{receiving only {1}}}}}".format(
+                         self.props['monthly maintenance cost'].get_value(),
+                         self.inputs['$'].connector.value
+                     )),
+                context = [
+                    self.props['monthly maintenance cost'],
+                    self.inputs['$'].connector ]
+                )
+
             raise merlin.InputRequirementException(
                 self,
                 self.inputs['$'],

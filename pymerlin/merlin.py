@@ -333,7 +333,7 @@ class Simulation(SimObject):
             sender: SimObject,
             msg_id: str="",
             msg: str="",
-            context: List[Dict[str, Any]]=list()):
+            context: List[SimObject]=list()):
 
         m = MerlinMessage(
             message_type,
@@ -940,16 +940,11 @@ class Process(SimObject):
             self,
             "{0}_{1}_insufficent_input".format(self.name, name),
             ("There is not enough {{{{{0}}}}} provided as an input. " +
-            "We needed {1} but got {2}").format(
-                self.inputs[name].type,
-                required,
-                available),
-            context=[
-                {
-                    'id': self.inputs[name].id,
-                    'type': self.inputs[name].__class__.__name__
-                }
-            ]
+                "We needed {1} but got {2}").format(
+                    self.inputs[name].type,
+                    required,
+                    available),
+            context=list([self.inputs[name]])
         )
 
     def compute(self, tick):
@@ -1795,13 +1790,19 @@ class MerlinMessage:
             sender: SimObject,
             message_id: str="",
             message: str="",
-            context: List[Dict[str, Any]]=list()):
+            context: List[SimObject]=list()):
         self.message_type = message_type  # type: MerlinMessage.MessageType
         self.time = time  # type: int
         self.sender = sender  # type: SimObject
         self.message_id = message_id  # type: str
         self.message = message  # type: str
-        self.context = context  # type: List[Dict[str, Any]
+        context_data = list()
+        for so in context:
+            d = dict()
+            d['id'] = so.id
+            d['type'] = so.__class__.__name__
+            context_data.append(d)
+        self.context = context_data  # type: List[Dict[str, Any]
 
     def __str__(self):
         return self.serialize()
