@@ -64,14 +64,15 @@ class Simulation(SimObject):
         self._unit_types = set()  # type: MutableSet[str]
         self._attributes = set()  # type: MutableSet[str]
         self._entities = set()  # type: MutableSet[Entity]
-        self.ruleset = ruleset
+        self._messages = list()  # type: List[MerlinMessage]
+        self.ruleset = ruleset  # type: Ruleset
         self.initial_state = config or []
         self.source_entities = set()  # type: MutableSet[Entity]
-        self.outputs = outputs or set()
-        self.num_steps = 1
-        self.current_step = 1
-        self.run_errors = list()
-        self.verbose = True
+        self.outputs = outputs or set()  # type: MutableSet[Entity]
+        self.num_steps = 1  # type: int
+        self.current_step = 1  # type: int
+        self.run_errors = list()  # type: List[MerlinException]
+        self.verbose = True  # type: bool
 
     def _run_senario_events(self, scenarios: List['Scenario']) -> None:
         for s in scenarios:
@@ -326,6 +327,27 @@ class Simulation(SimObject):
         # TODO: Write basic validation function for sim
         return True
 
+    def log_message(
+            self,
+            message_type: 'MerlinMessage.MessageType',
+            sender: SimObject,
+            msg_id: str="",
+            msg: str="",
+            context: List[Dict[str, Any]]=list()):
+
+        m = MerlinMessage(
+            message_type,
+            self.current_step,
+            sender,
+            msg_id,
+            msg,
+            context)
+
+        self._messages.append(m)
+
+    def get_run_messages(self) -> List[Dict[str, Any]]:
+        return [m.serialize() for m in self._messages]
+
     def get_sim_telemetry(self) -> List[Dict[str, Any]]:
         output = list()
         for o in self.outputs:
@@ -367,6 +389,11 @@ class Simulation(SimObject):
             for o in e.outputs:
                 output.append(self._get_object_telemetry(o))
 
+        # Append run messages
+        ms = dict()
+        ms['messages'] = self.get_run_messages()
+        output.append(ms)
+
         return output
 
     def run(
@@ -384,7 +411,8 @@ class Simulation(SimObject):
         """
         start_time = datetime.now()
         logging.info("Merlin simulation {0} started".format(self.name))
-        self.run_errors = list()
+        self.run_errors.clear()
+        self._messages.clear()
 
         if end > self.num_steps:
             self.num_steps = end
@@ -477,17 +505,21 @@ class Entity(SimObject):
     output connectors.
     """
 
-    def __init__(self, simulation=None, name='', attributes=set()):
+    def __init__(
+            self,
+            simulation: Simulation=None,
+            name: str='',
+            attributes: Set[str]=set()):
         super(Entity, self).__init__(name)
-        self._processes = dict()
-        self.sim = simulation
+        self._processes = dict()  # type: Dict[int, Set['Process']]
+        self.sim = simulation  # type: Simulation
         self.attributes = set(attributes)  # shallow copy
         self.inputs = set()  # type: Set[InputConnector]
         self.outputs = set()  # type: Set[OutputConnector]
         self.parent = None  # type: Union[None, Entity]
         self._children = set()  # type: MutableSet[Entity]
         self.current_time = None  # type: int
-        self.processed = False
+        self.processed = False  # type: bool
 
     def __str__(self):
         return """
@@ -1734,6 +1766,47 @@ class Scenario(SimObject):
         self.events = events  # type: Set[Event]
         self.sim = sim   # type: Simulation
         self.start_offset = start_offset or 0  # type: int
+
+
+class MerlinMessage:
+
+    class MessageType(Enum):
+        info = 0
+        hint = 1
+        warn = 2
+        error = 3
+
+    def __init__(
+            self,
+            message_type: MessageType,
+            time: int,
+            sender: SimObject,
+            message_id: str="",
+            message: str="",
+            context: List[Dict[str, Any]]=list()):
+        self.message_type = message_type  # type: MerlinMessage.MessageType
+        self.time = time  # type: int
+        self.sender = sender  # type: SimObject
+        self.message_id = message_id  # type: str
+        self.message = message  # type: str
+        self.context = context  # type: List[Dict[str, Any]
+
+    def __str__(self):
+        return self.serialize()
+
+    def serialize(self) -> Dict[str, Any]:
+        output = dict()
+        output['type'] = self.message_type.value
+        output['time'] = self.time
+        output['sender'] = \
+            {
+                'id': self.sender.id,
+                'type': self.sender.__class__.__name__
+            }
+        output['message_id'] = self.message_id
+        output['message'] = self.message
+        output['context'] = self.context
+        return output
 
 
 class Ruleset:

@@ -168,8 +168,9 @@ class TestSimulation:
         tel = sim.get_sim_telemetry()
 
         for to in tel:
-            if 'value' in to['data']:
-                assert len(to['data']['value']) == sim.num_steps
+            if 'data' in to:
+                if 'value' in to['data']:
+                    assert len(to['data']['value']) == sim.num_steps
 
     def test_source_entities(self, computation_test_harness):
         sim = computation_test_harness
@@ -726,4 +727,22 @@ class TestCoreActions:
         a = merlin.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
         a.execute(sim)
         assert prop.get_value() == 2.0
+
+class TestMessages:
+
+    def test_message(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        ccs = sim.get_process_by_name('Call Center Staff')
+        salary_prop = ccs.get_prop('staff salary')
+        salary_prop.set_value(6.00)
+        sim.run()
+        messages = sim.get_run_messages()
+        msg = messages[0]
+        assert msg
+        assert msg['time'] == 1
+        assert msg['message_id'] == 'call_center_required_salary'
+        assert len(msg['context']) == 1
+        assert msg['context'][0]['id']
+        assert msg['context'][0]['type'] == 'ProcessInput'
+
 

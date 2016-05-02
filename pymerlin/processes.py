@@ -134,12 +134,43 @@ class CallCenterStaffProcess(merlin.Process):
     def compute(self, tick):
         # check requirements
         if self.get_input_available('desks') < self.desks_required:
+
+            self.parent.sim.log_message(
+                merlin.MerlinMessage.MessageType.warn,
+                self,
+                msg="There are not enough {{desks provided}}, "
+                    "call center currently needs {0} desks".format(self.desks_required),
+                msg_id="call_center_required_desks",
+                context=
+                [
+                    {
+                        'id': self.inputs['desks'].id,
+                        'type': self.inputs['desks'].__class__.__name__
+                    }
+                ]
+            )
             raise merlin.InputRequirementException(
                 self,
                 self.inputs['desks'],
                 self.inputs['desks'].connector.value,
                 self.desks_required)
         if self.get_input_available('$') < self.funds_required:
+            self.parent.sim.log_message(
+                merlin.MerlinMessage.MessageType.warn,
+                self,
+                msg="There is not enough {{budget}} to pay staff, "
+                    "call center currently needs ${0}".format(
+                    self.funds_required),
+                msg_id="call_center_required_salary",
+                context=
+                [
+                    {
+                        'id': self.inputs['$'].id,
+                        'type': self.inputs['$'].__class__.__name__
+                    }
+                ]
+            )
+
             raise merlin.InputRequirementException(
                 self,
                 self.inputs['$'],
