@@ -58,13 +58,24 @@ class BudgetProcess(merlin.Process):
 
         self.outputs = {'$': p_output}
 
+
     def reset(self):
         # define internal instance variables on init
-        self.current_amount = self.get_prop_value("amount")
+        self.start_amount = self.get_prop_value("amount")
+        self.current_amount = self.start_amount
         self.amount_per_step = (self.current_amount /
                                 min(self.parent.sim.num_steps, 12))
 
     def compute(self, tick):
+        # Check to see that the start amount has changed, and if so
+        # do a recompute of amount per step and current amount
+        if self.start_amount != self.get_prop_value("amount"):
+            self.start_amount = self.get_prop_value("amount")
+            if self.start_amount < self.current_amount:
+                self.current_amount = self.start_amount
+            self.amount_per_step = (self.current_amount /
+                                min((self.parent.sim.num_steps - self.parent.sim.current_step), 12))
+
         if self.current_amount > 0.00:
             output = self.amount_per_step
             if output > self.current_amount:
