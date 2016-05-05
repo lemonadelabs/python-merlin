@@ -68,7 +68,7 @@ class Simulation(SimObject):
         self.ruleset = ruleset  # type: Ruleset
         self.initial_state = config or []
         self.source_entities = set()  # type: MutableSet[Entity]
-        self.outputs = outputs or set()  # type: MutableSet[Entity]
+        self.outputs = outputs or set()  # type: MutableSet[Output]
         self.num_steps = 1  # type: int
         self.current_step = 1  # type: int
         self.run_errors = list()  # type: List[MerlinException]
@@ -461,8 +461,8 @@ class Output(SimObject):
         ``unit_type`` needs to be added to the simulation with
         :py:meth:`pymerlin.merlin.add_unit_types`.
 
-        :attr:`.expected_minimum` sets an expectation to the output value,
-           which needs to be met and can be over-fulfilled.
+        :attr:`minimum` sets a minimum expectation to the output value,
+           which needs to be met or a warning will be flagged.
         """
         super(Output, self).__init__(name)
         self.inputs = set()  # type: Set[InputConnector]
@@ -471,7 +471,7 @@ class Output(SimObject):
         self.type = unit_type
         self.result = list()  # type: MutableSequence[float]
         self.sim = None  # type: Union[Simulation, None]
-        self.expected_minimum = None
+        self.minimum = None
 
     def tick(self, time):
         if self.current_time and time < self.current_time:
@@ -492,6 +492,18 @@ class Output(SimObject):
                 for i in self.inputs:
                     o += i.value
                 self.result.append(o)
+                if self.minimum and o < self.minimum:
+                    self.sim.log_message(
+                        MerlinMessage.MessageType.warn,
+                        self,
+                        "{0}_output_below_min".format(self.id),
+                        ("Output value {0} of type {1} has fallen " +
+                         "below the minimum of {2}").format(
+                            o,
+                            self.type,
+                            self.minimum)
+                    )
+
                 self.set_telemetry_value('value', o)
 
 
