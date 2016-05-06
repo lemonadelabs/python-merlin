@@ -11,7 +11,7 @@ from examples import RecordStorageFacility
 
 @pytest.fixture()
 def record_storage_example() -> merlin.Simulation:
-    return RecordStorageFacility.govRecordStorageCore()
+    return RecordStorageFacility.manyBudgetModel()
 
 
 @pytest.fixture()
@@ -134,6 +134,15 @@ def simple_branching_output_graph():
 
 
 class TestIntegration:
+
+    def test_multiple_runs(self, record_storage_example):
+        sim = record_storage_example  # type: merlin.Simulation
+        # sim.run(end=10)
+        sim.num_steps = 10
+        sim.run()
+        sim.run()
+        assert len(list(sim.outputs)[0].result) != 0
+
 
     def test_output(self, computation_test_harness):
         sim = computation_test_harness

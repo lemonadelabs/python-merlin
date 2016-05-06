@@ -422,7 +422,7 @@ class Simulation(SimObject):
 
         # clear data from the last run
         for o in self.outputs:
-            o.result = list()
+            o.reset()
 
         # call reset on all processes
         for e in self._entities:
@@ -472,6 +472,14 @@ class Output(SimObject):
         self.result = list()  # type: MutableSequence[float]
         self.sim = None  # type: Union[Simulation, None]
         self.minimum = None
+
+    def reset(self):
+        self.result.clear()
+        self.processed = False
+        self.current_time = None
+        self.reset_telemetry()
+        for i in self.inputs:
+            i.reset_telemetry()
 
     def tick(self, time):
         if self.current_time and time < self.current_time:
@@ -623,6 +631,10 @@ class Entity(SimObject):
         run, (i.e. executing the ``tick`` method several times in sequence
         governed by the connector network.
         """
+
+        self.current_time = None
+        self.processed = False
+
         for i in self.inputs:
             i.reset_telemetry()
 
