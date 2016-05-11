@@ -63,7 +63,6 @@ def computation_test_harness(sim) -> merlin.Simulation:
 def sim() -> merlin.Simulation:
     """ Returns a simulation object """
     return merlin.Simulation(
-        ruleset=None,
         config=[],
         outputs=set(),
         name='test_sim')

@@ -1099,13 +1099,15 @@ class ProcessProperty(SimObject):
             name,
             property_type=PropertyType.number_type,
             default=0.0,
-            parent=None):
+            parent=None,
+            readonly=False):
         """
         :param str name: a name for easy identification
         :param Enum property_type: the type of the property, choose from
            :py:class:`PropertyType`
         :param object default: a default value for this property
         :param Process parent: the process using this property
+        :param readonly: denotes if the field can be changed externally
         """
 
         super(ProcessProperty, self).__init__(name)
@@ -1115,6 +1117,7 @@ class ProcessProperty(SimObject):
         self.default = default
         self.parent = parent
         self._value = self.default
+        self.readonly = readonly
 
     def set_value(self, value):
         self._value = value
