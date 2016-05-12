@@ -143,6 +143,7 @@ class CallCenterStaffProcess(merlin.Process):
         maximal_output = self.get_prop_value('staff number')
 
         # check requirements
+
         if self.get_input_available('desks') < desks_required:
 
             self.parent.sim.log_message(
@@ -379,10 +380,18 @@ class LeasedAccomodationProvider(merlin.Process):
 
         # Define ouputs
         o_provided = merlin.ProcessOutput(
-            'o_accomodated'.format(provided_unit_type),
+            'o_accomodated',
             provided_unit_type)
 
-        self.outputs = {'o_accomodated'.format(provided_unit_type): o_provided}
+        o_used_rent = merlin.ProcessOutput(
+            'used_expenses',
+            'used_rent_expenses'
+        )
+
+        self.outputs = {
+            'o_accomodated': o_provided,
+            'used_expenses': o_used_rent
+        }
 
         # Define properties
         self.add_property(
@@ -425,32 +434,35 @@ class LeasedAccomodationProvider(merlin.Process):
         sufficient_lease = (tick <= self.get_prop_value('lease duration'))
 
         # check to see if we have enough rent
-        if sufficient_rent:
-            if sufficient_lease:
-                accom_provided = (
-                    self.get_prop_value('accom_type_per_area') *
-                    self.get_prop_value('area')
-                )
-
-                # consume rent
-                self.consume_input('i_rent$', total_cost)
-
-                # provide some accom
-                self.provide_output('o_accomodated', accom_provided)
-            else:
-                self.parent.sim.log_message(
-                    merlin.MerlinMessage.MessageType.warn,
-                    self,
-                    "{0}_lease_expired".format(self.id),
-                    "The lease has expired", context=list()
-                )
-                self.provide_output('o_accomodated', 0.0)
-        else:
+        if not sufficient_rent:
             self.notify_insufficient_input(
                 'rent$',
                 self.get_input_available('i_rent$'),
                 total_cost)
             self.provide_output('o_accomodated', 0.0)
+
+
+        if not sufficient_lease:
+            self.parent.sim.log_message(
+                merlin.MerlinMessage.MessageType.warn,
+                self,
+                "{0}_lease_expired".format(self.id),
+                "The lease has expired", context=list()
+            )
+
+        if sufficient_lease and sufficient_rent:
+            accom_provided = (
+                self.get_prop_value('accom_type_per_area') *
+                self.get_prop_value('area')
+            )
+
+            # consume rent
+            self.consume_input('i_rent$', total_cost)
+            # provide some accom
+            self.provide_output('o_accomodated', accom_provided)
+            self.provide_output('used_expenses', total_cost)
+        else:
+            self.write_zero_to_all()
 
 
 class BuildingMaintainenceProcess(merlin.Process):
