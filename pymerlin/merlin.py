@@ -930,6 +930,14 @@ class Process(SimObject):
         self.props[name].parent = None
         del self.props[name]
 
+
+    def write_zero_to_all(self):
+        """
+        Writes zero to all outputs
+        """
+        for k in self.outputs.keys():
+            self.outputs[k].connector.write(0.0)
+
     def provide_output(self, name, value):
         """
         :param str name: name of output
@@ -968,7 +976,7 @@ class Process(SimObject):
                     self.inputs[name].type,
                     required,
                     available),
-            context=list([self.inputs[name]])
+            context=list([self.inputs[name].connector])
         )
 
     def compute(self, tick):
@@ -1093,6 +1101,7 @@ class ProcessProperty(SimObject):
         bool_type = 1
         number_type = 2
         int_type = 3
+        date_type = 4
 
     def __init__(
             self,
