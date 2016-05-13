@@ -327,14 +327,14 @@ class StaffFTE(merlin.Process):
 
 
         if staff_paid and staff_accomodated:
-            # Do normal fte outputs
+            # Do normal fte per month outputs
             oh_fte = (
                 self.get_prop_value('oh_number') *
                 self.get_prop_value('working_hours') *
                 self.get_prop_value('working_weeks') *
                 self.get_prop_value('training') *
                 self.get_prop_value('leave')
-            )
+            ) / 12
 
             ls_fte = (
                 self.get_prop_value('ls_number') *
@@ -342,7 +342,7 @@ class StaffFTE(merlin.Process):
                 self.get_prop_value('working_weeks') *
                 self.get_prop_value('training') *
                 self.get_prop_value('leave')
-            )
+            ) / 12
 
             self.consume_input('staff_budget', salary_per_month)
             self.consume_input('staff_accom', total_staff)
