@@ -472,6 +472,7 @@ class Output(SimObject):
         self.result = list()  # type: MutableSequence[float]
         self.sim = None  # type: Union[Simulation, None]
         self.minimum = None
+        self.attributes = set()  # type: Set[str]
 
     def reset(self):
         self.result.clear()

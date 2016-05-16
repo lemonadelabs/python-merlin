@@ -211,24 +211,13 @@ class StaffFTE(merlin.Process):
         super(StaffFTE, self).__init__(name)
 
         # Define inputs
-        i_staff_budget = merlin.ProcessInput("staff_budget", "staff$")
-        i_staff_accom = merlin.ProcessInput("staff_accom", "staff_accomodated")
-
-        self.inputs = {
-            'staff_budget': i_staff_budget,
-            'staff_accom': i_staff_accom
-        }
+        self.add_input("staff_budget", "staff$")
+        self.add_input("staff_accom", "staff_accomodated")
 
         # Define outputs
-        o_ohFTE = merlin.ProcessOutput("overhead_staff_fte", "OH_FTE")
-        o_lsFTE = merlin.ProcessOutput("line_staff_fte", "LS_FTE")
-        o_used_expenses = merlin.ProcessOutput("used_expenses", "used_staff_expenses")
-
-        self.outputs = {
-            'overhead_staff_fte': o_ohFTE,
-            'line_staff_fte': o_lsFTE,
-            'used_expenses': o_used_expenses
-        }
+        self.add_output("overhead_staff_fte", "OH_FTE")
+        self.add_output("line_staff_fte", "LS_FTE")
+        self.add_output("used_expenses", "used_staff_expenses")
 
         # Define properties
         self.add_property(
@@ -375,23 +364,11 @@ class LeasedAccomodationProvider(merlin.Process):
         super(LeasedAccomodationProvider, self).__init__(name)
 
         # Define inputs
-        i_rent = merlin.ProcessInput('i_rent$', 'rent$')
-        self.inputs = {'i_rent$': i_rent}
+        self.add_input('i_rent$', 'rent$')
 
         # Define ouputs
-        o_provided = merlin.ProcessOutput(
-            'o_accomodated',
-            provided_unit_type)
-
-        o_used_rent = merlin.ProcessOutput(
-            'used_expenses',
-            'used_rent_expenses'
-        )
-
-        self.outputs = {
-            'o_accomodated': o_provided,
-            'used_expenses': o_used_rent
-        }
+        self.add_output('o_accomodated', provided_unit_type)
+        self.add_output('used_expenses', 'used_rent_expenses')
 
         # Define properties
         self.add_property(
