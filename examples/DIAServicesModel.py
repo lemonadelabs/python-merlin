@@ -132,35 +132,40 @@ class StorageServiceProcess(merlin.Process):
             (
                 self.get_input_available('used_rent_expenses') +
                 self.get_input_available('used_staff_expenses') +
-                self.get_input_available('storage_budget')
+                self.get_input_available('other$') -
+                self.get_input_available('FL_spare_other_expenses$')
             ) /
             self.get_input_available('file_count')
         )
 
-        files_accessed = (
+        """files_accessed = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
             self.get_prop_value('files_processed_per_lsfte') *
             self.get_prop_value('access_storage_ratio')
-        )
+        )"""
 
         files_stored = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
-            self.get_prop_value('files_processed_per_lsfte')
+            self.get_prop_value('files_handled_per_lsfte')
         )
 
         service_revenue = (
             self.get_input_available('file_count') *
-            (
-                (
-                    self.get_prop_value('storage_price') +
-                    self.get_prop_value('access_price')
-                ) *
-                self.get_prop_value('access_storage_ratio')
-            )
+            self.get_prop_value('files_handled_per_lsfte') *
+            self.get_input_available('line_staff_fte') *
+            self.get_prop_value('storage_fee') *
         )
-
+#What Konrad thinks should be there:
+#        budgetary_surplus = (
+#            self.get_input_available('file_count') *
+#            (
+#                (storage_cost + self.get_prop_value('access_cost')) *
+#                self.get_prop_value('access_storage_ratio')
+#            )
+#        )
+        
         budget_consumed = (
             self.get_input_available('file_count') *
             (
@@ -618,17 +623,17 @@ def createRecordStorage():
 
     FileLogistics.attributes.add("external capability")
 
-    StaffAccomodation = merlin.Entity(sim, "Staff Accommodation")
-    sim.add_entity(StaffAccomodation)
-    storage_e.add_child(StaffAccomodation)
+    StaffAccommodation = merlin.Entity(sim, "Staff Accommodation")
+    sim.add_entity(StaffAccommodation)
+    storage_e.add_child(StaffAccommodation)
     # the_file_log_process = FileLogisticsProcess("file logistics process")
     # FileLogistics.add_process(the_file_log_process)
-    StaffAccomodation.create_process(
+    StaffAccommodation.create_process(
         StaffAccommodationProcess,
         {
             'name': "staff accomodation"
         })
-    StaffAccomodation.attributes.add("resource")
+    StaffAccommodation.attributes.add("resource")
 
     LineStaffRes = merlin.Entity(sim, "Staff")
     sim.add_entity(LineStaffRes)
@@ -687,13 +692,13 @@ def createRecordStorage():
     sim.connect(TheStaffBudget, LineStaffRes, "staff$")
 
     sim.connect(TheRentBudget, StorageFacility, "rent$")
-    sim.connect(TheRentBudget, StaffAccomodation, "rent$")
+    sim.connect(TheRentBudget, StaffAccommodation, "rent$")
 
     sim.connect(TheOtherBudget, FileLogistics, "other$")
     sim.connect(TheOtherBudget, StorageFacility, "other$")
 
-    sim.connect(StaffAccomodation, LineStaffRes, "accomodatedStaff#")
-    sim.connect(StaffAccomodation, StorageFacility, "used_rent_expenses")
+    sim.connect(StaffAccommodation, LineStaffRes, "accommodatedStaff#")
+    sim.connect(StaffAccommodation, StorageFacility, "used_rent_expenses")
 
     sim.connect(LineStaffRes, StorageFacility, "OH_FTE")
     sim.connect(LineStaffRes, FileLogistics, "OH_FTE")
