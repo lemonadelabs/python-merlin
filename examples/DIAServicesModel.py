@@ -132,35 +132,40 @@ class StorageServiceProcess(merlin.Process):
             (
                 self.get_input_available('used_rent_expenses') +
                 self.get_input_available('used_staff_expenses') +
-                self.get_input_available('storage_budget')
+                self.get_input_available('other$') -
+                self.get_input_available('FL_spare_other_expenses$')
             ) /
             self.get_input_available('file_count')
         )
 
-        files_accessed = (
+        """files_accessed = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
             self.get_prop_value('files_processed_per_lsfte') *
             self.get_prop_value('access_storage_ratio')
-        )
+        )"""
 
         files_stored = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
-            self.get_prop_value('files_processed_per_lsfte')
+            self.get_prop_value('files_handled_per_lsfte')
         )
 
         service_revenue = (
             self.get_input_available('file_count') *
-            (
-                (
-                    self.get_prop_value('storage_price') +
-                    self.get_prop_value('access_price')
-                ) *
-                self.get_prop_value('access_storage_ratio')
-            )
+            self.get_prop_value('files_handled_per_lsfte') *
+            self.get_input_available('line_staff_fte') *
+            self.get_prop_value('storage_fee') *
         )
-
+#What Konrad thinks should be there:
+#        budgetary_surplus = (
+#            self.get_input_available('file_count') *
+#            (
+#                (storage_cost + self.get_prop_value('access_cost')) *
+#                self.get_prop_value('access_storage_ratio')
+#            )
+#        )
+        
         budget_consumed = (
             self.get_input_available('file_count') *
             (
