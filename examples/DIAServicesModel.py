@@ -419,7 +419,8 @@ class StaffAccommodationProcess(merlin.Process):
         self.add_property(
             'lease term[yr]/todo',
             'lease_term',
-            merlin.ProcessProperty.PropertyType.number_type
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_lease_term
         )
 
     def reset(self):
