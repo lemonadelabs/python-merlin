@@ -431,7 +431,7 @@ class StaffAccommodationProcess(merlin.Process):
     def compute(self, tick):
 
         cost_per_area = self.get_prop_value("cost[$]/area [m²]")
-        staff_per_area = self.get_prop_value("area [m²]")
+        staff_per_area = self.get_prop_value("staff [#]/area [m²]")
         area = self.get_prop_value("area [m²]")
         lease_term = self.get_prop_value("lease term[yr]")
 
@@ -456,7 +456,7 @@ class StaffAccommodationProcess(merlin.Process):
             self.consume_input("rent_expenses",
                                rent_expenses)
 
-            self.provide_output("staff_accomodated",
+            self.provide_output("staff_accommodated",
                                 staff_accommodated)
             self.provide_output("used_rent_expenses",
                                 used_rent_expenses)
