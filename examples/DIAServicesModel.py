@@ -417,8 +417,9 @@ class StaffAccommodationProcess(merlin.Process):
             merlin.ProcessProperty.PropertyType.number_type,
             default_staff_per_area_m2
         )
+        # todo
         self.add_property(
-            'lease term[yr]/todo',
+            'lease term[yr]',
             'lease_term',
             merlin.ProcessProperty.PropertyType.number_type,
             default_lease_term
@@ -428,8 +429,39 @@ class StaffAccommodationProcess(merlin.Process):
         pass
 
     def compute(self, tick):
-        # todo
-        self.write_zero_to_all()
+
+        cost_per_area = self.get_prop_value("cost[$]/area [m²]")
+        staff_per_area = self.get_prop_value("area [m²]")
+        area = self.get_prop_value("area [m²]")
+        lease_term = self.get_prop_value("lease term[yr]")
+
+        rent_expenses = self.get_input_available("rent_expenses")
+
+        staff_accommodated = area * staff_per_area
+        used_rent_expenses = cost_per_area*area
+
+        lease_still_on = (lease_term >= 1)
+        sufficient_funding = (rent_expenses >= used_rent_expenses)
+
+        if not lease_still_on:
+            self.notify_insufficient_input("lease_term[yr]",
+                                           lease_term,
+                                           1)
+        if not sufficient_funding:
+            self.notify_insufficient_input("rent_expenses",
+                                           rent_expenses,
+                                           used_rent_expenses)
+
+        if sufficient_funding and lease_still_on:
+            self.consume_input("rent_expenses",
+                               rent_expenses)
+
+            self.provide_output("staff_accomodated",
+                                staff_accommodated)
+            self.provide_output("used_rent_expenses",
+                                used_rent_expenses)
+        else:
+            self.write_zero_to_all()
 
 
 class StaffProcess(merlin.Process):
