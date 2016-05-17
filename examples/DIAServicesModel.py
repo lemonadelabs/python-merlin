@@ -617,17 +617,17 @@ def createRecordStorage():
 
     FileLogistics.attributes.add("external capability")
 
-    StaffAccomodation = merlin.Entity(sim, "Staff Accommodation")
-    sim.add_entity(StaffAccomodation)
-    storage_e.add_child(StaffAccomodation)
+    StaffAccommodation = merlin.Entity(sim, "Staff Accommodation")
+    sim.add_entity(StaffAccommodation)
+    storage_e.add_child(StaffAccommodation)
     # the_file_log_process = FileLogisticsProcess("file logistics process")
     # FileLogistics.add_process(the_file_log_process)
-    StaffAccomodation.create_process(
+    StaffAccommodation.create_process(
         StaffAccommodationProcess,
         {
             'name': "staff accomodation"
         })
-    StaffAccomodation.attributes.add("resource")
+    StaffAccommodation.attributes.add("resource")
 
     LineStaffRes = merlin.Entity(sim, "Staff")
     sim.add_entity(LineStaffRes)
@@ -686,13 +686,13 @@ def createRecordStorage():
     sim.connect(TheStaffBudget, LineStaffRes, "staff$")
 
     sim.connect(TheRentBudget, StorageFacility, "rent$")
-    sim.connect(TheRentBudget, StaffAccomodation, "rent$")
+    sim.connect(TheRentBudget, StaffAccommodation, "rent$")
 
     sim.connect(TheOtherBudget, FileLogistics, "other$")
     sim.connect(TheOtherBudget, StorageFacility, "other$")
 
-    sim.connect(StaffAccomodation, LineStaffRes, "accomodatedStaff#")
-    sim.connect(StaffAccomodation, StorageFacility, "used_rent_expenses")
+    sim.connect(StaffAccommodation, LineStaffRes, "accommodatedStaff#")
+    sim.connect(StaffAccommodation, StorageFacility, "used_rent_expenses")
 
     sim.connect(LineStaffRes, StorageFacility, "OH_FTE")
     sim.connect(LineStaffRes, FileLogistics, "OH_FTE")
