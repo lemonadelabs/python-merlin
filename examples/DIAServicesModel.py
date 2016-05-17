@@ -388,7 +388,7 @@ class StaffAccommodationProcess(merlin.Process):
             default_staff_per_area_m2=0.2,
             default_lease_term=5
             ):
-        super(TemplateProcess, self).__init__(name)
+        super(StaffAccommodationProcess, self).__init__(name)
 
         # Define Inputs
         self.add_input('rent_expenses', 'rent$')
@@ -617,6 +617,18 @@ def createRecordStorage():
 
     FileLogistics.attributes.add("external capability")
 
+    StaffAccomodation = merlin.Entity(sim, "Staff Accommodation")
+    sim.add_entity(StaffAccomodation)
+    storage_e.add_child(StaffAccomodation)
+    # the_file_log_process = FileLogisticsProcess("file logistics process")
+    # FileLogistics.add_process(the_file_log_process)
+    StaffAccomodation.create_process(
+        StaffAccommodationProcess,
+        {
+            'name': "staff accomodation"
+        })
+    StaffAccomodation.attributes.add("resource")
+
     LineStaffRes = merlin.Entity(sim, "Staff")
     sim.add_entity(LineStaffRes)
     storage_e.add_child(LineStaffRes)
@@ -668,5 +680,27 @@ def createRecordStorage():
                                      name="budgetary surplus")
     sim.add_output(budgetarySurplus)
     sim.connect_output(StorageFacility, budgetarySurplus)
+
+    # now connect all inputs of the services
+    sim.connect(TheStaffBudget, StorageFacility, "staff$")
+    sim.connect(TheStaffBudget, LineStaffRes, "staff$")
+
+    sim.connect(TheRentBudget, StorageFacility, "rent$")
+    sim.connect(TheRentBudget, StaffAccomodation, "rent$")
+
+    sim.connect(TheOtherBudget, FileLogistics, "other$")
+    sim.connect(TheOtherBudget, StorageFacility, "other$")
+
+    sim.connect(StaffAccomodation, LineStaffRes, "accomodatedStaff#")
+    sim.connect(StaffAccomodation, StorageFacility, "used_rent_expenses")
+
+    sim.connect(LineStaffRes, StorageFacility, "OH_FTE")
+    sim.connect(LineStaffRes, FileLogistics, "OH_FTE")
+    sim.connect(LineStaffRes, StorageFacility, "LS_FTE")
+    sim.connect(LineStaffRes, StorageFacility, "used_staff_expenses")
+
+    sim.connect(FileLogistics, StorageFacility, "FL_OH_FTE")
+    sim.connect(FileLogistics, StorageFacility, "files")
+    sim.connect(FileLogistics, StorageFacility, "FL_other_exp")
 
     return sim
