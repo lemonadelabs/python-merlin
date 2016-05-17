@@ -264,12 +264,12 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
         # Define Inputs
         self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('outsource_budget', 'other$')
+        self.add_input('other_expenses', 'other_exp')
 
         # Define Outputs
-        self.add_output("FL_OHSfte", "FL_OHSfte")
+        self.add_output('fl_overhead_staff_fte', 'FL_OH_FTE')
         self.add_output('file_count', 'files')
-        self.add_output('FL_spare_other_expenses', 'used_other_expenses')
+        self.add_output('FL_spare_other_expenses', 'FL_other_exp')
 
         # Define Properties
         self.add_property(
