@@ -157,7 +157,8 @@ class StorageServiceProcess(merlin.Process):
             self.get_input_available('line_staff_fte') *
             self.get_prop_value('storage_fee')
         )
-#What Konrad thinks should be there:
+
+# What Konrad thinks should be there:
 #        budgetary_surplus = (
 #            self.get_input_available('file_count') *
 #            (
@@ -165,7 +166,7 @@ class StorageServiceProcess(merlin.Process):
 #                self.get_prop_value('access_storage_ratio')
 #            )
 #        )
-        
+
         budget_consumed = (
             self.get_input_available('file_count') *
             (
@@ -229,11 +230,6 @@ class StorageServiceProcess(merlin.Process):
             self.provide_output(
                 'files_stored',
                 files_stored
-            )
-
-            self.provide_output(
-                'files_accessed',
-                files_accessed
             )
 
             self.provide_output(
@@ -544,14 +540,18 @@ def createRecordStorage():
     sim = merlin.Simulation()
     sim.add_attributes(["branch", "capability", "deliverable", "budget",
                         "asset", "resource", "external capability"])
-    # todo: create
-    sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$", "used_rent_expenses", "used_staff_expenses", "used_other_expenses",
-                        "files_stored", "operational_surplus", "service_revenue", "budgetary_surplus",
-                        "OH_FTE", "other$", "files", "used_other_expenses", "FL_OH_FTE", "FL_other_exp", "other$", "FL_OHSfte",
-                        "rent$", "accommodatedStaff#", "used_rent_expenses",
-                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE", "used_staff_expenses",
-                        "service_revenue", "budgetary_surplus", "operational_surplus", "files_stored"
-                        "rent$", "staff$", "other$"
+    sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
+                        "used_rent_expenses", "used_staff_expenses",
+                        "used_other_expenses", "files_stored",
+                        "operational_surplus", "service_revenue",
+                        "budgetary_surplus", "OH_FTE", "other$",
+                        "files", "used_other_expenses", "FL_OH_FTE",
+                        "FL_other_exp", "other$", "FL_OHSfte", "rent$",
+                        "accommodatedStaff#", "used_rent_expenses",
+                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE",
+                        "used_staff_expenses", "service_revenue",
+                        "budgetary_surplus", "operational_surplus",
+                        "files_stored", "rent$", "staff$", "other$"
                         ])
 
     # add a branch
@@ -571,7 +571,6 @@ def createRecordStorage():
     sim.add_entity(TheStaffBudget, is_source_entity=True)
     storage_e.add_child(TheStaffBudget)
     TheStaffBudget.attributes.add("budget")
-    #sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
     TheStaffBudget.create_process(
         processes.BudgetProcess,
         {
@@ -585,7 +584,6 @@ def createRecordStorage():
     sim.add_entity(TheRentBudget, is_source_entity=True)
     storage_e.add_child(TheRentBudget)
     TheRentBudget.attributes.add("budget")
-    #sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
     TheRentBudget.create_process(
         processes.BudgetProcess,
         {
@@ -599,7 +597,6 @@ def createRecordStorage():
     sim.add_entity(TheOtherBudget, is_source_entity=True)
     storage_e.add_child(TheOtherBudget)
     TheOtherBudget.attributes.add("budget")
-    #sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
     TheOtherBudget.create_process(
         processes.BudgetProcess,
         {
@@ -608,13 +605,10 @@ def createRecordStorage():
             'budget_type': "other$"
         })
 
-
-    # add entities and their processes
+    # add specific entities and their processes
     FileLogistics = merlin.Entity(sim, "File Logistics")
     sim.add_entity(FileLogistics)
     storage_e.add_child(FileLogistics)
-    # the_file_log_process = FileLogisticsProcess("file logistics process")
-    # FileLogistics.add_process(the_file_log_process)
     FileLogistics.create_process(
         OutsourcedFileLogisticsProcess,
         {
@@ -626,8 +620,6 @@ def createRecordStorage():
     StaffAccommodation = merlin.Entity(sim, "Staff Accommodation")
     sim.add_entity(StaffAccommodation)
     storage_e.add_child(StaffAccommodation)
-    # the_file_log_process = FileLogisticsProcess("file logistics process")
-    # FileLogistics.add_process(the_file_log_process)
     StaffAccommodation.create_process(
         StaffAccommodationProcess,
         {
@@ -638,8 +630,6 @@ def createRecordStorage():
     LineStaffRes = merlin.Entity(sim, "Staff")
     sim.add_entity(LineStaffRes)
     storage_e.add_child(LineStaffRes)
-    # the_line_staff_process = LineStaffProcess("line staff resource process")
-    # LineStaffRes.add_process(the_line_staff_process)
     LineStaffRes.create_process(
         StaffProcess,
         {
@@ -651,11 +641,6 @@ def createRecordStorage():
     StorageFacility = merlin.Entity(sim, "Storage Service")
     sim.add_entity(StorageFacility)
     storage_e.add_child(StorageFacility)
-    # todo
-    #sim.connect_entities(FileLogistics, StorageFacility, "file count")
-    #sim.connect_entities(LineStaffRes, StorageFacility, "lineFTE")
-    # the_stor_fac_process = StorageFacilityProcess("storage facility process")
-    # StorageFacility.add_process(the_stor_fac_process)
     StorageFacility.create_process(
         StorageServiceProcess,
         {
@@ -664,12 +649,12 @@ def createRecordStorage():
 
     StorageFacility.attributes.add("asset")
 
-    # need an expectation
     opSurplus = merlin.Output("operational_surplus",
                               name="operational surplus")
     sim.add_output(opSurplus)
     sim.connect_output(StorageFacility, opSurplus)
 
+    # todo: need an expectation
     filesStored = merlin.Output("files_stored",
                                 name="files stored")
     sim.add_output(filesStored)
@@ -688,25 +673,29 @@ def createRecordStorage():
     sim.connect_output(StorageFacility, budgetarySurplus)
 
     # now connect all inputs of the services
-    sim.connect(TheStaffBudget, StorageFacility, "staff$")
-    sim.connect(TheStaffBudget, LineStaffRes, "staff$")
+    sim.connect_entities(TheStaffBudget, StorageFacility, "staff$")
+    sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
 
-    sim.connect(TheRentBudget, StorageFacility, "rent$")
-    sim.connect(TheRentBudget, StaffAccommodation, "rent$")
+    sim.connect_entities(TheRentBudget, StorageFacility, "rent$")
+    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
-    sim.connect(TheOtherBudget, FileLogistics, "other$")
-    sim.connect(TheOtherBudget, StorageFacility, "other$")
+    sim.connect_entities(TheOtherBudget, FileLogistics, "other$")
+    sim.connect_entities(TheOtherBudget, StorageFacility, "other$")
 
-    sim.connect(StaffAccommodation, LineStaffRes, "accommodatedStaff#")
-    sim.connect(StaffAccommodation, StorageFacility, "used_rent_expenses")
+    sim.connect_entities(StaffAccommodation,
+                         LineStaffRes,
+                         "accommodatedStaff#")
+    sim.connect_entities(StaffAccommodation,
+                         StorageFacility,
+                         "used_rent_expenses")
 
-    sim.connect(LineStaffRes, StorageFacility, "OH_FTE")
-    sim.connect(LineStaffRes, FileLogistics, "OH_FTE")
-    sim.connect(LineStaffRes, StorageFacility, "LS_FTE")
-    sim.connect(LineStaffRes, StorageFacility, "used_staff_expenses")
+    sim.connect_entities(LineStaffRes, StorageFacility, "OH_FTE")
+    sim.connect_entities(LineStaffRes, FileLogistics, "OH_FTE")
+    sim.connect_entities(LineStaffRes, StorageFacility, "LS_FTE")
+    sim.connect_entities(LineStaffRes, StorageFacility, "used_staff_expenses")
 
-    sim.connect(FileLogistics, StorageFacility, "FL_OH_FTE")
-    sim.connect(FileLogistics, StorageFacility, "files")
-    sim.connect(FileLogistics, StorageFacility, "FL_other_exp")
+    sim.connect_entities(FileLogistics, StorageFacility, "FL_OH_FTE")
+    sim.connect_entities(FileLogistics, StorageFacility, "files")
+    sim.connect_entities(FileLogistics, StorageFacility, "FL_other_exp")
 
     return sim
