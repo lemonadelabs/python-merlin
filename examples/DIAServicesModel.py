@@ -644,7 +644,12 @@ def createRecordStorage():
     FileLogistics.create_process(
         OutsourcedFileLogisticsProcess,
         {
-            'name': "file logistics process"
+            'name': "file logistics process",
+            'contracted_volumes': 100,
+            'actual_volumes': 100,
+            'contract_cost': 1000,
+            'overage_cost_per_file': 10,
+            'required_management_fte': 1
         })
 
     FileLogistics.attributes.add("external capability")
@@ -655,7 +660,11 @@ def createRecordStorage():
     StaffAccommodation.create_process(
         StaffAccommodationProcess,
         {
-            'name': "staff accomodation"
+            'name': "staff accommodation",
+            'default_cost_m2': 10,
+            'default_area_m2': 100,
+            'default_staff_per_area_m2': 0.2,
+            'default_lease_term': 5
         })
     StaffAccommodation.attributes.add("resource")
 
@@ -665,7 +674,16 @@ def createRecordStorage():
     LineStaffRes.create_process(
         StaffProcess,
         {
-            'name': "line staff resource process"
+            'name': "line staff resource process",
+            'default_line_staff_no': 100,
+            'default_oh_staff_no': 10,
+            'default_hours_per_week': 40.0,
+            'default_weeks_per_year': 52,
+            'default_prof_training_percent': 20,
+            'default_leave_percent': 10,
+            'default_avg_oh_salary': 70e3,
+            'default_avg_line_salary': 60e3,
+            'default_hours_training': 100
         })
 
     LineStaffRes.attributes.add("resource")
@@ -676,7 +694,11 @@ def createRecordStorage():
     StorageFacility.create_process(
         StorageServiceProcess,
         {
-            'name': "storage facility process"
+            'name': "storage facility process",
+            'default_lifecycle': 20,
+            'default_storage_fee': 1,
+            'default_ohfte_lsfte_ratio': 0.1,
+            'default_files_handled_per_lsfte': 10000
         })
 
     StorageFacility.attributes.add("asset")
@@ -731,3 +753,12 @@ def createRecordStorage():
     sim.connect_entities(FileLogistics, StorageFacility, "FL_other_exp")
 
     return sim
+
+if __name__ == "__main__":
+
+    sim = createRecordStorage()
+
+    sim.set_time_span(48)
+    sim.run()
+    result = list(sim.outputs)
+    print(result[0].result, result[1].result)
