@@ -65,8 +65,8 @@ class StorageServiceProcess(merlin.Process):
         super(StorageServiceProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_expenses', 'rent$')
-        self.add_input('rent_expenses', 'staff$')
+        self.add_input('staff_expenses', 'staff$')
+        self.add_input('rent_expenses', 'rent$')
         self.add_input('line_staff_fte', 'LS_FTE')
         self.add_input('overhead_staff_fte', 'OH_FTE')
         self.add_input('fl_overhead_staff_fte', 'FL_OH_FTE')
