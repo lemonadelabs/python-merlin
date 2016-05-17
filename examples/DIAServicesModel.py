@@ -155,7 +155,7 @@ class StorageServiceProcess(merlin.Process):
             self.get_input_available('file_count') *
             self.get_prop_value('files_handled_per_lsfte') *
             self.get_input_available('line_staff_fte') *
-            self.get_prop_value('storage_fee') *
+            self.get_prop_value('storage_fee')
         )
 #What Konrad thinks should be there:
 #        budgetary_surplus = (
