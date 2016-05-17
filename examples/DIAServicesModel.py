@@ -72,7 +72,7 @@ class StorageServiceProcess(merlin.Process):
         self.add_input('fl_overhead_staff_fte', 'FL_OH_FTE')
         self.add_input('file_count', 'files')
         self.add_input('fl_spare_other_expenses', 'FL_other_exp')
-        self.add_input('other_expenses', 'other_exp')
+        self.add_input('other_expenses', 'other$')
         self.add_input('used_rent_expenses', 'used_rent_expenses')
         self.add_input('used_staff_expenses', 'used_staff_expenses')
 
@@ -264,7 +264,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
         # Define Inputs
         self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('other_expenses', 'other_exp')
+        self.add_input('other_expenses', 'other$')
 
         # Define Outputs
         self.add_output('fl_overhead_staff_fte', 'FL_OH_FTE')
@@ -375,14 +375,14 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
             self.write_zero_to_all()
 
 
-class StaffAccomodationProcess(merlin.Process):
+class StaffAccommodationProcess(merlin.Process):
     """
     Documentation of template process
     """
 
     def __init__(
             self,
-            name="staff accomodation",
+            name="staff accommodation",
             default_cost_m2=10,
             default_area_m2=100,
             default_staff_per_area_m2=0.2,
@@ -394,8 +394,8 @@ class StaffAccomodationProcess(merlin.Process):
         self.add_input('rent_expenses', 'rent$')
 
         # Define Outputs
-        self.add_output('staff_accomodated', 'accomodatedStaff#')
-        self.add_output('used_rent_expenses', 'usedRent$')
+        self.add_output('staff_accommodated', 'accommodatedStaff#')
+        self.add_output('used_rent_expenses', 'used_rent_expenses')
 
         # Define Properties
         self.add_property(
@@ -452,8 +452,8 @@ class StaffProcess(merlin.Process):
         super(StaffProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_expenses', 'staffExp$')
-        self.add_input('staff_accomodated', 'accomodatedStaff#')
+        self.add_input('staff_expenses', 'staff$')
+        self.add_input('staff_accommodated', 'accommodatedStaff#')
 
         # Define Outputs
         self.add_output('OHSfte', 'OH_FTE')
@@ -463,7 +463,7 @@ class StaffProcess(merlin.Process):
         # Define Properties
         # todo: this should become a "calculated" or "read only" property
         self.add_property(
-            'Staff #',
+            'staff #',
             'total_staff_no',
             merlin.ProcessProperty.PropertyType.number_type,
             default_line_staff_no+default_oh_staff_no  # as calculated
@@ -494,7 +494,7 @@ class StaffProcess(merlin.Process):
             default_weeks_per_year
         )
         self.add_property(
-            'professional training[%]',
+            'professional training [%]',
             'prof_training_percent',
             merlin.ProcessProperty.PropertyType.number_type,
             default_prof_training_percent
@@ -541,9 +541,9 @@ def createRecordStorage():
     # todo: create
     sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$", "used_rent_expenses", "used_staff_expenses", "used_other_expenses",
                         "files_stored", "operational_surplus", "service_revenue", "budgetary_surplus",
-                        "OH_FTE", "other$", "files", "used_other_expenses", "FL_OH_FTE", "FL_other_exp", "other_exp", "FL_OHSfte",
-                        "rent$", "accomodatedStaff#", "usedRent$",
-                        "staffExp$", "accomodatedStaff#", "OH_FTE", "LS_FTE", "used_staff_expenses",
+                        "OH_FTE", "other$", "files", "used_other_expenses", "FL_OH_FTE", "FL_other_exp", "other$", "FL_OHSfte",
+                        "rent$", "accommodatedStaff#", "used_rent_expenses",
+                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE", "used_staff_expenses",
                         "service_revenue", "budgetary_surplus", "operational_surplus", "files_stored"
                         "rent$", "staff$", "other$"
                         ])
@@ -589,12 +589,12 @@ def createRecordStorage():
         })
 
     # other budget
-    TheOhterBudget = merlin.Entity(sim, "Ohter Budget")
-    sim.add_entity(TheOhterBudget, is_source_entity=True)
-    storage_e.add_child(TheOhterBudget)
-    TheOhterBudget.attributes.add("budget")
+    TheOtherBudget = merlin.Entity(sim, "Other Budget")
+    sim.add_entity(TheOtherBudget, is_source_entity=True)
+    storage_e.add_child(TheOtherBudget)
+    TheOtherBudget.attributes.add("budget")
     #sim.connect_entities(TheMaintenance, StorageFacility, "maint$")
-    TheOhterBudget.create_process(
+    TheOtherBudget.create_process(
         processes.BudgetProcess,
         {
             'name': "other budget",
