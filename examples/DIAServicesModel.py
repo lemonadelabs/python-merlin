@@ -10,6 +10,8 @@ exmaple files.
 
 from pymerlin import merlin
 from pymerlin import processes
+from Canvas import Line
+from reportlab.graphics.renderSVG import LINE_STYLES
 
 
 # a template for a new process
@@ -577,6 +579,15 @@ class StaffProcess(merlin.Process):
         
         staff_expenses = self.get_input_available("staff_expenses")
         staff_accommodated = self.get_input_available("staff_accommodated")
+        
+        overhead_staff_fte = working_hours_per_week * working_weeks_per_year 
+                           * professional_training/100 * leave/100 * overhead_staff_no
+                           - ((overhead_staff_no / line_staff_no) * training_period)
+        line_staff_fte = working_hours_per_week * working_weeks_per_year 
+                       * professional_training/100 * leave/100 * line_staff_no
+                       - ((1-(overhead_staff_no / line_staff_no)) * training_period)
+        used_staff_expenses = avg_line_salary * line_staff_no 
+                            + avg_overhead_salary * overhead_saff_no
         
         sufficient_funding = (staff_expenses >= avg_overhead_salary * overhead_staff_no
                                               + avg_line_salary * line_staff_no)
