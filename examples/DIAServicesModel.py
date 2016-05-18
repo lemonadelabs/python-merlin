@@ -124,9 +124,6 @@ class StorageServiceProcess(merlin.Process):
 
     def compute(self, tick):
         # todo: output changed
-        self.write_zero_to_all()
-        return
-
         # Calculations
         storage_cost = (
             (
@@ -313,8 +310,6 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
     def compute(self, tick):
         # todo: redo calculations
-        self.write_zero_to_all()
-        return
 
         # Calculations
         overage = (
@@ -563,6 +558,175 @@ class StaffProcess(merlin.Process):
 
     def compute(self, tick):
         self.write_zero_to_all()
+
+
+class InternalICTDesktopService(merlin.Process):
+    
+    def __init__(
+            self,
+            actual_desktops=0,
+            desktops_per_staff=0,
+            actual_it_staff=0,
+            it_staff_per_desktop=0,
+            value_per_desktop=0,
+            cost_per_desktop=0,
+            name="Internal ICT Desktop Service"):
+        super(InternalICTDesktopService, self).__init__(name)
+
+        # Define Inputs
+        self.add_input('staff_accommodated', 'accommodatedStaff#')
+        self.add_input('overhead_staff_fte', 'OH_FTE')
+        self.add_input('ict_budget', 'other$')
+
+        # Define Outputs
+        self.add_output('desktops_accomodated', 'desktops')
+        self.add_output('internal_desktop_overhead_fte', 'IDS_OH_FTE')
+        self.add_output('budget_surplus', 'IDS_other_exp')
+
+        # Define Process Properties
+        self.add_property(
+            'Actual Desktops',
+            'actual_desktops',
+            merlin.ProcessProperty.PropertyType.number_type,
+            actual_desktops
+        )
+
+        self.add_property(
+            'Minimum Desktops / Staff',
+            'min_desktop_per_staff',
+            merlin.ProcessProperty.PropertyType.number_type,
+            desktops_per_staff
+        )
+
+        self.add_property(
+            'Actual IT Staff',
+            'actual_it_staff',
+            merlin.ProcessProperty.PropertyType.number_type,
+            actual_it_staff
+        )
+
+        self.add_property(
+            'Minimum IT Staff / Desktop',
+            'min_it_staff_per_desktop',
+            merlin.ProcessProperty.PropertyType.number_type,
+            it_staff_per_desktop
+        )
+
+        self.add_property(
+            'Value / Desktop',
+            'value_per_desktop',
+            merlin.ProcessProperty.PropertyType.number_type,
+            value_per_desktop
+        )
+
+        self.add_property(
+            'Maintenance Cost / Desktop',
+            'maintenance_cost_per_desktop',
+            merlin.ProcessProperty.PropertyType.number_type,
+            cost_per_desktop
+        )
+
+    def reset(self):
+        pass
+
+    def compute(self, tick):
+
+        # Calculations
+        overhead_fte_required = (
+            self.get_prop_value('min_it_staff_per_desktop') *
+            self.get_prop_value('actual_desktops')
+        )
+
+        budget_required = (
+            self.get_prop_value('actual_desktops') *
+            (
+                self.get_prop_value('maintenance_cost_per_desktop') +
+                self.get_prop_value('value_per_desktop')
+            )
+        )
+
+        ids_oh_ftes = (
+            self.get_input_available('overhead_staff_fte') -
+            self.get_prop_value('actual_it_staff')
+        )
+
+        # Constraints
+        sufficient_overhead = (
+            self.get_input_available('overhead_staff_fte') >=
+            overhead_fte_required
+        )
+
+        sufficient_budget = (
+            self.get_input_available('ict_budget') >=
+            budget_required
+        )
+
+        sufficient_accomodation = (
+            self.get_input_available('staff_accommodated') >=
+            self.get_input_available('actual_it_staff')
+        )
+
+        # Constraint notifications
+        if not sufficient_overhead:
+            self.notify_insufficient_input(
+                'overhead_staff_fte',
+                self.get_input_available('overhead_staff_fte'),
+                overhead_fte_required
+            )
+
+        if not sufficient_budget:
+            self.notify_insufficient_input(
+                'ict_budget',
+                self.get_input_available('ict_budget'),
+                budget_required
+            )
+
+        if not sufficient_accomodation:
+            self.notify_insufficient_input(
+                'staff_accommodated',
+                self.get_input_available('staff_accommodated'),
+                self.get_prop_value('actual_it_staff')
+            )
+
+        # Consume inputs and outputs
+        if (sufficient_accomodation and
+            sufficient_overhead and
+            sufficient_budget):
+
+            self.consume_input(
+                'staff_accommodated',
+                self.get_prop_value('actual_it_staff')
+            )
+
+            self.consume_input(
+                'overhead_staff_fte',
+                overhead_fte_required
+            )
+
+            self.consume_input(
+                'ict_budget',
+                budget_required
+            )
+
+            self.provide_output(
+                'desktops_accomodated',
+                self.get_prop_value('actual_desktops')
+            )
+
+            self.provide_output(
+                'internal_desktop_overhead_fte',
+                ids_oh_ftes
+            )
+
+            self.provide_output(
+                'budget_surplus',
+                self.get_input_available('ict_budget')
+            )
+
+        else:
+            self.write_zero_to_all()
+
+
 
 
 # create entities
