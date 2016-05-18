@@ -157,12 +157,23 @@ def IPSbranch():
     # and finally add the processes to the entities
     # so the processes are automatically hooked up to the
     # entities connectors
-    e_budget.add_process(BudgetProcess("passportPrintingBudget",
-                                       start_amount=400000))
-    the_staff_process = ppStaff()
-    the_staff_process.priority = 10  # pay the people first!
-    e_staff.add_process(the_staff_process)
-    e_printer.add_process(ppPrinter())
+    e_budget.create_process(
+        BudgetProcess,
+        {
+            'name': "passportPrintingBudget",
+            'start_amount': 4000000,
+        })
+
+    e_staff.create_process(
+        ppStaff,
+        {
+        })
+    e_staff.get_processes()[0].priority = 10
+
+    e_printer.create_process(
+        ppPrinter,
+        {
+        })
 
     # setup an apportioning bias for staff and printer budget
     budget_out_con = e_budget.get_output_by_type("$")
