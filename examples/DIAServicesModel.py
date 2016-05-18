@@ -634,7 +634,125 @@ class StaffProcess(merlin.Process):
             self.provide_output("used_staff_expenses", used_staff_expenses)
         else:
             self.write_zero_to_all()
-            
+
+
+class ICTDesktopContract(merlin.Process):
+
+    def __init__(
+            self,
+            desktops_per_staff=0,
+            cost_per_desktop=0,
+            contract_ohfte=1,
+            name="Desktop Contract"):
+        super(ICTDesktopContract, self).__init__(name)
+
+        # Define Inputs
+        self.add_input('overhead_staff_fte', 'OH_FTE')
+        self.add_input('contract_budget', 'other$')
+        self.add_input('staff_accommodated', 'accommodatedStaff#')
+
+        # Define Outputs
+        self.add_output('desktops_accomodated', 'desktops')
+        self.add_output('desktop_contract_overhead_fte', 'DC_OH_FTE')
+        self.add_output('budget_surplus', 'DC_other_exp')
+
+        # Define Properties
+        self.add_property(
+            'Desktops / Staff',
+            'desktops_per_staff',
+            merlin.ProcessProperty.PropertyType.number_type,
+            desktops_per_staff
+        )
+
+        self.add_property(
+            'Cost / Desktop',
+            'cost_per_desktop',
+            merlin.ProcessProperty.PropertyType.number_type,
+            cost_per_desktop
+        )
+
+        self.add_property(
+            'Desktop Contract Overhead Staff',
+            'desktop_contract_ohsfte',
+            merlin.ProcessProperty.PropertyType.number_type,
+            contract_ohfte
+        )
+
+    def reset(self):
+        pass
+
+    def compute(self, tick):
+
+        # Calculations
+        budget_consumed = (
+            self.get_prop_value('desktops_per_staff') *
+            self.get_prop_value('cost_per_desktop') *
+            self.get_input_available('staff_accommodated')
+        )
+
+        # Constraints
+        contract_managed = (
+            self.get_input_available('overhead_staff_fte') >=
+            self.get_prop_value('desktop_contract_ohsfte')
+        )
+
+        contract_funded = (
+            self.get_input_available('contract_budget') >=
+            budget_consumed
+        )
+
+        # Constraint notifications
+        if not contract_managed:
+            self.notify_insufficient_input(
+                'overhead_staff_fte',
+                self.get_input_available('overhead_staff_fte'),
+                self.get_prop_value('desktop_contract_ohsfte')
+            )
+
+        if not contract_funded:
+            self.notify_insufficient_input(
+                'contract_budget',
+                self.get_input_available('contract_budget'),
+                budget_consumed
+            )
+
+        # Process inputs and outputs
+        if contract_managed and contract_funded:
+
+            # Consume Inputs
+            self.consume_input(
+                'overhead_staff_fte',
+                self.get_prop_value('desktop_contract_ohsfte')
+            )
+
+            self.consume_input(
+                'contract_budget',
+                budget_consumed
+            )
+
+            # Provide Outputs
+
+            self.provide_output(
+                'desktops_accomodated',
+                (
+                    self.get_input_available('staff_accommodated') *
+                    self.get_prop_value('desktops_per_staff')
+                )
+            )
+
+            self.provide_output(
+                'internal_desktop_overhead_fte',
+                self.get_input_available('overhead_staff_fte')
+            )
+
+            self.provide_output(
+                'budget_surplus',
+                self.get_input_available('contract_budget')
+            )
+
+        else:
+            self.write_zero_to_all()
+
 
 class InternalICTDesktopService(merlin.Process):
     
