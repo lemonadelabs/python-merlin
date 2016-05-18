@@ -10,6 +10,8 @@ exmaple files.
 
 from pymerlin import merlin
 from pymerlin import processes
+from Canvas import Line
+from reportlab.graphics.renderSVG import LINE_STYLES
 
 
 # a template for a new process
@@ -134,7 +136,7 @@ class StorageServiceProcess(merlin.Process):
             ) /
             self.get_input_available('file_count')
         )
-
+#files accessed was taken out:
         """files_accessed = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
@@ -414,7 +416,7 @@ class StaffAccommodationProcess(merlin.Process):
         )
         # todo
         self.add_property(
-            'lease term[yr]',
+            'lease term [yr]',
             'lease_term',
             merlin.ProcessProperty.PropertyType.number_type,
             default_lease_term
@@ -428,7 +430,7 @@ class StaffAccommodationProcess(merlin.Process):
         cost_per_area = self.get_prop_value("cost[$]/area [m²]")
         staff_per_area = self.get_prop_value("staff [#]/area [m²]")
         area = self.get_prop_value("area [m²]")
-        lease_term = self.get_prop_value("lease term[yr]")
+        lease_term = self.get_prop_value("lease term [yr]")
 
         rent_expenses = self.get_input_available("rent_expenses")
 
@@ -439,7 +441,7 @@ class StaffAccommodationProcess(merlin.Process):
         sufficient_funding = (rent_expenses >= used_rent_expenses)
 
         if not lease_still_on:
-            self.notify_insufficient_input("lease_term[yr]",
+            self.notify_insufficient_input("lease_term [yr]",
                                            lease_term,
                                            1)
         if not sufficient_funding:
@@ -557,8 +559,61 @@ class StaffProcess(merlin.Process):
         pass
 
     def compute(self, tick):
+        # todo staff = LS + OHS ???
         self.write_zero_to_all()
-
+        
+        line_staff_no =  self.get_prop_value("line staff #")
+        overhead_staff_no = self.get_prop_value("overhead staff #")
+        working_hours_per_week = self.get_prop_value("working hours /week")
+        working_weeks_per_year = self.get_prop_value("working weeks /year")
+        professional_training = self.get.prop_value("professional training [%]")
+        leave = self.get.prop_value("leave [%]")
+        avg_line_salary = self.get.prop_value("avg line salary [$]")
+        avg_overhead_salary = self.get.prop_value("avg overhead salary [$]")
+        training_period = self.get.prop_value("training period [hours]")
+        
+        staff_expenses = self.get_input_available("staff_expenses")
+        staff_accommodated = self.get_input_available("staff_accommodated")
+        
+        overhead_staff_fte = working_hours_per_week * working_weeks_per_year 
+                           * professional_training/100 * leave/100 * overhead_staff_no
+                           - ((overhead_staff_no / line_staff_no) * training_period)
+        line_staff_fte = working_hours_per_week * working_weeks_per_year 
+                       * professional_training/100 * leave/100 * line_staff_no
+                       - ((1-(overhead_staff_no / line_staff_no)) * training_period)
+        used_staff_expenses = avg_line_salary * line_staff_no 
+                            + avg_overhead_salary * overhead_saff_no
+        
+        sufficient_funding = (staff_expenses >= avg_overhead_salary * overhead_staff_no
+                                              + avg_line_salary * line_staff_no)
+        sufficient_accommodation = (staff_accommodated >= overhead_staff_no 
+                                                        + line_staff_no)
+        
+        if not sufficient_funding:
+            self.notify_insufficient_input("staff_expenses",
+                                            staff_expenses,
+                                            used_staff_expenses)
+        
+        if not sufficient_accommodation:
+            self.notify_insufficient_input("staff_accommodated",
+                                            staff_accommodated,
+                                            overhead_staff_no + line_staff_no)
+            
+        if sufficient_funding and sufficient_accommodation:
+            self.consume_input("staff_expenses",
+                                staff_expenses)
+            self.consume_input("staff_accommodated",
+                                staff_accommodated)
+            
+            self.provide_output("overhead_staff_fte",
+                                 overhead_staff_fte)
+            self.provide_output("line_staff_fte",
+                                 line_staff_fte)
+            self.provide_output("used_staff_expenses",
+                                 used_staff_expenses)
+        else:
+            self.write_zero_to_all()
+            
 
 class InternalICTDesktopService(merlin.Process):
     
