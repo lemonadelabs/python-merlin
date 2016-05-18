@@ -574,6 +574,7 @@ def big_one_with_sub_budgets():
     branchBudget = merlin.Entity(sim, "branch budget")
     sim.add_entity(branchBudget)
     branch_e.add_child(branchBudget)
+    branchBudget.attributes.add("budget")
     branchBudget.create_process(
         SubBudgetProcess,
         {
@@ -588,6 +589,7 @@ def big_one_with_sub_budgets():
     departmentBudget = merlin.Entity(sim, "department staff")
     sim.add_entity(departmentBudget, is_source_entity=True)
     # and for the sake of it a department budget
+    departmentBudget.attributes.add("budget")
     departmentBudget.create_process(
         processes.BudgetProcess,
         {
