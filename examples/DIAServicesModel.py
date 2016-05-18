@@ -83,19 +83,19 @@ class StorageServiceProcess(merlin.Process):
         self.add_output("budgetary_surplus", 'budgetary_surplus')
 
         # Define Properties
-        self.add_property(
-            "lifecycle/years",
-            'lifecycle',
-            merlin.ProcessProperty.PropertyType.number_type,
-            default_lifecycle
-        )
+        # self.add_property(
+        #     "lifecycle/years",
+        #     'lifecycle',
+        #     merlin.ProcessProperty.PropertyType.number_type,
+        #     default_lifecycle
+        # )
 
-        default_storage_cost = 0  # todo
         self.add_property(
             "Storage Cost",
             'storage_cost',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_storage_cost
+            0,
+            read_only=True
         )
 
         self.add_property(
@@ -123,7 +123,6 @@ class StorageServiceProcess(merlin.Process):
         pass
 
     def compute(self, tick):
-        # todo: output changed
         # Calculations
         storage_cost = (
             (
@@ -148,14 +147,25 @@ class StorageServiceProcess(merlin.Process):
             self.get_prop_value('storage_fee')
         )
 
-# What Konrad thinks should be there:
-#        budgetary_surplus = (
-#            self.get_input_available('file_count') *
-#            (
-#                (storage_cost + self.get_prop_value('access_cost')) *
-#                self.get_prop_value('access_storage_ratio')
-#            )
-#        )
+        operational_surplus = (
+            service_revenue -
+            (
+                self.get_input_available('used_rent_expenses') +
+                self.get_input_available('used_staff_expenses') +
+                self.get_input_available('FL_spare_other_expenses')
+
+            )
+        )
+
+        budgetary_surplus = (
+            self.get_input_available('FL_spare_other_expenses') +
+            self.get_input_available('staff_expenses') +
+            self.get_input_available('rent_expenses') -
+            (
+                self.get_input_available('used_staff_expenses') +
+                self.get_input_available('used_rent_expenses')
+            )
+        )
 
         budget_consumed = (
             self.get_input_available('file_count') *
@@ -228,8 +238,13 @@ class StorageServiceProcess(merlin.Process):
             )
 
             self.provide_output(
-                'used_expenses',
-                budget_consumed
+                'operational_surplus',
+                operational_surplus
+            )
+
+            self.provide_output(
+                'budgetary_surplus',
+                budgetary_surplus
             )
 
         else:
