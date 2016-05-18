@@ -1132,6 +1132,7 @@ class ProcessProperty(SimObject):
         self.readonly = readonly
 
     def set_value(self, value):
+        self.set_telemetry_value('value', value)
         self._value = value
 
     def get_value(self):

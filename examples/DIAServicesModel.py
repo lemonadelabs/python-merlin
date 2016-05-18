@@ -134,6 +134,8 @@ class StorageServiceProcess(merlin.Process):
             self.get_input_available('file_count')
         )
 
+        self.get_prop('storage_cost').set_value(storage_cost)
+
         files_stored = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
