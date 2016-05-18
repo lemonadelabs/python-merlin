@@ -908,7 +908,8 @@ class Process(SimObject):
                      display_name,
                      name,
                      property_type,
-                     default_value):
+                     default_value,
+                     read_only=False):
         """
         :param
         :param str display_name: will be exposed to front-end and is more
@@ -916,6 +917,7 @@ class Process(SimObject):
         :param str name: to identify within :py:class:`.Process`
         :param PropertyType property_type: the representation of the value
         :param float default_value: the default value
+        :param bool read_only: Specifies if the created pp is read_only
         """
         if name in self.props:
             raise KeyError("property %s already exists" % (name,))
@@ -924,13 +926,13 @@ class Process(SimObject):
                     display_name,
                     property_type=property_type,
                     default=default_value,
-                    parent=self)
+                    parent=self,
+                    readonly=read_only)
         self.props[name] = prop
 
     def remove_property(self, name):
         self.props[name].parent = None
         del self.props[name]
-
 
     def write_zero_to_all(self):
         """

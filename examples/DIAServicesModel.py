@@ -135,14 +135,6 @@ class StorageServiceProcess(merlin.Process):
             self.get_input_available('file_count')
         )
 
-        # files accessed was taken out:
-        # files_accessed = (
-        #     self.get_input_available('file_count') *
-        #     self.get_prop_value('line_staff_fte') *
-        #     self.get_prop_value('files_processed_per_lsfte') *
-        #     self.get_prop_value('access_storage_ratio')
-        # )
-
         files_stored = (
             self.get_input_available('file_count') *
             self.get_prop_value('line_staff_fte') *
