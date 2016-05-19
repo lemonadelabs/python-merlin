@@ -136,7 +136,7 @@ def IPSbranch():
     # define outputs
     pp_delivered = merlin.Output("count",
                                  name="passports printed")
-    sim.outputs.add(pp_delivered)
+    sim.add_output(pp_delivered)
 
     e_budget = merlin.Entity(name="budget",
                              attributes={'budget'})
