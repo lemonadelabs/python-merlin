@@ -610,6 +610,19 @@ class TestEvents:
         assert prop.get_value() == 2.0
 
 
+    def test_additive_modify_process_property_event(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = sim.get_entity_by_name('call center')
+        p = e.get_process_by_name('Call Center Staff')
+        prop = p.get_prop('staff salary')
+        assert prop.get_value() == 5.0
+        a = merlin.Action.create(
+            "Entity {0} := Property {1}, -2.0, additive:bool = {2}".format(e.id, prop.id, True))
+        assert len(a) == 1
+        a[0].execute(sim)
+        assert prop.get_value() == 3.0
+
+
     def test_parent_entity_event(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
         child_ent = merlin.Entity(name="child_ent")
@@ -735,6 +748,17 @@ class TestCoreActions:
         a = merlin.ModifyProcessPropertyAction(e.id, prop.id, 2.0)
         a.execute(sim)
         assert prop.get_value() == 2.0
+
+    def test_additve_modify_process_property_action(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        e = sim.get_entity_by_name('call center')
+        p = e.get_process_by_name('Call Center Staff')
+        prop = p.get_prop('staff salary')
+        assert prop.get_value() == 5.0
+        a = merlin.ModifyProcessPropertyAction(e.id, prop.id, -2.0, additive=True)
+        a.execute(sim)
+        assert prop.get_value() == 3.0
+
 
 class TestMessages:
 

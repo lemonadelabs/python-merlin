@@ -1135,7 +1135,7 @@ class ProcessProperty(SimObject):
         self.set_telemetry_value('value', value)
         self._value = value
 
-    def get_value(self):
+    def get_value(self)->float:
         return self._value
 
 
@@ -1589,8 +1589,13 @@ class Action(SimObject):
 
             if a['op'] == ':=':
                 # modify process property
-                return ModifyProcessPropertyAction(
-                    *(a['operand_1']['params'] + a['operand_2']['params']))
+                if a['operand_2']['props'] is not None:
+                    return ModifyProcessPropertyAction(
+                        *(a['operand_1']['params'] + a['operand_2']['params']),
+                        **a['operand_2']['props'])
+                else:
+                    return ModifyProcessPropertyAction(
+                        *(a['operand_1']['params'] + a['operand_2']['params']))
 
             if a['op'] == '/':
                 # Disconnect operator
@@ -2311,18 +2316,23 @@ class ModifyProcessPropertyAction(Action):
             self,
             entity_id,
             property_id,
-            value):
+            value,
+            additive=False):
         super(ModifyProcessPropertyAction, self).__init__()
         self.entity_id = int(entity_id)
         self.property_id = int(property_id)
         self.value = float(value)
+        self.additive = additive
 
     def execute(self, simulation: Simulation):
         e = simulation.get_entity_by_id(self.entity_id)
         for p in e.get_processes():
             for prop in p.get_properties():
                 if prop.id == self.property_id:
-                    prop.set_value(self.value)
+                    if self.additive:
+                        prop.set_value(prop.get_value() + self.value)
+                    else:
+                        prop.set_value(self.value)
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -2337,7 +2347,9 @@ class ModifyProcessPropertyAction(Action):
                 {
                     'type': 'Property',
                     'params': [self.property_id, self.value],
-                    'props': None
+                    'props': {
+                        'additive': self.additive
+                    }
                 }
         }
 

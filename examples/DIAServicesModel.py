@@ -124,21 +124,24 @@ class StorageServiceProcess(merlin.Process):
 
     def compute(self, tick):
         # Calculations
-        storage_cost = (
-            (
-                self.get_input_available('used_rent_expenses') +
-                self.get_input_available('used_staff_expenses') +
-                self.get_input_available('other$') -
-                self.get_input_available('FL_spare_other_expenses$')
-            ) /
-            self.get_input_available('file_count')
-        )
 
-        self.get_prop('storage_cost').set_value(storage_cost)
+        try:
+            storage_cost = (
+                (
+                    self.get_input_available('used_rent_expenses') +
+                    self.get_input_available('used_staff_expenses') +
+                    self.get_input_available('other_expenses') -
+                    self.get_input_available('fl_spare_other_expenses')
+                ) /
+                self.get_input_available('file_count')
+            )
+            self.get_prop('storage_cost').set_value(storage_cost)
+        except ZeroDivisionError:
+            storage_cost = 0
 
         files_stored = (
             self.get_input_available('file_count') *
-            self.get_prop_value('line_staff_fte') *
+            self.get_input_available('line_staff_fte') *
             self.get_prop_value('files_handled_per_lsfte')
         )
 
@@ -154,13 +157,13 @@ class StorageServiceProcess(merlin.Process):
             (
                 self.get_input_available('used_rent_expenses') +
                 self.get_input_available('used_staff_expenses') +
-                self.get_input_available('FL_spare_other_expenses')
+                self.get_input_available('fl_spare_other_expenses')
 
             )
         )
 
         budgetary_surplus = (
-            self.get_input_available('FL_spare_other_expenses') +
+            self.get_input_available('fl_spare_other_expenses') +
             self.get_input_available('staff_expenses') +
             self.get_input_available('rent_expenses') -
             (
@@ -170,17 +173,19 @@ class StorageServiceProcess(merlin.Process):
         )
 
         budget_consumed = (
-            self.get_input_available('file_count') *
             (
-                (storage_cost + self.get_prop_value('access_cost')) *
-                self.get_prop_value('access_storage_ratio')
-            )
+                self.get_input_available('file_count') /
+                self.parent.sim.num_steps
+            ) * storage_cost
         )
 
-        management_required = (
-            self.get_input_available('line_staff_fte') /
-            self.get_prop_value('ohfte_lsfte_ratio')
-        )
+        try:
+            management_required = (
+                self.get_input_available('line_staff_fte') /
+                self.get_prop_value('ohfte_lsfte_ratio')
+            )
+        except ZeroDivisionError:
+            management_required = 0
 
         # Constraints
         sufficient_managment = (
@@ -189,7 +194,7 @@ class StorageServiceProcess(merlin.Process):
         )
 
         sufficient_funding = (
-            self.get_input_available('storage_budget') >= budget_consumed
+            self.get_input_available('other_expenses') >= budget_consumed
         )
 
         # Constraint Notifications
@@ -223,7 +228,7 @@ class StorageServiceProcess(merlin.Process):
             )
 
             self.consume_input(
-                'storage_budget',
+                'other_expenses',
                 budget_consumed
             )
 
@@ -335,10 +340,10 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         # Constraints
         contract_managed = (
             self.get_input_available('overhead_staff_fte') >=
-            self.get_prop_value('contract_management'))
+            self.get_prop_value('file_logistics_OHSfte'))
 
         contract_funded = (
-            self.get_input_available('outsource_budget') >=
+            self.get_input_available('other_expenses') >=
             monthly_cost
         )
 
@@ -417,12 +422,11 @@ class StaffAccommodationProcess(merlin.Process):
             default_area_m2
         )
         self.add_property(
-            'staff [#]/area [m²]',
-            'staff_per_area_m2',
+            'area [m²]/staff [#]',
+            'area_per_staff_m2',
             merlin.ProcessProperty.PropertyType.number_type,
             default_staff_per_area_m2
         )
-        # todo
         self.add_property(
             'lease term [yr]',
             'lease_term',
@@ -435,23 +439,31 @@ class StaffAccommodationProcess(merlin.Process):
 
     def compute(self, tick):
 
-        cost_per_area = self.get_prop_value("cost[$]/area [m²]")
-        staff_per_area = self.get_prop_value("staff [#]/area [m²]")
-        area = self.get_prop_value("area [m²]")
-        lease_term = self.get_prop_value("lease term [yr]")
+        cost_per_area = self.get_prop_value("cost_per_m2")
+        area_per_staff = self.get_prop_value("area_per_staff_m2")
+        area = self.get_prop_value("area_m2")
+        lease_term = self.get_prop_value("lease_term")
 
         rent_expenses = self.get_input_available("rent_expenses")
 
-        staff_accommodated = area * staff_per_area
+        try:
+            staff_accommodated = area / area_per_staff
+        except ZeroDivisionError:
+            staff_accommodated = 0
+
         used_rent_expenses = cost_per_area*area
 
         lease_still_on = (lease_term >= 1)
         sufficient_funding = (rent_expenses >= used_rent_expenses)
 
         if not lease_still_on:
-            self.notify_insufficient_input("lease_term [yr]",
-                                           lease_term,
-                                           1)
+            self.parent.sim.log_message(
+                merlin.MerlinMessage.MessageType.warn,
+                self,
+                '{0}_lease_expired'.format(self.id),
+                'The {{{{lease has expired}}}}',
+                [self.get_prop('lease_term')]
+            )
         if not sufficient_funding:
             self.notify_insufficient_input("rent_expenses",
                                            rent_expenses,
@@ -567,41 +579,46 @@ class StaffProcess(merlin.Process):
         pass
 
     def compute(self, tick):
-        # todo staff = LS + OHS ???
         self.write_zero_to_all()
         
-        line_staff_no = self.get_prop_value("line staff #")
-        overhead_staff_no = self.get_prop_value("overhead staff #")
-        working_hours_per_week = self.get_prop_value("working hours /week")
-        working_weeks_per_year = self.get_prop_value("working weeks /year")
+        line_staff_no = self.get_prop_value("line_staff_no")
+        overhead_staff_no = self.get_prop_value("oh_staff_no")
+        working_hours_per_week = self.get_prop_value("hours_per_week")
+        working_weeks_per_year = self.get_prop_value("weeks_per_year")
         professional_training = self.get_prop_value(
-            "professional training [%]"
+            "prof_training_percent"
         )
-        leave = self.get_prop_value("leave [%]")
-        avg_line_salary = self.get_prop_value("avg line salary [$]")
-        avg_overhead_salary = self.get_prop_value("avg overhead salary [$]")
-        training_period = self.get_prop_value("training period [hours]")
+        leave = self.get_prop_value("leave_percent")
+        avg_line_salary = self.get_prop_value("avgLineSalary")
+        avg_overhead_salary = self.get_prop_value("avgOHSalary")
+        training_period = self.get_prop_value("hours_training")
         
         staff_expenses = self.get_input_available("staff_expenses")
         staff_accommodated = self.get_input_available("staff_accommodated")
-        
-        overhead_staff_fte = (
-            (
-                working_hours_per_week * working_weeks_per_year *
-                professional_training/100 * leave/100 * overhead_staff_no
-            ) -
-            ((overhead_staff_no / line_staff_no) * training_period)
-        )
 
-        line_staff_fte = (
-            (
-                working_hours_per_week * working_weeks_per_year *
-                professional_training/100 * leave/100 * line_staff_no
-            ) -
-            (
-                (1-(overhead_staff_no / line_staff_no)) * training_period
+        try:
+            overhead_staff_fte = (
+                (
+                    working_hours_per_week * working_weeks_per_year *
+                    professional_training/100 * leave/100 * overhead_staff_no
+                ) -
+                ((overhead_staff_no / line_staff_no) * training_period)
             )
-        )
+        except ZeroDivisionError:
+            overhead_staff_fte = 0
+
+        try:
+            line_staff_fte = (
+                (
+                    working_hours_per_week * working_weeks_per_year *
+                    professional_training/100 * leave/100 * line_staff_no
+                ) -
+                (
+                    (1-(overhead_staff_no / line_staff_no)) * training_period
+                )
+            )
+        except ZeroDivisionError:
+            line_staff_fte = 0
 
         used_staff_expenses = (
             (avg_line_salary * line_staff_no) +
