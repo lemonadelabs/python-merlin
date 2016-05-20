@@ -937,7 +937,7 @@ def createRecordStorage():
     # this is the capability, right now
 
     sim = merlin.Simulation()
-    sim.add_attributes(["branch", "capability", "deliverable", "budget",
+    sim.add_attributes(["branch", "service", "deliverable", "budget",
                         "asset", "resource", "external capability"])
     sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
                         "used_rent_expenses", "used_staff_expenses",
@@ -962,7 +962,7 @@ def createRecordStorage():
     storage_e = merlin.Entity(sim, "storage")
     sim.add_entity(storage_e, parent=branch_e)
     branch_e.add_child(storage_e)
-    branch_e.attributes.add("capability")
+    storage_e.attributes.add("service")
 
     # add the budget entities/processes
     # staff budget
