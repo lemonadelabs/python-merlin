@@ -352,7 +352,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
             self.notify_insufficient_input(
                 'overhead_staff_fte',
                 self.get_input_available('overhead_staff_fte'),
-                self.get_prop_value('contract_management')
+                self.get_prop_value('file_logistics_OHSfte')
             )
 
         if not contract_funded:
@@ -366,7 +366,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
             self.consume_input(
                 'overhead_staff_fte',
-                self.get_prop_value('contract_management'))
+                self.get_prop_value('file_logistics_OHSfte'))
 
             self.consume_input(
                 'outsource_budget',
@@ -628,8 +628,9 @@ class StaffProcess(merlin.Process):
         sufficient_funding = (
             staff_expenses >=
             (
-                (avg_overhead_salary * overhead_staff_no) +
-                (avg_line_salary * line_staff_no)
+                ((avg_overhead_salary * overhead_staff_no) +
+                (avg_line_salary * line_staff_no)) /
+                self.parent.sim.num_steps
             )
         )
 
@@ -655,8 +656,8 @@ class StaffProcess(merlin.Process):
             self.consume_input("staff_expenses", staff_expenses)
             self.consume_input("staff_accommodated", staff_accommodated)
             
-            self.provide_output("overhead_staff_fte", overhead_staff_fte)
-            self.provide_output("line_staff_fte", line_staff_fte)
+            self.provide_output("OHSfte", overhead_staff_fte)
+            self.provide_output("LSfte", line_staff_fte)
             self.provide_output("used_staff_expenses", used_staff_expenses)
         else:
             self.write_zero_to_all()
