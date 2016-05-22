@@ -357,8 +357,8 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
         if not contract_funded:
             self.notify_insufficient_input(
-                'outsource_budget',
-                self.get_input_available('outsource_budget'),
+                'other_expenses',
+                self.get_input_available('other_expenses'),
                 monthly_cost
             )
 
@@ -369,7 +369,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
                 self.get_prop_value('file_logistics_OHSfte'))
 
             self.consume_input(
-                'outsource_budget',
+                'other_expenses',
                 monthly_cost
             )
 
@@ -378,7 +378,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
                 self.get_prop_value('actual_volume'))
 
             self.provide_output(
-                'used_file_logistic_expenses',
+                'FL_spare_other_expenses',
                 monthly_cost
             )
 
