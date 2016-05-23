@@ -133,7 +133,6 @@ class StorageServiceProcess(merlin.Process):
 
     def compute(self, tick):
         # Calculations
-
         try:
             storage_cost = (
                 (
@@ -146,6 +145,7 @@ class StorageServiceProcess(merlin.Process):
             )
             self.get_prop('storage_cost').set_value(storage_cost)
         except ZeroDivisionError:
+            logging.info("Divide by zero error in storage_cost")
             storage_cost = 0
 
         files_stored = (
@@ -194,6 +194,7 @@ class StorageServiceProcess(merlin.Process):
                 self.get_prop_value('ohfte_lsfte_ratio')
             )
         except ZeroDivisionError:
+            logging.info("Divide by Zero in management_required")
             management_required = 0
 
         # Constraints
@@ -387,6 +388,11 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
             self.provide_output(
                 'FL_spare_other_expenses',
                 monthly_cost
+            )
+
+            self.provide_output(
+                'fl_overhead_staff_fte',
+                self.get_prop_value('file_logistics_OHSfte')
             )
 
         else:
