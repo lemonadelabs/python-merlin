@@ -10,6 +10,15 @@ exmaple files.
 
 from pymerlin import merlin
 from pymerlin import processes
+import logging
+
+# Global logging settings
+logging_level = logging.INFO
+log_to_file = ''
+logging.basicConfig(
+    filename=log_to_file,
+    level=logging_level,
+    format='%(asctime)s: [%(levelname)s] %(message)s')
 
 
 # a template for a new process
@@ -324,8 +333,6 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         pass
 
     def compute(self, tick):
-        # todo: redo calculations
-
         # Calculations
         overage = (
             self.get_prop_value('actual_volume') -
@@ -579,8 +586,7 @@ class StaffProcess(merlin.Process):
         pass
 
     def compute(self, tick):
-        self.write_zero_to_all()
-        
+
         line_staff_no = self.get_prop_value("line_staff_no")
         overhead_staff_no = self.get_prop_value("oh_staff_no")
         working_hours_per_week = self.get_prop_value("hours_per_week")
@@ -603,8 +609,9 @@ class StaffProcess(merlin.Process):
                     professional_training/100 * leave/100 * overhead_staff_no
                 ) -
                 ((overhead_staff_no / line_staff_no) * training_period)
-            )
+            ) / 12.0
         except ZeroDivisionError:
+            logging.info("Overhead Staff FTE calc Zero Division Error")
             overhead_staff_fte = 0
 
         try:
@@ -616,8 +623,9 @@ class StaffProcess(merlin.Process):
                 (
                     (1-(overhead_staff_no / line_staff_no)) * training_period
                 )
-            )
+            ) / 12.0
         except ZeroDivisionError:
+            logging.info("Line Staff FTE calc Zero Division Error")
             line_staff_fte = 0
 
         used_staff_expenses = (
@@ -655,7 +663,6 @@ class StaffProcess(merlin.Process):
         if sufficient_funding and sufficient_accommodation:
             self.consume_input("staff_expenses", staff_expenses)
             self.consume_input("staff_accommodated", staff_accommodated)
-            
             self.provide_output("OHSfte", overhead_staff_fte)
             self.provide_output("LSfte", line_staff_fte)
             self.provide_output("used_staff_expenses", used_staff_expenses)
