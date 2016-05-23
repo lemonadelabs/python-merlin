@@ -1607,9 +1607,19 @@ class Action(SimObject):
                 elif a['operand_1']['type'] == 'UnitType':
                     raise MerlinScriptException(
                         "Operation RemoveUnitType not supported")
+            elif a['op'] == ':=':
+                if a['operand_1']['type'] == 'Output':
+                    return ModifyOutputMinimum(
+                        a['operand_1']['params'][0],
+                        **(a['operand_1']['props']))
+                else:
+                    raise MerlinScriptException(
+                        "Invalid type for unary assignment operator"
+                    )
+
             else:
                 raise MerlinScriptException(
-                    "Invalid operator for unary expression, must be + or -")
+                    "Invalid operator for unary expression, must be +, :=, or -")
         else:
 
             if len(a['operand_1']['params']) == 0 \
@@ -1662,15 +1672,20 @@ class Action(SimObject):
             tokens = tokens[1:]
             # now look for a type
             type1 = Action._parse_type(tokens[0])
+
             if type1:
                 # parse type 1 params
-                type1_params = Action._parse_params(tokens[1:])
+                tokens = tokens[1:]
+                type1_params = Action._parse_params(tokens)
+                tokens = tokens[len(type1_params):]
+                print(tokens)
+                type1_props = Action._parse_props(tokens)
                 return {
                     'op': op,
                     'operand_1': {
                         'type': type1,
                         'params': type1_params,
-                        'props': None
+                        'props': type1_props
                     },
                     'operand_2': None}
             else:
@@ -1741,7 +1756,6 @@ class Action(SimObject):
 
     @classmethod
     def _parse_props(cls, tokens: List[str]) -> Dict[str, Any]:
-        # TODO: fix this function
         if not tokens:
             return None
         props = dict()
@@ -1753,7 +1767,7 @@ class Action(SimObject):
             else:
                 type_p = t.partition(':')
                 if type_p[0] == t:
-                    print("type partition error")
+                    # print("type partition error {0}".format(t))
                     return None
                 else:
                     label = type_p[0].strip()
@@ -1779,7 +1793,14 @@ class Action(SimObject):
 
     @classmethod
     def _parse_type(cls, token):
-        if token in ['Entity', 'Attribute', 'UnitType', 'Process', 'Property']:
+        if token in [
+            'Entity',
+            'Attribute',
+            'UnitType',
+            'Process',
+            'Property',
+            'Output'
+        ]:
             return token
         else:
             return None
@@ -2427,3 +2448,33 @@ class ParentEntityAction(Action):
         child_entity = simulation.get_entity_by_id(self.child_entity_id)
         if parent_entity and child_entity:
             simulation.parent_entity(parent_entity, child_entity)
+
+
+class ModifyOutputMinimum(Action):
+    
+    def __init__(
+            self,
+            output_id,
+            minimum=None
+            ):
+        super(ModifyOutputMinimum, self).__init__()
+        self.output_id = int(output_id)
+        self.minimum = minimum
+
+    def serialize(self) -> Dict[str, Any]:
+        return {
+            'op': ":=",
+            'operand_1': {
+                'type': "Output",
+                'params': [self.output_id],
+                "props": {
+                    'minimum': self.minimum
+                }
+            },
+            'operand_2': None
+        }
+
+    def execute(self, simulation: Simulation):
+        for o in simulation.outputs:
+            if o.id == self.output_id:
+                o.minimum = self.minimum

@@ -636,6 +636,17 @@ class TestEvents:
         assert child_ent in parent_ent.get_children()
         assert child_ent.parent == parent_ent
 
+
+    def test_modify_output_minimum_event(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        output = list(sim.outputs)[0]
+        output.minimum = 0
+        a = merlin.Action.create(":= Output {0}, minimum:float = {1}".format(output.id, 10))
+        assert len(a) == 1
+        a[0].execute(sim)
+        assert output.minimum == 10
+
+
 class TestCoreActions:
 
     def test_add_attributes_action(self, sim):
@@ -758,6 +769,14 @@ class TestCoreActions:
         a = merlin.ModifyProcessPropertyAction(e.id, prop.id, -2.0, additive=True)
         a.execute(sim)
         assert prop.get_value() == 3.0
+
+    def test_modify_output_minimum(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        output = list(sim.outputs)[0]
+        output.minimum = 0
+        a = merlin.ModifyOutputMinimum(output.id, 10)
+        a.execute(sim)
+        assert output.minimum == 10
 
 
 class TestMessages:
