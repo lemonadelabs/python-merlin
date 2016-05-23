@@ -1054,22 +1054,6 @@ def createRecordStorage(sim=None):
     else:
         assert isinstance(sim, merlin.Simulation)
 
-    sim.add_attributes(["branch", "service", "deliverable", "budget",
-                        "asset", "resource", "external capability"])
-    sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
-                        "used_rent_expenses", "used_staff_expenses",
-                        "used_other_expenses", "files_stored",
-                        "operational_surplus", "service_revenue",
-                        "budgetary_surplus", "OH_FTE", "other$",
-                        "files", "used_other_expenses", "FL_OH_FTE",
-                        "FL_other_exp", "other$", "FL_OHSfte", "rent$",
-                        "accommodatedStaff#", "used_rent_expenses",
-                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE",
-                        "used_staff_expenses", "service_revenue",
-                        "budgetary_surplus", "operational_surplus",
-                        "files_stored", "rent$", "staff$", "other$"
-                        ])
-
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
     sim.add_entity(branch_e, parent=None)

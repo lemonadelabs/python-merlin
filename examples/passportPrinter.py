@@ -129,9 +129,6 @@ class ppPrinter(merlin.Process):
 def IPSbranch():
 
     sim = merlin.Simulation()
-    sim.set_time_span(12)
-    sim.add_attributes(["budget", "asset", "resource"])
-    sim.add_unit_types(["FTE", "$", "count"])
 
     # define outputs
     pp_delivered = merlin.Output("count",
@@ -191,6 +188,7 @@ def IPSbranch():
 if __name__ == "__main__":
 
     sim = IPSbranch()
+    sim.set_time_span(12)
     sim.run()
     result = list(sim.outputs)[0].result
     print(result)
