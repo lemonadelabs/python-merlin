@@ -966,12 +966,20 @@ class Process(SimObject):
         for k in self.outputs.keys():
             self.outputs[k].connector.write(0.0)
 
-    def consume_all_inputs(self):
+    def consume_all_inputs(self, absValue=float("inf"), relValue=1.0):
         """
+        :param float absValue: optional absolute value
+        :param float relValue: optional relative value
+        :returns: None
+
+        by default this method consumes all available input.
+
         consumes everything available from all inputs
         """
         for k in self.inputs:
-            self.consume_input(k, self.get_input_available(k))
+            self.consume_input(k,
+                               min(absValue,
+                                   relValue*self.get_input_available(k)))
 
     def provide_output(self, name, value):
         """

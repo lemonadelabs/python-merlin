@@ -52,6 +52,7 @@ class TemplateProcess(merlin.Process):
         pass
 
     def compute(self, tick):
+        self.consume_all_inputs()
         self.write_zero_to_all()
 
 
@@ -265,6 +266,7 @@ class StorageServiceProcess(merlin.Process):
             )
 
         else:
+            self.consume_all_inputs(0)
             self.write_zero_to_all()
 
 
@@ -396,6 +398,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
             )
 
         else:
+            self.consume_all_inputs(0)
             self.write_zero_to_all()
 
 
@@ -491,6 +494,7 @@ class StaffAccommodationProcess(merlin.Process):
             self.provide_output("used_rent_expenses",
                                 used_rent_expenses)
         else:
+            self.consume_all_inputs(0)
             self.write_zero_to_all()
 
 
@@ -604,7 +608,7 @@ class StaffProcess(merlin.Process):
         avg_line_salary = self.get_prop_value("avgLineSalary")
         avg_overhead_salary = self.get_prop_value("avgOHSalary")
         training_period = self.get_prop_value("hours_training")
-        
+
         staff_expenses = self.get_input_available("staff_expenses")
         staff_accommodated = self.get_input_available("staff_accommodated")
 
@@ -638,12 +642,12 @@ class StaffProcess(merlin.Process):
             (avg_line_salary * line_staff_no) +
             (avg_overhead_salary * overhead_staff_no)
         )
-        
+
         sufficient_funding = (
             staff_expenses >=
             (
                 ((avg_overhead_salary * overhead_staff_no) +
-                (avg_line_salary * line_staff_no)) /
+                 (avg_line_salary * line_staff_no)) /
                 self.parent.sim.num_steps
             )
         )
@@ -651,21 +655,21 @@ class StaffProcess(merlin.Process):
         sufficient_accommodation = (
             staff_accommodated >= overhead_staff_no + line_staff_no
         )
-        
+
         if not sufficient_funding:
             self.notify_insufficient_input(
                 "staff_expenses",
                 staff_expenses,
                 used_staff_expenses
             )
-        
+
         if not sufficient_accommodation:
             self.notify_insufficient_input(
                 "staff_accommodated",
                 staff_accommodated,
                 overhead_staff_no + line_staff_no
             )
-            
+
         if sufficient_funding and sufficient_accommodation:
             self.consume_input("staff_expenses", staff_expenses)
             self.consume_input("staff_accommodated", staff_accommodated)
@@ -673,6 +677,7 @@ class StaffProcess(merlin.Process):
             self.provide_output("LSfte", line_staff_fte)
             self.provide_output("used_staff_expenses", used_staff_expenses)
         else:
+            self.consume_all_inputs(0)
             self.write_zero_to_all()
 
 
@@ -791,6 +796,7 @@ class ICTDesktopContract(merlin.Process):
             )
 
         else:
+            self.consume_all_inputs(0)
             self.write_zero_to_all()
 
 
@@ -962,6 +968,7 @@ class InternalICTDesktopService(merlin.Process):
             )
 
         else:
+            self.consume_all_inputs(0)
             self.write_zero_to_all()
 
 
@@ -1224,8 +1231,8 @@ def createRecordStorage(sim=None):
     return sim
 
 
-def createRegistrationFacility(sim=None):
-    # right now this is the registration facility with inhouse desktops.
+def createRegistrationService(sim=None):
+    # right now this is the registration service with inhouse desktops.
     # this function will change to have optionally the external and
     # later both.
 
@@ -1380,10 +1387,12 @@ def createRegistrationFacility(sim=None):
 
     # now connect all inputs of the services
     sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
-    sim.connect_entities(StaffAccommodation, LineStaffRes, "accommodatedStaff#")
+    sim.connect_entities(StaffAccommodation, LineStaffRes,
+                         "accommodatedStaff#")
 
     # all inputs from Inhouse Desktop Service
-    sim.connect_entities(StaffAccommodation, InhouseDesktops, "accommodatedStaff#")
+    sim.connect_entities(StaffAccommodation, InhouseDesktops,
+                         "accommodatedStaff#")
     sim.connect_entities(LineStaffRes, InhouseDesktops, "OH_FTE")
     sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
 
@@ -1392,13 +1401,18 @@ def createRegistrationFacility(sim=None):
     sim.connect_entities(TheRentBudget, RegistrationFacility, "rent$")
     sim.connect_entities(TheOtherBudget, RegistrationFacility, "other$")
     sim.connect_entities(LineStaffRes, RegistrationFacility, "LS_FTE")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility, "desktops_accommodated")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "desktops_accommodated")
     sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_FTE")
     sim.connect_entities(InhouseDesktops, RegistrationFacility, "IDS_OH_FTE")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility, "IDS_other_exp")
-    sim.connect_entities(StaffAccommodation, RegistrationFacility, "used_rent_expenses")
-    sim.connect_entities(LineStaffRes, RegistrationFacility, "used_staff_expenses")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility, "it_depreciation_expenses$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "IDS_other_exp")
+    sim.connect_entities(StaffAccommodation, RegistrationFacility,
+                         "used_rent_expenses")
+    sim.connect_entities(LineStaffRes, RegistrationFacility,
+                         "used_staff_expenses")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "it_depreciation_expenses$")
 
     sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
