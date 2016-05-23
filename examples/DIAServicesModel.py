@@ -782,7 +782,7 @@ class ICTDesktopContract(merlin.Process):
 
 
 class InternalICTDesktopService(merlin.Process):
-    
+
     def __init__(
             self,
             actual_desktops=0,
@@ -950,11 +950,93 @@ class InternalICTDesktopService(merlin.Process):
             self.write_zero_to_all()
 
 
-# create entities
-def createRecordStorage():
-    # this is the capability, right now
+class RegistrationServiceProcess(merlin.Process):
+    """
+    started as a modified copy of StorageServiceProcess
 
-    sim = merlin.Simulation()
+    """
+
+    def __init__(
+            self,
+            default_lifecycle=20,
+            default_registration_fee=1,
+            default_ohfte_lsfte_ratio=0.1,
+            default_applications_processed_per_lsfte=10000,
+            name="Storage Service"
+            ):
+        super(StorageServiceProcess, self).__init__(name)
+
+        # Define Inputs
+        self.add_input('staff_expenses', 'staff$')
+        self.add_input('rent_expenses', 'rent$')
+        self.add_input('line_staff_fte', 'LS_FTE')
+        self.add_input('overhead_staff_fte', 'OH_FTE')
+        self.add_input('fl_overhead_staff_fte', 'FL_OH_FTE')
+        # probably not needed in absense of another "File Logistics"
+        # self.add_input('application_count', 'application_count')
+        self.add_input('fl_spare_other_expenses', 'FL_other_exp')
+        self.add_input('other_expenses', 'other$')
+        self.add_input('used_rent_expenses', 'used_rent_expenses')
+        self.add_input('used_staff_expenses', 'used_staff_expenses')
+
+        # Define Outputs
+        self.add_output("operational_surplus", 'operational_surplus')
+        self.add_output("applications_processed", 'applications_processed')
+        self.add_output("service_revenue", 'service_revenue')
+        self.add_output("budgetary_surplus", 'budgetary_surplus')
+
+        # Define Properties
+        # self.add_property(
+        #     "lifecycle/years",
+        #     'lifecycle',
+        #     merlin.ProcessProperty.PropertyType.number_type,
+        #     default_lifecycle
+        # )
+
+        self.add_property(
+            "Storage Cost",
+            'storage_cost',
+            merlin.ProcessProperty.PropertyType.number_type,
+            0,
+            read_only=True
+        )
+
+        self.add_property(
+            "Registration Fee",
+            'registration_fee',
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_registration_fee
+        )
+
+        self.add_property(
+            "Minimum OH FTEs / LS FTEs",
+            'ohfte_lsfte_ratio',
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_ohfte_lsfte_ratio
+        )
+
+        self.add_property(
+            "Applications Processed / LS FTE",
+            'applications_processed_per_lsfte',
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_applications_processed_per_lsfte
+        )
+
+    def reset(self):
+        pass
+
+    def compute(self, tick):
+        self.write_zero_to_all()
+
+
+#  create entities for record storage service
+def createRecordStorage(sim=None):
+
+    if sim is None:
+        sim = merlin.Simulation()
+    else:
+        assert isinstance(sim, merlin.Simulation)
+
     sim.add_attributes(["branch", "service", "deliverable", "budget",
                         "asset", "resource", "external capability"])
     sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
@@ -1136,6 +1218,203 @@ def createRecordStorage():
     sim.connect_entities(FileLogistics, StorageFacility, "FL_OH_FTE")
     sim.connect_entities(FileLogistics, StorageFacility, "files")
     sim.connect_entities(FileLogistics, StorageFacility, "FL_other_exp")
+
+    return sim
+
+
+def createRegistrationFacility(sim=None):
+    # right now this is the registration facility with inhouse desktops.
+    # this function will change to have optionally the external and
+    # later both.
+
+    # this procedure might add this branch to an existing model.
+
+    if sim is None:
+        sim = merlin.Simulation()
+    else:
+        assert isinstance(sim, merlin.Simulation)
+
+    sim.add_attributes(["branch", "service", "deliverable", "budget",
+                        "asset", "resource", "external capability"])
+    sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
+                        "used_rent_expenses", "used_staff_expenses",
+                        "used_other_expenses", "files_stored",
+                        "operational_surplus", "service_revenue",
+                        "budgetary_surplus", "OH_FTE", "other$",
+                        "files", "used_other_expenses", "FL_OH_FTE",
+                        "FL_other_exp", "other$", "FL_OHSfte", "rent$",
+                        "accommodatedStaff#", "used_rent_expenses",
+                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE",
+                        "used_staff_expenses", "service_revenue",
+                        "budgetary_surplus", "operational_surplus",
+                        "files_stored", "rent$", "staff$", "other$"
+                        ])
+
+    # add a branch
+    branch_e = merlin.Entity(sim, "the branch 2")
+    sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
+
+    # add the registration service
+    registration_e = merlin.Entity(sim, "registration")
+    sim.add_entity(registration_e, parent=branch_e)
+    branch_e.add_child(registration_e)
+    registration_e.attributes.add("service")
+
+    # add the budget entities/processes
+    # staff budget
+    TheStaffBudget = merlin.Entity(sim, "Staff Budget")
+    sim.add_entity(TheStaffBudget, is_source_entity=True)
+    registration_e.add_child(TheStaffBudget)
+    TheStaffBudget.attributes.add("budget")
+    TheStaffBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "staff budget",
+            'start_amount': 4000000,
+            'budget_type': "staff$"
+        })
+
+    # rent budget
+    TheRentBudget = merlin.Entity(sim, "Rent Budget")
+    sim.add_entity(TheRentBudget, is_source_entity=True)
+    registration_e.add_child(TheRentBudget)
+    TheRentBudget.attributes.add("budget")
+    TheRentBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "rent budget",
+            'start_amount': 4000000,
+            'budget_type': "rent$"
+        })
+
+    # other budget, provides for IT as well
+    TheOtherBudget = merlin.Entity(sim, "Other Budget")
+    sim.add_entity(TheOtherBudget, is_source_entity=True)
+    registration_e.add_child(TheOtherBudget)
+    TheOtherBudget.attributes.add("budget")
+    TheOtherBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "other budget",
+            'start_amount': 4000000,
+            'budget_type': "other$"
+        })
+
+    # file logistics is no longer existing
+    # FileLogistics = merlin.Entity(sim, "File Logistics")
+
+    StaffAccommodation = merlin.Entity(sim, "Staff Accommodation")
+    sim.add_entity(StaffAccommodation)
+    registration_e.add_child(StaffAccommodation)
+    StaffAccommodation.create_process(
+        StaffAccommodationProcess,
+        {
+            'name': "staff accommodation",
+            'default_cost_m2': 10,
+            'default_area_m2': 100,
+            'default_staff_per_area_m2': 0.2,
+            'default_lease_term': 5
+        })
+    StaffAccommodation.attributes.add("resource")
+
+    LineStaffRes = merlin.Entity(sim, "Staff")
+    sim.add_entity(LineStaffRes)
+    registration_e.add_child(LineStaffRes)
+    LineStaffRes.create_process(
+        StaffProcess,
+        {
+            'name': "line staff resource process",
+            'default_line_staff_no': 100,
+            'default_oh_staff_no': 10,
+            'default_hours_per_week': 40.0,
+            'default_weeks_per_year': 52,
+            'default_prof_training_percent': 20,
+            'default_leave_percent': 10,
+            'default_avg_oh_salary': 70e3,
+            'default_avg_line_salary': 60e3,
+            'default_hours_training': 100
+        })
+
+    LineStaffRes.attributes.add("resource")
+
+    InhouseDesktops = merlin.Entity(sim, "Inhouse Desktop Service")
+    sim.add_entity(InhouseDesktops)
+    registration_e.add_child(InhouseDesktops)
+    InhouseDesktops.create_process(
+        InternalICTDesktopService,
+        {
+            # todo: set to reasonable values!
+            'actual_desktops': 0,
+            'desktops_per_staff': 0,
+            'actual_it_staff': 0,
+            'it_staff_per_desktop': 0,
+            'value_per_desktop': 0,
+            'cost_per_desktop': 0
+         })
+    InhouseDesktops.attributes.add("resource")
+
+    RegistrationFacility = merlin.Entity(sim, "Registration Service")
+    sim.add_entity(RegistrationFacility)
+    registration_e.add_child(RegistrationFacility)
+    RegistrationFacility.create_process(
+        RegistrationServiceProcess,
+        {
+            'name': "storage facility process",
+            'default_lifecycle': 20,
+            'default_storage_fee': 1,
+            'default_ohfte_lsfte_ratio': 0.1,
+            'default_files_handled_per_lsfte': 10000
+        })
+
+    RegistrationFacility.attributes.add("asset")
+
+    opSurplus = merlin.Output("operational_surplus",
+                              name="operational surplus")
+    sim.add_output(opSurplus)
+    sim.connect_output(RegistrationFacility, opSurplus)
+
+    # todo: need an expectation
+    applProcessed = merlin.Output("applications_processed",
+                                  name="applications_processed")
+    sim.add_output(applProcessed)
+    sim.connect_output(RegistrationFacility, applProcessed)
+
+    # need an expectation
+    serviceRevenue = merlin.Output("service_revenue",
+                                   name="service revenue")
+    sim.add_output(serviceRevenue)
+    sim.connect_output(RegistrationFacility, serviceRevenue)
+
+    # need an expectation
+    budgetarySurplus = merlin.Output("budgetary_surplus",
+                                     name="budgetary surplus")
+    sim.add_output(budgetarySurplus)
+    sim.connect_output(RegistrationFacility, budgetarySurplus)
+
+    # todo: update these!
+
+    # now connect all inputs of the services
+    sim.connect_entities(TheStaffBudget, RegistrationFacility, "staff$")
+    sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
+
+    sim.connect_entities(TheRentBudget, RegistrationFacility, "rent$")
+    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
+
+    sim.connect_entities(TheOtherBudget, RegistrationFacility, "other$")
+
+    sim.connect_entities(StaffAccommodation,
+                         LineStaffRes,
+                         "accommodatedStaff#")
+    sim.connect_entities(StaffAccommodation,
+                         RegistrationFacility,
+                         "used_rent_expenses")
+
+    sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_FTE")
+    sim.connect_entities(LineStaffRes, RegistrationFacility, "LS_FTE")
+    sim.connect_entities(LineStaffRes,
+                         RegistrationFacility,
+                         "used_staff_expenses")
 
     return sim
 
