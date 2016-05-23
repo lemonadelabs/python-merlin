@@ -899,7 +899,7 @@ class InternalICTDesktopService(merlin.Process):
 
         sufficient_accomodation = (
             self.get_input_available('staff_accommodated') >=
-            self.get_input_available('actual_it_staff')
+            self.get_prop_value('actual_it_staff')
         )
 
         # Constraint notifications
@@ -984,14 +984,14 @@ class RegistrationServiceProcess(merlin.Process):
         # Define Inputs
         self.add_input('staff_expenses', 'staff$')
         self.add_input('rent_expenses', 'rent$')
+        self.add_input('other_expenses', 'other$')
         self.add_input('line_staff_fte', 'LS_FTE')
         self.add_input("desktops accommodated", "desktops_accommodated")
         self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('fl_overhead_staff_fte', 'FL_OH_FTE')
+        self.add_input('ids_overhead_staff_fte', 'IDS_OH_FTE')
         # probably not needed in absence of another "File Logistics"
         # self.add_input('application_count', 'application_count')
-        self.add_input('fl_spare_other_expenses', 'FL_other_exp')
-        self.add_input('other_expenses', 'other$')
+        self.add_input('ids_spare_other_expenses', 'IDS_other_exp')
         self.add_input('used_rent_expenses', 'used_rent_expenses')
         self.add_input('used_staff_expenses', 'used_staff_expenses')
         self.add_input("IT depreciation expenses", "it_depreciation_expenses$")
@@ -1043,6 +1043,7 @@ class RegistrationServiceProcess(merlin.Process):
         pass
 
     def compute(self, tick):
+        self.consume_all_inputs()
         self.write_zero_to_all()
 
 
@@ -1053,22 +1054,6 @@ def createRecordStorage(sim=None):
         sim = merlin.Simulation()
     else:
         assert isinstance(sim, merlin.Simulation)
-
-    sim.add_attributes(["branch", "service", "deliverable", "budget",
-                        "asset", "resource", "external capability"])
-    sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
-                        "used_rent_expenses", "used_staff_expenses",
-                        "used_other_expenses", "files_stored",
-                        "operational_surplus", "service_revenue",
-                        "budgetary_surplus", "OH_FTE", "other$",
-                        "files", "used_other_expenses", "FL_OH_FTE",
-                        "FL_other_exp", "other$", "FL_OHSfte", "rent$",
-                        "accommodatedStaff#", "used_rent_expenses",
-                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE",
-                        "used_staff_expenses", "service_revenue",
-                        "budgetary_surplus", "operational_surplus",
-                        "files_stored", "rent$", "staff$", "other$"
-                        ])
 
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
@@ -1251,22 +1236,6 @@ def createRegistrationFacility(sim=None):
     else:
         assert isinstance(sim, merlin.Simulation)
 
-    sim.add_attributes(["branch", "service", "deliverable", "budget",
-                        "asset", "resource", "external capability"])
-    sim.add_unit_types(["files", "LS_FTE", "OH_FTE", "other$",
-                        "used_rent_expenses", "used_staff_expenses",
-                        "used_other_expenses", "files_stored",
-                        "operational_surplus", "service_revenue",
-                        "budgetary_surplus", "OH_FTE", "other$",
-                        "files", "used_other_expenses", "FL_OH_FTE",
-                        "FL_other_exp", "other$", "FL_OHSfte", "rent$",
-                        "accommodatedStaff#", "used_rent_expenses",
-                        "staff$", "accommodatedStaff#", "OH_FTE", "LS_FTE",
-                        "used_staff_expenses", "service_revenue",
-                        "budgetary_surplus", "operational_surplus",
-                        "files_stored", "rent$", "staff$", "other$"
-                        ])
-
     # add a branch
     branch_e = merlin.Entity(sim, "the branch 2")
     sim.add_entity(branch_e, parent=None)
@@ -1393,7 +1362,7 @@ def createRegistrationFacility(sim=None):
 
     # todo: need an expectation
     applProcessed = merlin.Output("applications_processed",
-                                  name="applications_processed")
+                                  name="applications processed")
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
@@ -1409,29 +1378,29 @@ def createRegistrationFacility(sim=None):
     sim.add_output(budgetarySurplus)
     sim.connect_output(RegistrationFacility, budgetarySurplus)
 
-    # todo: update these!
-
     # now connect all inputs of the services
-    sim.connect_entities(TheStaffBudget, RegistrationFacility, "staff$")
     sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
+    sim.connect_entities(StaffAccommodation, LineStaffRes, "accommodatedStaff#")
 
+    # all inputs from Inhouse Desktop Service
+    sim.connect_entities(StaffAccommodation, InhouseDesktops, "accommodatedStaff#")
+    sim.connect_entities(LineStaffRes, InhouseDesktops, "OH_FTE")
+    sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
+
+    # all inputs from RegistrationFacility
+    sim.connect_entities(TheStaffBudget, RegistrationFacility, "staff$")
     sim.connect_entities(TheRentBudget, RegistrationFacility, "rent$")
-    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
-
     sim.connect_entities(TheOtherBudget, RegistrationFacility, "other$")
-
-    sim.connect_entities(StaffAccommodation,
-                         LineStaffRes,
-                         "accommodatedStaff#")
-    sim.connect_entities(StaffAccommodation,
-                         RegistrationFacility,
-                         "used_rent_expenses")
-
-    sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_FTE")
     sim.connect_entities(LineStaffRes, RegistrationFacility, "LS_FTE")
-    sim.connect_entities(LineStaffRes,
-                         RegistrationFacility,
-                         "used_staff_expenses")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility, "desktops_accommodated")
+    sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_FTE")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility, "IDS_OH_FTE")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility, "IDS_other_exp")
+    sim.connect_entities(StaffAccommodation, RegistrationFacility, "used_rent_expenses")
+    sim.connect_entities(LineStaffRes, RegistrationFacility, "used_staff_expenses")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility, "it_depreciation_expenses$")
+
+    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
     return sim
 

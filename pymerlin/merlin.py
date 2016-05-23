@@ -8,6 +8,7 @@ the system as well as some bootstrap and helper functions.
 """
 
 import logging
+import warnings
 import uuid
 import json
 import importlib
@@ -15,8 +16,8 @@ from datetime import datetime
 from enum import Enum
 from json.decoder import JSONDecodeError
 from typing import (Iterable, Set, Mapping, Any,
-                    List, MutableSequence, Dict,
-                    Union, MutableSet, MutableMapping)
+                    List, MutableSequence, Dict,  # @UnusedImports
+                    Union, MutableSet, MutableMapping)  # @UnusedImports
 
 
 class SimObject:
@@ -61,8 +62,6 @@ class Simulation(SimObject):
 
     def __init__(self, ruleset=None, config=None, outputs=None, name=''):
         super(Simulation, self).__init__(name)
-        self._unit_types = set()  # type: MutableSet[str]
-        self._attributes = set()  # type: MutableSet[str]
         self._entities = set()  # type: MutableSet[Entity]
         self._messages = list()  # type: List[MerlinMessage]
         self.ruleset = ruleset  # type: Ruleset
@@ -210,12 +209,21 @@ class Simulation(SimObject):
         used in the parameter for instantiating
         :py:class:`pymerlin.merlin.Entity`.
         """
-        for a in ats:
-            if a not in self._attributes:
-                self._attributes.add(a)
+        warnings.warn("Simulation.add_attributes to be phased out",
+                      DeprecationWarning)
 
     def get_attributes(self):
-        return set(self._attributes)
+        """
+        :returns: a set of all attributes in this model
+        :rtype: set(strings)
+
+        return attributes as a set of strings (not iterator).
+        """
+        atts = set()
+        # get an iterator of all changes
+        atts |= {a for e in self.get_entities() for a in e.attributes}
+        atts |= {a for e in self.outputs for a in e.attributes}
+        return atts
 
     def add_unit_types(self, uts):
         """
@@ -226,18 +234,35 @@ class Simulation(SimObject):
         :py:class:`pymerlin.merlin.ProcessInput` and by
         :py:meth:`pymerlin.merlin.Simulation.connect_entities`
         """
-        for ut in uts:
-            if ut not in self._attributes:
-                self._unit_types.add(ut)
+        warnings.warn("Simulation.add_unit_types to be phased out",
+                      DeprecationWarning)
 
     def get_unit_types(self):
-        return set(self._unit_types)
+        """
+        :returns: a set of all units in this model
+        :rtype: set(strings)
+
+        return attributes as a set of strings (not iterator).
+        """
+        units = set()
+        units |= {o.type for o in self.outputs}
+
+        # get units/unit_types/types from output and input connectors
+        for e in self.get_entities():
+            units |= {o.type for o in e.outputs}
+            units |= {i.type for i in e.inputs}
+
+            for p in e.get_processes():
+                units |= {o.type for o in p.outputs.values()}
+                units |= {i.type for i in p.inputs.values()}
+
+        return units
 
     def is_attribute(self, a):
-        return a in self._attributes
+        return a in self.get_attributes()
 
     def is_unit_type(self, ut):
-        return ut in self._unit_types
+        return ut in self.get_unit_types()
 
     def set_source_entities(self, entities):
         """
@@ -941,6 +966,13 @@ class Process(SimObject):
         for k in self.outputs.keys():
             self.outputs[k].connector.write(0.0)
 
+    def consume_all_inputs(self):
+        """
+        consumes everything available from all inputs
+        """
+        for k in self.inputs:
+            self.consume_input(k, self.get_input_available(k))
+
     def provide_output(self, name, value):
         """
         :param str name: name of output
@@ -1135,7 +1167,7 @@ class ProcessProperty(SimObject):
         self.set_telemetry_value('value', value)
         self._value = value
 
-    def get_value(self)->float:
+    def get_value(self) -> float:
         return self._value
 
 
@@ -1851,7 +1883,7 @@ class MerlinMessage:
 
     def __init__(
             self,
-            message_type: MessageType,
+            message_type: MessageType,  # @UndefinedVariable
             time: int,
             sender: SimObject,
             message_id: str="",

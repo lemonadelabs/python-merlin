@@ -293,11 +293,6 @@ def govRecordStorageCore():
     # this is the capability, right now
 
     sim = merlin.Simulation()
-    sim.add_attributes(["branch", "capability", "deliverable", "budget",
-                        "asset", "resource", "external capability"])
-    sim.add_unit_types(["file count", "lineStaffNo", "files handled",
-                        "files stored", "ohFTE", "lineFTE",
-                        "rent$", "maint$", "op$"])
 
     # add a branch
     branch_e = merlin.Entity(sim, "the branch")
@@ -480,7 +475,6 @@ def manyBudgetModel():
 
 def big_one_with_sub_budgets():
     sim = govRecordStorageCore()
-    sim.add_unit_types(["$"])
 
     branch_e = sim.get_entity_by_name("the branch")
     storage_e = branch_e.get_child_by_name("the storage")
