@@ -1043,6 +1043,7 @@ class RegistrationServiceProcess(merlin.Process):
         pass
 
     def compute(self, tick):
+        self.consume_all_inputs()
         self.write_zero_to_all()
 
 
