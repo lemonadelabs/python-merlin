@@ -191,7 +191,7 @@ class StorageServiceProcess(merlin.Process):
 
         try:
             management_required = (
-                self.get_input_available('line_staff_fte') /
+                self.get_input_available('line_staff_fte') *
                 self.get_prop_value('ohfte_lsfte_ratio')
             )
         except ZeroDivisionError:
