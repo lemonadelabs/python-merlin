@@ -525,12 +525,12 @@ class StaffProcess(merlin.Process):
         self.add_output('used_staff_expenses', 'used_staff_expenses')
 
         # Define Properties
-        # todo: this should become a "calculated" or "read only" property
         self.add_property(
             'staff #',
             'total_staff_no',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_line_staff_no+default_oh_staff_no  # as calculated
+            default_line_staff_no+default_oh_staff_no,
+            read_only=True
         )
         self.add_property(
             'line staff #',
