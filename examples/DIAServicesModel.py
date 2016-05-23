@@ -810,6 +810,8 @@ class InternalICTDesktopService(merlin.Process):
         self.add_output('desktops_accomodated', 'desktops')
         self.add_output('internal_desktop_overhead_fte', 'IDS_OH_FTE')
         self.add_output('budget_surplus', 'IDS_other_exp')
+        self.add_output("IT depreciation expenses",
+                        "IT_depreciation_expenses$")
 
         # Define Process Properties
         self.add_property(
@@ -971,20 +973,22 @@ class RegistrationServiceProcess(merlin.Process):
             default_applications_processed_per_lsfte=10000,
             name="Storage Service"
             ):
-        super(StorageServiceProcess, self).__init__(name)
+        super(RegistrationServiceProcess, self).__init__(name)
 
         # Define Inputs
         self.add_input('staff_expenses', 'staff$')
         self.add_input('rent_expenses', 'rent$')
         self.add_input('line_staff_fte', 'LS_FTE')
+        self.add_input("desktops accommodated", "desktops_accommodated")
         self.add_input('overhead_staff_fte', 'OH_FTE')
         self.add_input('fl_overhead_staff_fte', 'FL_OH_FTE')
-        # probably not needed in absense of another "File Logistics"
+        # probably not needed in absence of another "File Logistics"
         # self.add_input('application_count', 'application_count')
         self.add_input('fl_spare_other_expenses', 'FL_other_exp')
         self.add_input('other_expenses', 'other$')
         self.add_input('used_rent_expenses', 'used_rent_expenses')
         self.add_input('used_staff_expenses', 'used_staff_expenses')
+        self.add_input("IT depreciation expenses", "it_depreciation_expenses$")
 
         # Define Outputs
         self.add_output("operational_surplus", 'operational_surplus')
@@ -1369,9 +1373,9 @@ def createRegistrationFacility(sim=None):
         {
             'name': "storage facility process",
             'default_lifecycle': 20,
-            'default_storage_fee': 1,
+            'default_registration_fee': 1,
             'default_ohfte_lsfte_ratio': 0.1,
-            'default_files_handled_per_lsfte': 10000
+            'default_applications_processed_per_lsfte': 10000
         })
 
     RegistrationFacility.attributes.add("asset")
