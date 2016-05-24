@@ -1070,12 +1070,12 @@ def createRecordStorage(sim=None):
         assert isinstance(sim, merlin.Simulation)
 
     # add a branch
-    branch_e = merlin.Entity(sim, "the branch")
+    branch_e = merlin.Entity(sim, "Information Services Branch")
     sim.add_entity(branch_e, parent=None)
     branch_e.attributes.add("branch")
 
     # add the govRecordStorage capability
-    storage_e = merlin.Entity(sim, "storage")
+    storage_e = merlin.Entity(sim, "Storage Service")
     sim.add_entity(storage_e, parent=branch_e)
     branch_e.add_child(storage_e)
     storage_e.attributes.add("service")
@@ -1251,12 +1251,12 @@ def createRegistrationService(sim=None):
         assert isinstance(sim, merlin.Simulation)
 
     # add a branch
-    branch_e = merlin.Entity(sim, "the branch 2")
+    branch_e = merlin.Entity(sim, "Registration Services Branch")
     sim.add_entity(branch_e, parent=None)
     branch_e.attributes.add("branch")
 
     # add the registration service
-    registration_e = merlin.Entity(sim, "registration")
+    registration_e = merlin.Entity(sim, "Registration Service")
     sim.add_entity(registration_e, parent=branch_e)
     branch_e.add_child(registration_e)
     registration_e.attributes.add("service")
