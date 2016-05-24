@@ -68,7 +68,7 @@ class StorageServiceProcess(merlin.Process):
             self,
             default_lifecycle=20,
             default_storage_fee=1,
-            default_ohfte_lsfte_ratio=0.1,
+            default_ohfte_lsfte_ratio=0.05,
             default_files_handled_per_lsfte=10000,
             name="Storage Service"
             ):
@@ -930,7 +930,7 @@ class InternalICTDesktopService(merlin.Process):
                 self.get_prop_value('actual_it_staff')
             )
 
-        # Consume inputs and outputs
+        # Consume inputs and provide outputs
         if (
                 sufficient_accomodation and
                 sufficient_overhead and
@@ -965,6 +965,11 @@ class InternalICTDesktopService(merlin.Process):
             self.provide_output(
                 'budget_surplus',
                 self.get_input_available('ict_budget')
+            )
+
+            self.provide_output(
+                'IT depreciation expenses',
+                0.0  # todo
             )
 
         else:
@@ -1018,8 +1023,8 @@ class RegistrationServiceProcess(merlin.Process):
         # )
 
         self.add_property(
-            "Storage Cost",
-            'storage_cost',
+            "Registration Service Cost",
+            'registration_cost',
             merlin.ProcessProperty.PropertyType.number_type,
             0,
             read_only=True
@@ -1050,6 +1055,8 @@ class RegistrationServiceProcess(merlin.Process):
         pass
 
     def compute(self, tick):
+        # required to provide a value!
+        self.get_prop('registration_cost').set_value(0.0)
         self.consume_all_inputs()
         self.write_zero_to_all()
 
@@ -1152,7 +1159,7 @@ def createRecordStorage(sim=None):
         {
             'name': "line staff resource process",
             'default_line_staff_no': 100,
-            'default_oh_staff_no': 10,
+            'default_oh_staff_no': 11,
             'default_hours_per_week': 40.0,
             'default_weeks_per_year': 52,
             'default_prof_training_percent': 20,
@@ -1173,7 +1180,7 @@ def createRecordStorage(sim=None):
             'name': "storage facility process",
             'default_lifecycle': 20,
             'default_storage_fee': 1,
-            'default_ohfte_lsfte_ratio': 0.1,
+            'default_ohfte_lsfte_ratio': 0.05,
             'default_files_handled_per_lsfte': 10000
         })
 
@@ -1353,7 +1360,7 @@ def createRegistrationService(sim=None):
     RegistrationFacility.create_process(
         RegistrationServiceProcess,
         {
-            'name': "storage facility process",
+            'name': "registration facility process",
             'default_lifecycle': 20,
             'default_registration_fee': 1,
             'default_ohfte_lsfte_ratio': 0.1,
