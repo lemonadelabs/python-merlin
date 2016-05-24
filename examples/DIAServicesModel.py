@@ -410,9 +410,9 @@ class StaffAccommodationProcess(merlin.Process):
     def __init__(
             self,
             name="staff accommodation",
-            default_cost_m2=10,
-            default_area_m2=100,
-            default_staff_per_area_m2=0.2,
+            default_cost_m2=400,
+            default_area_m2=1500,
+            default_area_per_staff_m2=15,
             default_lease_term=5
             ):
         super(StaffAccommodationProcess, self).__init__(name)
@@ -426,7 +426,7 @@ class StaffAccommodationProcess(merlin.Process):
 
         # Define Properties
         self.add_property(
-            'cost[$]/area [m²]',
+            'annual cost[$]/area [m²]',
             'cost_per_m2',
             merlin.ProcessProperty.PropertyType.number_type,
             default_cost_m2
@@ -441,7 +441,7 @@ class StaffAccommodationProcess(merlin.Process):
             'area [m²]/staff [#]',
             'area_per_staff_m2',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_staff_per_area_m2
+            default_area_per_staff_m2
         )
         self.add_property(
             'lease term [yr]',
@@ -1070,12 +1070,12 @@ def createRecordStorage(sim=None):
         assert isinstance(sim, merlin.Simulation)
 
     # add a branch
-    branch_e = merlin.Entity(sim, "the branch")
+    branch_e = merlin.Entity(sim, "Information Services Branch")
     sim.add_entity(branch_e, parent=None)
     branch_e.attributes.add("branch")
 
     # add the govRecordStorage capability
-    storage_e = merlin.Entity(sim, "storage")
+    storage_e = merlin.Entity(sim, "Storage Service")
     sim.add_entity(storage_e, parent=branch_e)
     branch_e.add_child(storage_e)
     storage_e.attributes.add("service")
@@ -1144,9 +1144,9 @@ def createRecordStorage(sim=None):
         StaffAccommodationProcess,
         {
             'name': "staff accommodation",
-            'default_cost_m2': 10,
-            'default_area_m2': 100,
-            'default_staff_per_area_m2': 0.2,
+            'default_cost_m2': 400,
+            'default_area_m2': 2000,
+            'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
     StaffAccommodation.attributes.add("resource")
@@ -1163,8 +1163,8 @@ def createRecordStorage(sim=None):
             'default_hours_per_week': 40.0,
             'default_weeks_per_year': 52,
             'default_prof_training_percent': 20,
-            'default_leave_percent': 10,
-            'default_avg_oh_salary': 70e3,
+            'default_leave_percent': 20,
+            'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
             'default_hours_training': 100
         })
@@ -1251,12 +1251,12 @@ def createRegistrationService(sim=None):
         assert isinstance(sim, merlin.Simulation)
 
     # add a branch
-    branch_e = merlin.Entity(sim, "the branch 2")
+    branch_e = merlin.Entity(sim, "Registration Services Branch")
     sim.add_entity(branch_e, parent=None)
     branch_e.attributes.add("branch")
 
     # add the registration service
-    registration_e = merlin.Entity(sim, "registration")
+    registration_e = merlin.Entity(sim, "Registration Service")
     sim.add_entity(registration_e, parent=branch_e)
     branch_e.add_child(registration_e)
     registration_e.attributes.add("service")
@@ -1312,8 +1312,8 @@ def createRegistrationService(sim=None):
         {
             'name': "staff accommodation",
             'default_cost_m2': 10,
-            'default_area_m2': 100,
-            'default_staff_per_area_m2': 0.2,
+            'default_area_m2': 2000,
+            'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
     StaffAccommodation.attributes.add("resource")
