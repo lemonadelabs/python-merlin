@@ -186,14 +186,6 @@ class TestSimulation:
         assert len(sim.source_entities) == 1
         assert e in sim.source_entities
 
-    def test_add_attribute(self, sim):
-        sim.add_attributes(['attr'])
-        assert sim.is_attribute('attr')
-
-    def test_add_unit_type(self, sim):
-        sim.add_unit_types(['unit_type'])
-        assert sim.is_unit_type('unit_type')
-
     def test_add_entity(self, sim, entity):
         sim.add_entity(entity)
         assert (entity in sim.get_entities())
@@ -372,62 +364,7 @@ class TestOutputConnector:
             else:
                 npt.assert_almost_equal(e[1], 0.1)
 
-
-class TestScenarios:
-
-    def test_simple_scenario(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        e = merlin.Event.create(1, '+ Attribute foo, bar, baz')
-        s = merlin.Scenario({e}, sim=sim)
-        assert sim.is_attribute('foo') == False
-        assert sim.is_attribute('bar') == False
-        assert sim.is_attribute('baz') == False
-        sim.run(scenarios=[s])
-        assert sim.is_attribute('foo')
-        assert sim.is_attribute('bar')
-        assert sim.is_attribute('baz')
-
-    def test_multiple_action_scenario(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        e = merlin.Event.create(
-            1,
-            """
-            + Attribute foo
-            + UnitType cheese
-            """)
-        s = merlin.Scenario({e}, sim=sim)
-        assert sim.is_attribute('foo') == False
-        assert sim.is_unit_type('cheese') == False
-        sim.run(scenarios=[s])
-        assert sim.is_attribute('foo') == True
-        assert sim.is_unit_type('cheese') == True
-
-    def test_event_time(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        e = merlin.Event.create(5, '+ Attribute foo')
-        s = merlin.Scenario({e}, sim=sim)
-        assert sim.is_attribute('foo') == False
-        sim.run(end=4, scenarios=[s])
-        assert sim.is_attribute('foo') == False
-        sim.run(end=6, scenarios=[s])
-        assert sim.is_attribute('foo') == True
-
-
-    def test_multiple_scenarios(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        e = merlin.Event.create(5, '+ Attribute foo')
-        e2 = merlin.Event.create(7, '+ UnitType bar')
-        s1 = merlin.Scenario({e}, sim=sim)
-        s2 = merlin.Scenario({e2}, sim=sim)
-        assert sim.is_attribute('foo') == False
-        assert sim.is_unit_type('bar') == False
-        sim.run(scenarios=[s1, s2])
-        assert sim.is_attribute('foo') == True
-        assert sim.is_unit_type('bar') == True
-
-
 class TestEvents:
-
 
     def test_add_dict_events(self):
         data = [
@@ -646,18 +583,29 @@ class TestEvents:
         a[0].execute(sim)
         assert output.minimum == 10
 
+    def test_modify_endpoint_bias(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        budget = sim.get_entity_by_name('Budget')
+        o = budget.get_output_by_type('$')
+        eps = o.get_endpoint_objects()
+        for e in eps:
+            npt.assert_almost_equal(e.bias, 0.5)
+        a1 = merlin.Action.create("Entity {0} := Endpoint {1}, bias:float = {2}".format(budget.id,
+                                                                                        eps[0].id,
+                                                                                        0.7))
+        a2 = merlin.Action.create(
+            "Entity {0} := Endpoint {1}, bias:float = {2}".format(budget.id,
+                                                                  eps[1].id,
+                                                                  0.3))
+        a1[0].execute(sim)
+        a2[0].execute(sim)
+        npt.assert_almost_equal(eps[0].bias, 0.7)
+        npt.assert_almost_equal(eps[1].bias, 0.3)
+
+
 
 class TestCoreActions:
 
-    def test_add_attributes_action(self, sim):
-        a = merlin.AddAttributesAction(['attr'])
-        a.execute(sim)
-        assert sim.is_attribute('attr')
-
-    def test_add_unit_type_action(self, sim):
-        a = merlin.UnitTypeAction(['unit_type'])
-        a.execute(sim)
-        assert sim.is_unit_type('unit_type')
 
     def test_remove_entity_action(self, sim, simple_entity_graph):
         seg = simple_entity_graph
@@ -774,9 +722,23 @@ class TestCoreActions:
         sim = computation_test_harness  # type: merlin.Simulation
         output = list(sim.outputs)[0]
         output.minimum = 0
-        a = merlin.ModifyOutputMinimum(output.id, 10)
+        a = merlin.ModifyOutputMinimumAction(output.id, 10)
         a.execute(sim)
         assert output.minimum == 10
+
+    def test_modify_endpoint_bias(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        budget = sim.get_entity_by_name('Budget')
+        o = budget.get_output_by_type('$')
+        eps = o.get_endpoint_objects()
+        for e in eps:
+            npt.assert_almost_equal(e.bias, 0.5)
+        a1 = merlin.ModifyEndpointBiasAction(budget.id, eps[0].id, bias=0.7)
+        a2 = merlin.ModifyEndpointBiasAction(budget.id, eps[1].id, bias=0.3)
+        a1.execute(sim)
+        a2.execute(sim)
+        npt.assert_almost_equal(eps[0].bias, 0.7)
+        npt.assert_almost_equal(eps[1].bias, 0.3)
 
 
 class TestMessages:
