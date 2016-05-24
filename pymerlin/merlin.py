@@ -2469,11 +2469,13 @@ class ModifyOutputMinimumAction(Action):
     def __init__(
             self,
             output_id,
-            minimum=None
+            minimum=None,
+            additive=False
             ):
         super(ModifyOutputMinimumAction, self).__init__()
         self.output_id = int(output_id)
         self.minimum = minimum
+        self.additive = additive
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -2482,7 +2484,8 @@ class ModifyOutputMinimumAction(Action):
                 'type': "Output",
                 'params': [self.output_id],
                 "props": {
-                    'minimum': self.minimum
+                    'minimum': self.minimum,
+                    'additive': self.additive
                 }
             },
             'operand_2': None
@@ -2491,17 +2494,21 @@ class ModifyOutputMinimumAction(Action):
     def execute(self, simulation: Simulation):
         for o in simulation.outputs:
             if o.id == self.output_id:
-                o.minimum = self.minimum
+                if self.additive:
+                    o.minimum += self.minimum
+                else:
+                    o.minimum = self.minimum
                 break
 
 
 class ModifyEndpointBiasAction(Action):
 
-    def __init__(self, entity_id, endpoint_id, bias=0.0):
+    def __init__(self, entity_id, endpoint_id, bias=0.0, additive=False):
         super(ModifyEndpointBiasAction, self).__init__()
         self.entity_id = int(entity_id)
         self.endpoint_id = int(endpoint_id)
         self.bias = bias
+        self.additive = additive
 
     def serialize(self):
         return {
@@ -2515,7 +2522,8 @@ class ModifyEndpointBiasAction(Action):
                 'type': 'Endpoint',
                 'params': [self.endpoint_id],
                 'props': {
-                    'bias': self.bias
+                    'bias': self.bias,
+                    'additive': self.additive
                 }
             }
         }
@@ -2525,5 +2533,8 @@ class ModifyEndpointBiasAction(Action):
         for o in e.outputs:
             for ep in o.get_endpoint_objects():
                 if ep.id == self.endpoint_id:
-                    ep.bias = self.bias
+                    if self.additive:
+                        ep.bias += self.bias
+                    else:
+                        ep.bias = self.bias
                     break
