@@ -1246,7 +1246,7 @@ class OutputConnector(Connector):
             self.apportioning,
             self.get_endpoints())
 
-    class Endpoint:
+    class Endpoint(SimObject):
         """
         This class is used to organize the :py:class:`.InputConnector`s which
         are connected to an :py:class:`.OutputConnector`.
@@ -1258,6 +1258,7 @@ class OutputConnector(Connector):
         equal weight.
         """
         def __init__(self, connector=None, bias=0.0):
+            super(OutputConnector.Endpoint, self).__init__(name='Endpoint')
             self.connector = connector
             self.bias = bias
 
@@ -1365,7 +1366,7 @@ class OutputConnector(Connector):
                 result = ep
         return result
 
-    def get_endpoints(self):
+    def get_endpoints(self) -> 'List[tuple(InputConnector, float)]':
         """
         Get the :py:class:`.InputConnector`s and their biases connected to this
         :py:class:`.OutputConnector`.
@@ -1374,6 +1375,9 @@ class OutputConnector(Connector):
         :returns: list of (:py:class:`.InputConnector`, bias)
         """
         return [(e.connector, e.bias) for e in self._endpoints]
+
+    def get_endpoint_objects(self) -> List['OutputConnector.Endpoint']:
+        return list(self._endpoints)
 
     def _ballance_bias(self):
         val = 1.0 / float(len(self._endpoints))
@@ -1609,7 +1613,7 @@ class Action(SimObject):
                         "Operation RemoveUnitType not supported")
             elif a['op'] == ':=':
                 if a['operand_1']['type'] == 'Output':
-                    return ModifyOutputMinimum(
+                    return ModifyOutputMinimumAction(
                         a['operand_1']['params'][0],
                         **(a['operand_1']['props']))
                 else:
@@ -1619,7 +1623,8 @@ class Action(SimObject):
 
             else:
                 raise MerlinScriptException(
-                    "Invalid operator for unary expression, must be +, :=, or -")
+                    ("Invalid operator for unary expression, " +
+                     "must be +, :=, or -"))
         else:
 
             if len(a['operand_1']['params']) == 0 \
@@ -1638,14 +1643,22 @@ class Action(SimObject):
                     *(a['operand_1']['params'] + a['operand_2']['params']))
 
             if a['op'] == ':=':
-                # modify process property
-                if a['operand_2']['props'] is not None:
-                    return ModifyProcessPropertyAction(
+                if a['operand_2']['type'] == 'Endpoint':
+                    # modify endpoint bias
+                    return ModifyEndpointBiasAction(
                         *(a['operand_1']['params'] + a['operand_2']['params']),
                         **a['operand_2']['props'])
                 else:
-                    return ModifyProcessPropertyAction(
-                        *(a['operand_1']['params'] + a['operand_2']['params']))
+                    # modify process property
+                    if a['operand_2']['props'] is not None:
+                        return ModifyProcessPropertyAction(
+                            *(a['operand_1']['params'] +
+                              a['operand_2']['params']),
+                            **a['operand_2']['props'])
+                    else:
+                        return ModifyProcessPropertyAction(
+                            *(a['operand_1']['params'] +
+                              a['operand_2']['params']))
 
             if a['op'] == '/':
                 # Disconnect operator
@@ -1799,7 +1812,8 @@ class Action(SimObject):
             'UnitType',
             'Process',
             'Property',
-            'Output'
+            'Output',
+            'Endpoint'
         ]:
             return token
         else:
@@ -2450,14 +2464,14 @@ class ParentEntityAction(Action):
             simulation.parent_entity(parent_entity, child_entity)
 
 
-class ModifyOutputMinimum(Action):
+class ModifyOutputMinimumAction(Action):
     
     def __init__(
             self,
             output_id,
             minimum=None
             ):
-        super(ModifyOutputMinimum, self).__init__()
+        super(ModifyOutputMinimumAction, self).__init__()
         self.output_id = int(output_id)
         self.minimum = minimum
 
@@ -2478,3 +2492,38 @@ class ModifyOutputMinimum(Action):
         for o in simulation.outputs:
             if o.id == self.output_id:
                 o.minimum = self.minimum
+                break
+
+
+class ModifyEndpointBiasAction(Action):
+
+    def __init__(self, entity_id, endpoint_id, bias=0.0):
+        super(ModifyEndpointBiasAction, self).__init__()
+        self.entity_id = int(entity_id)
+        self.endpoint_id = int(endpoint_id)
+        self.bias = bias
+
+    def serialize(self):
+        return {
+            'op': ':=',
+            'operand_1': {
+                'type': 'Entity',
+                'params': [self.entity_id],
+                'props': None
+            },
+            'operand_2': {
+                'type': 'Endpoint',
+                'params': [self.endpoint_id],
+                'props': {
+                    'bias': self.bias
+                }
+            }
+        }
+
+    def execute(self, simulation: Simulation):
+        e = simulation.get_entity_by_id(self.entity_id)
+        for o in e.outputs:
+            for ep in o.get_endpoint_objects():
+                if ep.id == self.endpoint_id:
+                    ep.bias = self.bias
+                    break
