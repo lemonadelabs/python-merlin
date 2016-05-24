@@ -823,7 +823,7 @@ class InternalICTDesktopService(merlin.Process):
         self.add_output('internal_desktop_overhead_fte', 'IDS_OH_FTE')
         self.add_output('budget_surplus', 'IDS_other_exp')
         self.add_output("IT depreciation expenses",
-                        "IT_depreciation_expenses$")
+                        "it_depreciation_expenses$")
 
         # Define Process Properties
         self.add_property(
@@ -998,7 +998,7 @@ class RegistrationServiceProcess(merlin.Process):
         self.add_input('rent_expenses', 'rent$')
         self.add_input('other_expenses', 'other$')
         self.add_input('line_staff_fte', 'LS_FTE')
-        self.add_input("desktops accommodated", "desktops_accommodated")
+        self.add_input("desktops accommodated", "desktops")
         self.add_input('overhead_staff_fte', 'OH_FTE')
         self.add_input('ids_overhead_staff_fte', 'IDS_OH_FTE')
         # probably not needed in absence of another "File Logistics"
@@ -1409,7 +1409,7 @@ def createRegistrationService(sim=None):
     sim.connect_entities(TheOtherBudget, RegistrationFacility, "other$")
     sim.connect_entities(LineStaffRes, RegistrationFacility, "LS_FTE")
     sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "desktops_accommodated")
+                         "desktops")
     sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_FTE")
     sim.connect_entities(InhouseDesktops, RegistrationFacility, "IDS_OH_FTE")
     sim.connect_entities(InhouseDesktops, RegistrationFacility,
