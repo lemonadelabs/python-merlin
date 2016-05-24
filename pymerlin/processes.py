@@ -46,46 +46,31 @@ class BudgetProcess(merlin.Process):
         super(BudgetProcess, self).__init__(name)
 
         # Define outputs
-        p_output = merlin.ProcessOutput('output_$',
-                                        budget_type,
-                                        connector=None)
+        self.add_output("$", budget_type)
 
         # Define properties
-        self.add_property("amount",
+        self.add_property("annual amount",
                           "amount",
                           merlin.ProcessProperty.PropertyType.number_type,
                           start_amount)
 
-        self.outputs = {'$': p_output}
+        self.instantaneous_update = True
+        self.current_budget_amount = float(start_amount)
 
     def reset(self):
         # define internal instance variables on init
-        self.start_amount = self.get_prop_value("amount")
-        self.current_amount = self.start_amount
-        self.amount_per_step = (self.current_amount /
-                                min(self.parent.sim.num_steps, 12))
+        self.current_budget_amount = self.get_prop_value("amount")
 
     def compute(self, tick):
         # Check to see that the start amount has changed, and if so
         # do a recompute of amount per step and current amount
-        if self.start_amount != self.get_prop_value("amount"):
-            self.start_amount = self.get_prop_value("amount")
-            if self.start_amount < self.current_amount:
-                self.current_amount = self.start_amount
-            self.amount_per_step = (self.current_amount /
-                                min((self.parent.sim.num_steps - self.parent.sim.current_step), 12))
 
-        if self.current_amount > 0.00:
-            output = self.amount_per_step
-            if output > self.current_amount:
-                output = self.current_amount
-            self.current_amount -= output
-            self.provide_output('$', output)
-        else:
-            self.provide_output('$', 0.0)
+        # reset the current budget value
+        if tick % 12 == 1 or self.instantaneous_update:
+            self.current_budget_amount = self.get_prop_value("amount")
 
-        if tick % 12 == 0:
-            self.current_amount = self.get_prop_value("amount")
+        self.provide_output('$', max(0.0,
+                                     self.current_budget_amount/12.0))
 
 
 class CallCenterStaffProcess(merlin.Process):
