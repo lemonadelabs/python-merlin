@@ -218,8 +218,8 @@ class StorageServiceProcess(merlin.Process):
 
         if not sufficient_funding:
             self.notify_insufficient_input(
-                'storage_budget',
-                self.get_input_available('storage_budget'),
+                'other_expenses',
+                self.get_input_available('other_expenses'),
                 budget_consumed
             )
 
