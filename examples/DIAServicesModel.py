@@ -67,8 +67,8 @@ class StorageServiceProcess(merlin.Process):
     def __init__(
             self,
             default_lifecycle=20,
-            default_storage_fee=1,
-            default_ohfte_lsfte_ratio=0.05,
+            default_storage_price=1,
+            default_ohfte_lsfte_ratio=0.10,
             default_files_handled_per_lsfte=10000,
             name="Storage Service"
             ):
@@ -109,10 +109,10 @@ class StorageServiceProcess(merlin.Process):
         )
 
         self.add_property(
-            "Storage Fee",
-            'storage_fee',
+            "Storage Price / $",
+            'storage_price',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_storage_fee
+            default_storage_price
         )
 
         self.add_property(
@@ -159,7 +159,7 @@ class StorageServiceProcess(merlin.Process):
             self.get_input_available('file_count') *
             self.get_prop_value('files_handled_per_lsfte') *
             self.get_input_available('line_staff_fte') *
-            self.get_prop_value('storage_fee')
+            self.get_prop_value('storage_price')
         )
 
         operational_surplus = (
@@ -511,8 +511,8 @@ class StaffProcess(merlin.Process):
             default_hours_per_week=40.0,
             default_weeks_per_year=52,
             default_prof_training_percent=20,
-            default_leave_percent=10,
-            default_avg_oh_salary=70e3,
+            default_leave_percent=20,
+            default_avg_oh_salary=75e3,
             default_avg_line_salary=60e3,
             # todo: implement
             default_hours_training=100
@@ -574,13 +574,13 @@ class StaffProcess(merlin.Process):
             default_leave_percent
         )
         self.add_property(
-            'avg overhead salary',
+            'avg annual overhead salary',
             'avgOHSalary',
             merlin.ProcessProperty.PropertyType.number_type,
             default_avg_oh_salary
         )
         self.add_property(
-            'avg line salary',
+            'avg annual line salary',
             'avgLineSalary',
             merlin.ProcessProperty.PropertyType.number_type,
             default_avg_line_salary
@@ -855,7 +855,7 @@ class InternalICTDesktopService(merlin.Process):
         )
 
         self.add_property(
-            'Value / Desktop',
+            'Acquisition Value [$] / Desktop',
             'value_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
             value_per_desktop
@@ -986,7 +986,7 @@ class RegistrationServiceProcess(merlin.Process):
     def __init__(
             self,
             default_lifecycle=20,
-            default_registration_fee=1,
+            default_registration_price=1,
             default_ohfte_lsfte_ratio=0.1,
             default_applications_processed_per_lsfte=10000,
             name="Storage Service"
@@ -1031,10 +1031,10 @@ class RegistrationServiceProcess(merlin.Process):
         )
 
         self.add_property(
-            "Registration Fee",
-            'registration_fee',
+            "Registration Price / $",
+            'registration_price',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_registration_fee
+            default_registration_price
         )
 
         self.add_property(
@@ -1145,7 +1145,7 @@ def createRecordStorage(sim=None):
         {
             'name': "staff accommodation",
             'default_cost_m2': 400,
-            'default_area_m2': 2000,
+            'default_area_m2': 3500,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1179,8 +1179,8 @@ def createRecordStorage(sim=None):
         {
             'name': "storage facility process",
             'default_lifecycle': 20,
-            'default_storage_fee': 1,
-            'default_ohfte_lsfte_ratio': 0.05,
+            'default_storage_price': 1,
+            'default_ohfte_lsfte_ratio': 0.1,
             'default_files_handled_per_lsfte': 10000
         })
 
@@ -1311,8 +1311,8 @@ def createRegistrationService(sim=None):
         StaffAccommodationProcess,
         {
             'name': "staff accommodation",
-            'default_cost_m2': 10,
-            'default_area_m2': 2000,
+            'default_cost_m2': 400,
+            'default_area_m2': 3500,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1330,8 +1330,8 @@ def createRegistrationService(sim=None):
             'default_hours_per_week': 40.0,
             'default_weeks_per_year': 52,
             'default_prof_training_percent': 20,
-            'default_leave_percent': 10,
-            'default_avg_oh_salary': 70e3,
+            'default_leave_percent': 20,
+            'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
             'default_hours_training': 100
         })
@@ -1346,10 +1346,10 @@ def createRegistrationService(sim=None):
         {
             # todo: set to reasonable values!
             'actual_desktops': 0,
-            'desktops_per_staff': 0,
+            'desktops_per_staff': 1.0,
             'actual_it_staff': 0,
-            'it_staff_per_desktop': 0,
-            'value_per_desktop': 0,
+            'it_staff_per_desktop': 1.0/15.0,
+            'value_per_desktop': 4000.0,
             'cost_per_desktop': 0
          })
     InhouseDesktops.attributes.add("resource")
@@ -1362,7 +1362,7 @@ def createRegistrationService(sim=None):
         {
             'name': "registration facility process",
             'default_lifecycle': 20,
-            'default_registration_fee': 1,
+            'default_registration_price': 1,
             'default_ohfte_lsfte_ratio': 0.1,
             'default_applications_processed_per_lsfte': 10000
         })
