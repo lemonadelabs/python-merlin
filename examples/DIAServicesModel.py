@@ -11,6 +11,7 @@ exmaple files.
 from pymerlin import merlin
 from pymerlin import processes
 import logging
+import math
 
 # Global logging settings
 logging_level = logging.INFO
@@ -387,7 +388,7 @@ class StaffAccommodationProcess(merlin.Process):
         rent_expenses = self.get_input_available("rent expenses")
 
         try:
-            staff_accommodated = area / area_per_staff
+            staff_accommodated = math.floor(area / area_per_staff)
         except ZeroDivisionError:
             staff_accommodated = 0
 
