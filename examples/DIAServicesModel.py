@@ -128,7 +128,6 @@ class StorageServiceProcess(merlin.Process):
         if sufficient_funding:
 
             # Consume inputs
-
             self.consume_input(
                 'monthly line staff work hrs',
                 self.get_input_available('monthly line staff work hrs')
@@ -136,8 +135,28 @@ class StorageServiceProcess(merlin.Process):
 
             self.consume_input(
                 'monthly operational budget',
-                self.get_prop_value('storage_rent')/12.0
+                self.get_input_available('monthly operational budget')
             )
+
+            self.consume_input(
+                'file count',
+                files_stored
+            )
+
+            self.consume_input(
+                'accommodation expenses',
+                self.get_input_available('accommodation expenses')
+            )
+
+            self.consume_input(
+                'staff expenses',
+                self.get_input_available('staff expenses')
+            )
+
+            self.consume_input(
+                'logistics expenses',
+                self.get_input_available('logistics expenses')
+             )
 
             # Provide outputs
             self.provide_output(
@@ -421,7 +440,8 @@ class StaffProcess(merlin.Process):
             default_avg_oh_salary=75e3,
             default_avg_line_salary=60e3,
             # todo: implement
-            default_hours_training=100
+            default_hours_training=100,
+            default_span_of_control=10
             ):
         super(StaffProcess, self).__init__(name)
 
@@ -489,7 +509,7 @@ class StaffProcess(merlin.Process):
             'span of control',
             'span_of_control',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_hours_training
+            default_span_of_control
         )
         self.add_property(
             'hours of training period',
@@ -692,25 +712,24 @@ class InternalICTDesktopService(merlin.Process):
     def __init__(
             self,
             actual_desktops=0,
-            desktops_per_staff=0,
-            actual_it_staff=0,
-            it_staff_per_desktop=0,
-            value_per_desktop=0,
-            cost_per_desktop=0,
+            it_hrs_per_desktop=0,
+            acq_cost_per_desktop=0,
+            maint_cost_per_desktop=0,
+            depr_period=4,
+            financial_charge_percent=8,
+            life_time=6,
             name="Internal ICT Desktop Service"):
         super(InternalICTDesktopService, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_accommodated', 'accommodatedStaff#')
-        self.add_input('overhead_staff_work_hr', 'OH_work_hr')
-        self.add_input('ict_budget', 'other$')
+        self.add_input('line staff work hrs', 'LS_work_hr')
+        self.add_input('IT budget', 'other$')
 
         # Define Outputs
-        self.add_output('desktops_accomodated', 'desktops')
-        self.add_output('internal_desktop_overhead_work_hr', 'IDS_OH_work_hr')
-        self.add_output('budget_surplus', 'IDS_other_exp')
-        self.add_output("IT depreciation expenses",
-                        "it_depreciation_expenses$")
+        self.add_output('desktops provided', 'desktop#')
+        self.add_output('budgetary surplus', 'surplus$')
+        self.add_output("IT expenses", "ITexpense$")
+        self.add_output('remaining line staff work hrs', 'LS_work_hr')
 
         # Define Process Properties
         self.add_property(
@@ -721,38 +740,45 @@ class InternalICTDesktopService(merlin.Process):
         )
 
         self.add_property(
-            'Minimum Desktops / Staff',
-            'min_desktop_per_staff',
+            'Annual Support Hours Per Desktop',
+            'hrs_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            desktops_per_staff
+            it_hrs_per_desktop
         )
 
         self.add_property(
-            'Actual IT Staff',
-            'actual_it_staff',
+            'Acquisition Costs / Desktop',
+            'cost_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            actual_it_staff
+            acq_cost_per_desktop
         )
 
         self.add_property(
-            'Minimum IT Staff / Desktop',
-            'min_it_staff_per_desktop',
+            "Desktop Lifetime",
+            "life_time",
             merlin.ProcessProperty.PropertyType.number_type,
-            it_staff_per_desktop
+            life_time
         )
 
         self.add_property(
-            'Acquisition Value [$] / Desktop',
-            'value_per_desktop',
-            merlin.ProcessProperty.PropertyType.number_type,
-            value_per_desktop
-        )
-
-        self.add_property(
-            'Maintenance Cost / Desktop',
+            'Annual Maintenance Cost / Desktop',
             'maintenance_cost_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            cost_per_desktop
+            maint_cost_per_desktop
+        )
+
+        self.add_property(
+            'depreciation period',
+            'depreciation_period',
+            merlin.ProcessProperty.PropertyType.number_type,
+            depr_period
+        )
+
+        self.add_property(
+            "financial charge %",
+            "fin_charge_percent",
+            merlin.ProcessProperty.PropertyType.number_type,
+            financial_charge_percent
         )
 
     def reset(self):
@@ -760,103 +786,88 @@ class InternalICTDesktopService(merlin.Process):
 
     def compute(self, tick):
 
-        # Calculations
-        overhead_work_hr_required = (
-            self.get_prop_value('min_it_staff_per_desktop') *
-            self.get_prop_value('actual_desktops')
-        )
+        # get Inputs
+        work_hrs = self.get_input_available('line staff work hrs')
+        it_budget = self.get_input_available('IT budget')
+        # get Process Properties
+        actual_desktops = self.get_prop_value('actual_desktops')
+        it_hrs_per_desktop = self.get_prop_value('hrs_per_desktop')
+        acq_cost_per_desktop = self.get_prop_value('cost_per_desktop')
+        maint_cost_per_desktop = self.get_prop_value(
+                                            'maintenance_cost_per_desktop')
+        depr_period = self.get_prop_value('depreciation_period')
+        financial_charge_percent = self.get_prop_value("fin_charge_percent")
+        # life_time = self.get_prop_value("life_time")
 
-        budget_required = (
-            self.get_prop_value('actual_desktops') *
-            (
-                self.get_prop_value('maintenance_cost_per_desktop') +
-                self.get_prop_value('value_per_desktop')
-            )
-        )
+        desktops_provided = actual_desktops
 
-        ids_oh_work_hrs = (
-            self.get_input_available('overhead_staff_work_hr') -
-            self.get_prop_value('actual_it_staff')
-        )
+        work_hrs_required = desktops_provided * it_hrs_per_desktop / 12.0
 
-        # Constraints
-        sufficient_overhead = (
-            self.get_input_available('overhead_staff_work_hr') >=
-            overhead_work_hr_required
-        )
+        expenses = (desktops_provided * maint_cost_per_desktop +
+                    # todo: think about that! is contained in depreciation...
+                    # desktops_provided * acq_cost_per_desktop / life_time +
+                    desktops_provided * acq_cost_per_desktop / depr_period +
+                    desktops_provided * acq_cost_per_desktop *
+                    financial_charge_percent / 100.0
+                    ) / 12.0
 
         sufficient_budget = (
-            self.get_input_available('ict_budget') >=
-            budget_required
+            it_budget >= expenses
         )
 
-        sufficient_accomodation = (
-            self.get_input_available('staff_accommodated') >=
-            self.get_prop_value('actual_it_staff')
+        sufficient_staffing = (
+            work_hrs >= work_hrs_required
         )
 
         # Constraint notifications
-        if not sufficient_overhead:
-            self.notify_insufficient_input(
-                'overhead_staff_work_hr',
-                self.get_input_available('overhead_staff_work_hr'),
-                overhead_work_hr_required
-            )
 
         if not sufficient_budget:
             self.notify_insufficient_input(
-                'ict_budget',
-                self.get_input_available('ict_budget'),
-                budget_required
+                "IT budget",
+                it_budget,
+                expenses
             )
 
-        if not sufficient_accomodation:
+        if not sufficient_staffing:
             self.notify_insufficient_input(
-                'staff_accommodated',
-                self.get_input_available('staff_accommodated'),
-                self.get_prop_value('actual_it_staff')
+                'line staff work hrs',
+                work_hrs,
+                work_hrs_required
             )
 
         # Consume inputs and provide outputs
         if (
-                sufficient_accomodation and
-                sufficient_overhead and
+                sufficient_staffing and
                 sufficient_budget
         ):
 
             self.consume_input(
-                'staff_accommodated',
-                self.get_prop_value('actual_it_staff')
+                'line staff work hrs', work_hrs
             )
 
             self.consume_input(
-                'overhead_staff_work_hr',
-                overhead_work_hr_required
-            )
-
-            self.consume_input(
-                'ict_budget',
-                budget_required
+                'IT budget',
+                it_budget
             )
 
             self.provide_output(
-                'desktops_accomodated',
-                self.get_prop_value('actual_desktops')
+                'desktops provided',
+                desktops_provided
             )
 
             self.provide_output(
-                'internal_desktop_overhead_work_hr',
-                ids_oh_work_hrs
+                'remaining line staff work hrs',
+                work_hrs - work_hrs_required
             )
 
             self.provide_output(
-                'budget_surplus',
-                self.get_input_available('ict_budget')
+                'budgetary surplus',
+                it_budget - expenses
             )
 
             self.provide_output(
-                'IT depreciation expenses',
-                0.0  # todo
+                'IT expenses',
+                expenses
             )
 
         else:
@@ -866,69 +877,38 @@ class InternalICTDesktopService(merlin.Process):
 
 class RegistrationServiceProcess(merlin.Process):
     """
-    started as a modified copy of StorageServiceProcess
-
+    registrations of successfully re-enacted dreams
     """
 
     def __init__(
             self,
-            default_lifecycle=20,
-            default_registration_price=1,
-            default_ohwork_hr_lswork_hr_ratio=0.1,
-            default_applications_processed_per_lswork_hr=10000,
+            default_registration_fee=10.0,
+            default_applications_processed_per_lswork_hr=10,
+            default_applications_submitted=100000,
             name="Storage Service"
             ):
         super(RegistrationServiceProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_expenses', 'staff$')
-        self.add_input('rent_expenses', 'rent$')
-        self.add_input('other_expenses', 'other$')
-        self.add_input('line_staff_work_hr', 'LS_work_hr')
-        self.add_input("desktops accommodated", "desktops")
-        self.add_input('overhead_staff_work_hr', 'OH_work_hr')
-        self.add_input('ids_overhead_staff_work_hr', 'IDS_OH_work_hr')
-        # probably not needed in absence of another "File Logistics"
-        # self.add_input('application_count', 'application_count')
-        self.add_input('ids_spare_other_expenses', 'IDS_other_exp')
-        self.add_input('used_rent_expenses', 'used_rent_expenses')
-        self.add_input('used_staff_expenses', 'used_staff_expenses')
-        self.add_input("IT depreciation expenses", "it_depreciation_expenses$")
+        self.add_input('Staff Expenses', 'staffExpense$')
+        self.add_input('Accommodation Expenses', 'accommodationExpense$')
+        self.add_input('IT Expenses', 'ITexpense$')
+        self.add_input('line staff work hours', 'LS_work_hr')
+        self.add_input("desktops provided", "desktop#")
 
         # Define Outputs
-        self.add_output("operational_surplus", 'operational_surplus')
-        self.add_output("applications_processed", 'applications_processed')
-        self.add_output("service_revenue", 'service_revenue')
-        self.add_output("budgetary_surplus", 'budgetary_surplus')
+        self.add_output("Applications Processed", 'appl#')
+        # self.add_output("cost per registration", "cost_per_appl")
+        self.add_output("Service Revenue", 'revenue$')
+        self.add_output("Operational Surplus", 'opsurplus$')
 
         # Define Properties
-        # self.add_property(
-        #     "lifecycle/years",
-        #     'lifecycle',
-        #     merlin.ProcessProperty.PropertyType.number_type,
-        #     default_lifecycle
-        # )
 
         self.add_property(
-            "Registration Service Cost",
-            'registration_cost',
+            "Registration Fee / $",
+            'registration_fee',
             merlin.ProcessProperty.PropertyType.number_type,
-            0,
-            read_only=True
-        )
-
-        self.add_property(
-            "Registration Price / $",
-            'registration_price',
-            merlin.ProcessProperty.PropertyType.number_type,
-            default_registration_price
-        )
-
-        self.add_property(
-            "Minimum OH work_hrs / LS work_hrs",
-            'ohwork_hr_lswork_hr_ratio',
-            merlin.ProcessProperty.PropertyType.number_type,
-            default_ohwork_hr_lswork_hr_ratio
+            default_registration_fee
         )
 
         self.add_property(
@@ -938,14 +918,108 @@ class RegistrationServiceProcess(merlin.Process):
             default_applications_processed_per_lswork_hr
         )
 
+        self.add_property(
+            "Applications Submitted Per Year",
+            'applications_submitted',
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_applications_submitted
+        )
+
     def reset(self):
         pass
 
     def compute(self, tick):
-        # required to provide a value!
-        self.get_prop('registration_cost').set_value(0.0)
-        self.consume_all_inputs()
-        self.write_zero_to_all()
+
+        # get Inputs
+        staff_expenses = self.get_input_available('Staff Expenses')
+        accommodation_expenses = self.get_input_available('Accommodation Expenses')
+        it_expenses = self.get_input_available('IT Expenses')
+        work_hrs = self.get_input_available('line staff work hours')
+        desktops = self.get_input_available("desktops provided")
+
+        # get Properties
+        registration_fee = self.get_prop_value("registration_fee")
+        applications_processed_per_lswork_hr = self.get_prop_value(
+                            'applications_processed_per_lswork_hr')
+        applications_submitted = self.get_prop_value('applications_submitted')
+
+        revenue = applications_submitted * registration_fee / 12.0
+
+        total_expenses = (staff_expenses + accommodation_expenses +
+                          it_expenses)
+
+        sufficient_process_staff = (applications_submitted / 12.0 <=
+                                    applications_processed_per_lswork_hr *
+                                    work_hrs)
+
+        monthly_work_hrs_pp = 52.0*40.0*0.8*0.8/12
+        desktops_required = work_hrs / monthly_work_hrs_pp
+        sufficient_desktops = (desktops >= desktops_required)
+
+        if not sufficient_desktops:
+            self.notify_insufficient_input(
+                'desktops provided',
+                desktops,
+                desktops_required
+            )
+
+        if not sufficient_process_staff:
+            self.notify_insufficient_input(
+                'line staff work hours',
+                work_hrs,
+                (applications_submitted / 12.0 /
+                 applications_processed_per_lswork_hr)
+            )
+
+        # Process inputs and outputs
+        if sufficient_desktops and sufficient_process_staff:
+
+            # Consume inputs
+
+            self.consume_input(
+                'line staff work hours',
+                work_hrs
+            )
+
+            self.consume_input(
+                'Staff Expenses',
+                self.get_input_available('Staff Expenses')
+            )
+
+            self.consume_input(
+                'Accommodation Expenses',
+                self.get_input_available('Accommodation Expenses')
+            )
+
+            self.consume_input(
+                'IT Expenses',
+                self.get_input_available('IT Expenses')
+            )
+
+            self.consume_input(
+                "desktops provided",
+                self.get_input_available("desktops provided")
+            )
+
+            # Provide outputs
+            self.provide_output(
+                'Applications Processed',
+                applications_submitted / 12.0
+            )
+
+            self.provide_output(
+                'Service Revenue',
+                revenue
+            )
+
+            self.provide_output(
+                'Operational Surplus',
+                revenue - total_expenses
+            )
+
+        else:
+            self.consume_all_inputs(0)
+            self.write_zero_to_all()
 
 
 #  create entities for record storage service
@@ -1053,7 +1127,8 @@ def createRecordStorage(sim=None):
             'default_leave_percent': 20,
             'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
-            'default_hours_training': 100
+            'default_hours_training': 100,
+            'default_span_of_control': 10
         })
 
     LineStaffRes.attributes.add("resource")
@@ -1151,7 +1226,7 @@ def createRegistrationService(sim=None):
         processes.BudgetProcess,
         {
             'name': "staff budget",
-            'start_amount': 4000000,
+            'start_amount': 80000000,
             'budget_type': "staff$"
         })
 
@@ -1164,7 +1239,7 @@ def createRegistrationService(sim=None):
         processes.BudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 4000000,
+            'start_amount': 20000000,
             'budget_type': "rent$"
         })
 
@@ -1177,7 +1252,7 @@ def createRegistrationService(sim=None):
         processes.BudgetProcess,
         {
             'name': "other budget",
-            'start_amount': 4000000,
+            'start_amount': 8000000,
             'budget_type': "other$"
         })
 
@@ -1208,29 +1283,30 @@ def createRegistrationService(sim=None):
             'default_line_staff_no': 100,
             'default_oh_staff_no': 10,
             'default_hours_per_week': 40.0,
-            'default_weeks_per_year': 52,
-            'default_prof_training_percent': 20,
+            'default_admin_training_percent': 20,
             'default_leave_percent': 20,
             'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
-            'default_hours_training': 100
+            'default_hours_training': 100,
+            'default_span_of_control': 10
         })
 
     LineStaffRes.attributes.add("resource")
 
-    InhouseDesktops = merlin.Entity(sim, "Inhouse Desktop Service")
+    InhouseDesktops = merlin.Entity(sim, "In-house Desktop Service")
     sim.add_entity(InhouseDesktops)
     registration_e.add_child(InhouseDesktops)
     InhouseDesktops.create_process(
         InternalICTDesktopService,
         {
             # todo: set to reasonable values!
-            'actual_desktops': 0,
-            'desktops_per_staff': 1.0,
-            'actual_it_staff': 0,
-            'it_staff_per_desktop': 1.0/15.0,
-            'value_per_desktop': 4000.0,
-            'cost_per_desktop': 0
+            'actual_desktops': 100,
+            'it_hrs_per_desktop': 40.0,
+            'acq_cost_per_desktop': 4000.0,
+            'maint_cost_per_desktop': 400.0,
+            'depr_period': 4,
+            'financial_charge_percent': 8,
+            'life_time': 6
          })
     InhouseDesktops.attributes.add("resource")
 
@@ -1241,75 +1317,69 @@ def createRegistrationService(sim=None):
         RegistrationServiceProcess,
         {
             'name': "registration facility process",
-            'default_lifecycle': 20,
-            'default_registration_price': 1,
-            'default_ohwork_hr_lswork_hr_ratio': 0.1,
-            'default_applications_processed_per_lswork_hr': 10000
+            'default_registration_fee': 50.0,
+            'default_applications_processed_per_lswork_hr': 10,
+            "default_applications_submitted": 1000000,
         })
 
     RegistrationFacility.attributes.add("asset")
 
-    opSurplus = merlin.Output("operational_surplus",
-                              name="operational surplus")
+    opSurplus = merlin.Output("opsurplus$",
+                              name="Operational Surplus")
     sim.add_output(opSurplus)
     sim.connect_output(RegistrationFacility, opSurplus)
 
     # todo: need an expectation
-    applProcessed = merlin.Output("applications_processed",
-                                  name="applications processed")
+    applProcessed = merlin.Output("appl#",
+                                  name="Applications Processed")
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
     # need an expectation
-    serviceRevenue = merlin.Output("service_revenue",
-                                   name="service revenue")
+    serviceRevenue = merlin.Output("revenue$",
+                                   name="Service Revenue")
     sim.add_output(serviceRevenue)
     sim.connect_output(RegistrationFacility, serviceRevenue)
 
     # need an expectation
-    budgetarySurplus = merlin.Output("budgetary_surplus",
-                                     name="budgetary surplus")
+    budgetarySurplus = merlin.Output("surplus$",
+                                     name="Budgetary Surplus")
     sim.add_output(budgetarySurplus)
-    sim.connect_output(RegistrationFacility, budgetarySurplus)
+    # sim.connect_output(RegistrationFacility, budgetarySurplus)
+    sim.connect_output(StaffAccommodation, budgetarySurplus)
+    sim.connect_output(LineStaffRes, budgetarySurplus)
+    sim.connect_output(InhouseDesktops, budgetarySurplus)
 
-    # now connect all inputs of the services
+    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
+
     sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
-    sim.connect_entities(StaffAccommodation, LineStaffRes,
-                         "accommodatedStaff#")
+    sim.connect_entities(StaffAccommodation,
+                         LineStaffRes,
+                         "workspace#")
 
     # all inputs from Inhouse Desktop Service
-    sim.connect_entities(StaffAccommodation, InhouseDesktops,
-                         "accommodatedStaff#")
-    sim.connect_entities(LineStaffRes, InhouseDesktops, "OH_work_hr")
+    sim.connect_entities(LineStaffRes, InhouseDesktops, "LS_work_hr")
     sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
 
     # all inputs from RegistrationFacility
-    sim.connect_entities(TheStaffBudget, RegistrationFacility, "staff$")
-    sim.connect_entities(TheRentBudget, RegistrationFacility, "rent$")
-    sim.connect_entities(TheOtherBudget, RegistrationFacility, "other$")
-    sim.connect_entities(LineStaffRes, RegistrationFacility, "LS_work_hr")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "desktops")
-    sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_work_hr")
-    sim.connect_entities(InhouseDesktops,
-                         RegistrationFacility,
-                         "IDS_OH_work_hr")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "IDS_other_exp")
-    sim.connect_entities(StaffAccommodation, RegistrationFacility,
-                         "used_rent_expenses")
-    sim.connect_entities(LineStaffRes, RegistrationFacility,
-                         "used_staff_expenses")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "it_depreciation_expenses$")
 
-    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "LS_work_hr")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "desktop#")
+    sim.connect_entities(StaffAccommodation, RegistrationFacility,
+                         "accommodationExpense$")
+    sim.connect_entities(LineStaffRes, RegistrationFacility,
+                         "staffExpense$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "ITexpense$")
 
     return sim
 
 if __name__ == "__main__":
 
-    sim = createRecordStorage()
+    # sim = createRecordStorage()
+    sim = createRegistrationService()
 
     sim.set_time_span(48)
     sim.run()
