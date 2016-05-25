@@ -1047,7 +1047,7 @@ def createRecordStorage(sim=None):
 
     # add the budget entities/processes
     # staff budget
-    TheStaffBudget = merlin.Entity(sim, "Budgeted - Staff Expenses")
+    TheStaffBudget = merlin.Entity(sim, "Budgeted – Staff Expenses")
     sim.add_entity(TheStaffBudget, is_source_entity=True)
     storage_e.add_child(TheStaffBudget)
     TheStaffBudget.attributes.add("budget")
@@ -1060,7 +1060,7 @@ def createRecordStorage(sim=None):
         })
 
     # rent budget
-    TheRentBudget = merlin.Entity(sim, "Budgeted - Rent Expenses")
+    TheRentBudget = merlin.Entity(sim, "Budgeted – Rent Expenses")
     sim.add_entity(TheRentBudget, is_source_entity=True)
     storage_e.add_child(TheRentBudget)
     TheRentBudget.attributes.add("budget")
@@ -1073,7 +1073,7 @@ def createRecordStorage(sim=None):
         })
 
     # other budget
-    TheOtherBudget = merlin.Entity(sim, "Budgeted - Other Expenses")
+    TheOtherBudget = merlin.Entity(sim, "Budgeted – Other Expenses")
     sim.add_entity(TheOtherBudget, is_source_entity=True)
     storage_e.add_child(TheOtherBudget)
     TheOtherBudget.attributes.add("budget")
@@ -1222,7 +1222,7 @@ def createRegistrationService(sim=None):
 
     # add the budget entities/processes
     # staff budget
-    TheStaffBudget = merlin.Entity(sim, "Budgeted - Staff Expenses")
+    TheStaffBudget = merlin.Entity(sim, "Budgeted – Staff Expenses")
     sim.add_entity(TheStaffBudget, is_source_entity=True)
     registration_e.add_child(TheStaffBudget)
     TheStaffBudget.attributes.add("budget")
@@ -1235,7 +1235,7 @@ def createRegistrationService(sim=None):
         })
 
     # rent budget
-    TheRentBudget = merlin.Entity(sim, "Budgeted - Rent Expenses")
+    TheRentBudget = merlin.Entity(sim, "Budgeted – Rent Expenses")
     sim.add_entity(TheRentBudget, is_source_entity=True)
     registration_e.add_child(TheRentBudget)
     TheRentBudget.attributes.add("budget")
@@ -1248,7 +1248,7 @@ def createRegistrationService(sim=None):
         })
 
     # other budget, provides for IT as well
-    TheOtherBudget = merlin.Entity(sim, "Budgeted - Other Expenses")
+    TheOtherBudget = merlin.Entity(sim, "Budgeted – Other Expenses")
     sim.add_entity(TheOtherBudget, is_source_entity=True)
     registration_e.add_child(TheOtherBudget)
     TheOtherBudget.attributes.add("budget")
