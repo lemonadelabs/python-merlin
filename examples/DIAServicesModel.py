@@ -11,6 +11,7 @@ exmaple files.
 from pymerlin import merlin
 from pymerlin import processes
 import logging
+import math
 
 # Global logging settings
 logging_level = logging.INFO
@@ -19,41 +20,6 @@ logging.basicConfig(
     filename=log_to_file,
     level=logging_level,
     format='%(asctime)s: [%(levelname)s] %(message)s')
-
-
-# a template for a new process
-class TemplateProcess(merlin.Process):
-    """
-    Documentation of template process
-    """
-
-    def __init__(
-            self,
-            name="Template",
-            template_volumes=100,
-            ):
-        super(TemplateProcess, self).__init__(name)
-
-        # Define Inputs
-        self.add_input('template input name', 'template_in_unit')
-
-        # Define Outputs
-        self.add_output('template_output_name', 'template_out_unit')
-
-        # Define Properties
-        self.add_property(
-            'Contracted File Volume',
-            'contract_volume',
-            merlin.ProcessProperty.PropertyType.number_type,
-            template_volumes
-        )
-
-    def reset(self):
-        pass
-
-    def compute(self, tick):
-        self.consume_all_inputs()
-        self.write_zero_to_all()
 
 
 # all processes for this model
@@ -68,65 +34,46 @@ class StorageServiceProcess(merlin.Process):
             self,
             default_lifecycle=20,
             default_storage_fee=1,
-            default_ohfte_lsfte_ratio=0.05,
-            default_files_handled_per_lsfte=10000,
+            default_files_handled_per_lswork_hr=20,
+            default_annual_storage_rent=1.0e4,
             name="Storage Service"
             ):
         super(StorageServiceProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_expenses', 'staff$')
-        self.add_input('rent_expenses', 'rent$')
-        self.add_input('line_staff_fte', 'LS_FTE')
-        self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('fl_overhead_staff_fte', 'FL_OH_FTE')
-        self.add_input('file_count', 'files')
-        self.add_input('fl_spare_other_expenses', 'FL_other_exp')
-        self.add_input('other_expenses', 'other$')
-        self.add_input('used_rent_expenses', 'used_rent_expenses')
-        self.add_input('used_staff_expenses', 'used_staff_expenses')
+        self.add_input('file count', 'file#')
+        self.add_input('monthly operational budget', "other$")
+        self.add_input('monthly line staff work hrs', 'LS_work_hr')
+        self.add_input('accommodation expenses', 'accommodationExpense$')
+        self.add_input('staff expenses', 'staffExpense$')
+        self.add_input('logistics expenses', 'logisticExpense$')
 
         # Define Outputs
-        self.add_output("operational_surplus", 'operational_surplus')
-        self.add_output("files_stored", 'files_stored')
-        self.add_output("service_revenue", 'service_revenue')
-        self.add_output("budgetary_surplus", 'budgetary_surplus')
-
-        # Define Properties
-        # self.add_property(
-        #     "lifecycle/years",
-        #     'lifecycle',
-        #     merlin.ProcessProperty.PropertyType.number_type,
-        #     default_lifecycle
-        # )
+        self.add_output("Additional Files Stored", 'file#')
+        self.add_output("Service Revenue", 'revenue$')
+        self.add_output("Budgetary Surplus", 'surplus$')
+        self.add_output("Operational Surplus", 'opsurplus$')
+#        self.add_output("Storage Cost Per File", "cost_per_file")
 
         self.add_property(
-            "Storage Cost",
-            'storage_cost',
-            merlin.ProcessProperty.PropertyType.number_type,
-            0,
-            read_only=True
-        )
-
-        self.add_property(
-            "Storage Fee",
+            "Access Fee / $",
             'storage_fee',
             merlin.ProcessProperty.PropertyType.number_type,
             default_storage_fee
         )
 
         self.add_property(
-            "Minimum OH FTEs / LS FTEs",
-            'ohfte_lsfte_ratio',
+            "Files Handled / LS work hr",
+            'files_handled_per_lswork_hr',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_ohfte_lsfte_ratio
+            default_files_handled_per_lswork_hr
         )
 
         self.add_property(
-            "Files Handled / LS FTE",
-            'files_handled_per_lsfte',
+            "Annual Storage Rent",
+            "storage_rent",
             merlin.ProcessProperty.PropertyType.number_type,
-            default_files_handled_per_lsfte
+            default_annual_storage_rent
         )
 
     def reset(self):
@@ -134,134 +81,102 @@ class StorageServiceProcess(merlin.Process):
 
     def compute(self, tick):
         # Calculations
-        try:
-            storage_cost = (
-                (
-                    self.get_input_available('used_rent_expenses') +
-                    self.get_input_available('used_staff_expenses') +
-                    self.get_input_available('other_expenses') -
-                    self.get_input_available('fl_spare_other_expenses')
-                ) /
-                self.get_input_available('file_count')
-            )
-            self.get_prop('storage_cost').set_value(storage_cost)
-        except ZeroDivisionError:
-            logging.info("Divide by zero error in storage_cost")
-            storage_cost = 0
+        total_expenses = (self.get_input_available('accommodation expenses') +
+                          self.get_input_available('staff expenses') +
+                          self.get_input_available('logistics expenses') +
+                          self.get_prop_value('storage_rent')/12.0)
 
-        files_stored = (
-            self.get_input_available('file_count') *
-            self.get_input_available('line_staff_fte') *
-            self.get_prop_value('files_handled_per_lsfte')
+#         try:
+#             storage_cost = (total_expenses /
+#                             self.get_input_available('file count'))
+#             self.provide_output("Storage Cost Per File", storage_cost)
+#         except ZeroDivisionError:
+#             logging.info("Divide by zero error in storage_cost")
+#             storage_cost = 0
+
+        files_stored = min(
+            self.get_input_available('file count'),
+            self.get_input_available('monthly line staff work hrs') *
+            self.get_prop_value('files_handled_per_lswork_hr')
         )
 
         service_revenue = (
-            self.get_input_available('file_count') *
-            self.get_prop_value('files_handled_per_lsfte') *
-            self.get_input_available('line_staff_fte') *
+            files_stored *
             self.get_prop_value('storage_fee')
         )
 
         operational_surplus = (
-            service_revenue -
-            (
-                self.get_input_available('used_rent_expenses') +
-                self.get_input_available('used_staff_expenses') +
-                self.get_input_available('fl_spare_other_expenses')
-
-            )
+            service_revenue - total_expenses
         )
 
         budgetary_surplus = (
-            self.get_input_available('fl_spare_other_expenses') +
-            self.get_input_available('staff_expenses') +
-            self.get_input_available('rent_expenses') -
-            (
-                self.get_input_available('used_staff_expenses') +
-                self.get_input_available('used_rent_expenses')
-            )
-        )
-
-        budget_consumed = (
-            (
-                self.get_input_available('file_count') /
-                self.parent.sim.num_steps
-            ) * storage_cost
-        )
-
-        try:
-            management_required = (
-                self.get_input_available('line_staff_fte') *
-                self.get_prop_value('ohfte_lsfte_ratio')
-            )
-        except ZeroDivisionError:
-            logging.info("Divide by Zero in management_required")
-            management_required = 0
-
-        # Constraints
-        sufficient_managment = (
-            self.get_input_available('overhead_staff_fte') >=
-            management_required
+          self.get_input_available('monthly operational budget') -
+          self.get_prop_value('storage_rent')/12.0
         )
 
         sufficient_funding = (
-            self.get_input_available('other_expenses') >= budget_consumed
+            budgetary_surplus >= 0
         )
-
-        # Constraint Notifications
-        if not sufficient_managment:
-            self.notify_insufficient_input(
-                'overhead_staff_fte',
-                self.get_input_available('overhead_staff_fte'),
-                management_required
-            )
 
         if not sufficient_funding:
             self.notify_insufficient_input(
-                'other_expenses',
-                self.get_input_available('other_expenses'),
-                budget_consumed
+                'monthly operational budget',
+                self.get_input_available('monthly operational budget'),
+                self.get_prop_value('storage_rent')/12.0
             )
 
         # Process inputs and outputs
-        if sufficient_funding and sufficient_managment:
+        if sufficient_funding:
 
             # Consume inputs
-
             self.consume_input(
-                'line_staff_fte',
-                self.get_input_available('line_staff_fte')
+                'monthly line staff work hrs',
+                self.get_input_available('monthly line staff work hrs')
             )
 
             self.consume_input(
-                'overhead_staff_fte',
-                management_required
+                'monthly operational budget',
+                self.get_input_available('monthly operational budget')
             )
 
             self.consume_input(
-                'other_expenses',
-                budget_consumed
+                'file count',
+                files_stored
             )
+
+            self.consume_input(
+                'accommodation expenses',
+                self.get_input_available('accommodation expenses')
+            )
+
+            self.consume_input(
+                'staff expenses',
+                self.get_input_available('staff expenses')
+            )
+
+            self.consume_input(
+                'logistics expenses',
+                self.get_input_available('logistics expenses')
+             )
 
             # Provide outputs
-
             self.provide_output(
-                'files_stored',
+                'Additional Files Stored',
                 files_stored
             )
 
             self.provide_output(
-                'service_revenue',
+                'Service Revenue',
                 service_revenue
             )
 
             self.provide_output(
-                'operational_surplus',
+                'Operational Surplus',
                 operational_surplus
             )
 
             self.provide_output(
-                'budgetary_surplus',
+                'Budgetary Surplus',
                 budgetary_surplus
             )
 
@@ -283,36 +198,37 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
             actual_volumes=100,
             contract_cost=1000,
             overage_cost_per_file=10,
-            required_management_fte=1
+            required_management_work_hr=1,
+            default_contract_length=6
             ):
         super(OutsourcedFileLogisticsProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('other_expenses', 'other$')
+        self.add_input('overhead staff work hrs', 'OH_work_hr')
+        self.add_input('Monthly Contract Budget', 'other$')
 
         # Define Outputs
-        self.add_output('fl_overhead_staff_fte', 'FL_OH_FTE')
-        self.add_output('file_count', 'files')
-        self.add_output('FL_spare_other_expenses', 'FL_other_exp')
+        self.add_output('files handled', 'file#')
+        self.add_output('budgetary surplus', 'other$')
+        self.add_output('monthly logistics costs', "logisticExpense$")
 
         # Define Properties
         self.add_property(
-            'Contracted File Volume',
+            'Contracted Annual File Volume',
             'contract_volume',
             merlin.ProcessProperty.PropertyType.number_type,
             contracted_volumes
         )
 
         self.add_property(
-            'Actual File Volume',
+            'Actual Annual File Volume',
             'actual_volume',
             merlin.ProcessProperty.PropertyType.number_type,
             actual_volumes
         )
 
         self.add_property(
-            'Contract Cost',
+            'Annual Contract Cost',
             'contract_cost',
             merlin.ProcessProperty.PropertyType.number_type,
             contract_cost
@@ -326,10 +242,17 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         )
 
         self.add_property(
-            'file logistics OHSfte',
-            'file_logistics_OHSfte',
+            'Annual Overhead Staff Hours',
+            'file_logistics_OHSwork_hr',
             merlin.ProcessProperty.PropertyType.number_type,
-            required_management_fte
+            required_management_work_hr
+        )
+
+        self.add_property(
+            "lenght of contrcat/yrs",
+            "contract_yrs",
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_contract_length
         )
 
     def reset(self):
@@ -343,59 +266,60 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         )
 
         cc = self.get_prop_value('contract_cost')
-        oc = self.get_prop_value('overage_cost')
+        oc = self.get_prop_value('additional_cost')
         total_cost = cc if overage <= 0 else cc + (overage * oc)
         monthly_cost = total_cost / 12
 
         # Constraints
         contract_managed = (
-            self.get_input_available('overhead_staff_fte') >=
-            self.get_prop_value('file_logistics_OHSfte'))
+            self.get_input_available('overhead staff work hrs') >=
+            self.get_prop_value('file_logistics_OHSwork_hr') / 12.0)
 
         contract_funded = (
-            self.get_input_available('other_expenses') >=
+            self.get_input_available('Monthly Contract Budget') >=
             monthly_cost
         )
 
         # Notify constraint violations
         if not contract_managed:
             self.notify_insufficient_input(
-                'overhead_staff_fte',
-                self.get_input_available('overhead_staff_fte'),
-                self.get_prop_value('file_logistics_OHSfte')
+                'overhead staff work hrs',
+                self.get_input_available('overhead staff work hrs'),
+                self.get_prop_value('file_logistics_OHSwork_hr') / 12.0
             )
 
         if not contract_funded:
             self.notify_insufficient_input(
-                'other_expenses',
-                self.get_input_available('other_expenses'),
+                'Monthly Contract Budget',
+                self.get_input_available('Monthly Contract Budget'),
                 monthly_cost
             )
 
         if contract_funded and contract_managed:
+            # consume it all!
 
-            self.consume_input(
-                'overhead_staff_fte',
-                self.get_prop_value('file_logistics_OHSfte'))
+            self.provide_output(
+                'files handled',
+                self.get_prop_value('actual_volume')/12.0)
 
-            self.consume_input(
-                'other_expenses',
+            self.provide_output(
+                'monthly logistics costs',
                 monthly_cost
             )
 
             self.provide_output(
-                'file_count',
-                self.get_prop_value('actual_volume'))
-
-            self.provide_output(
-                'FL_spare_other_expenses',
-                monthly_cost
+                "budgetary surplus",
+                self.get_input_available('Monthly Contract Budget')-monthly_cost
             )
 
-            self.provide_output(
-                'fl_overhead_staff_fte',
-                self.get_prop_value('file_logistics_OHSfte')
+            self.consume_input(
+                'Monthly Contract Budget',
+                self.get_input_available('Monthly Contract Budget')
             )
+
+            self.consume_input(
+                'overhead staff work hrs',
+                self.get_prop_value('file_logistics_OHSwork_hr'))
 
         else:
             self.consume_all_inputs(0)
@@ -418,11 +342,12 @@ class StaffAccommodationProcess(merlin.Process):
         super(StaffAccommodationProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('rent_expenses', 'rent$')
+        self.add_input('rent expenses', 'rent$')
 
         # Define Outputs
-        self.add_output('staff_accommodated', 'accommodatedStaff#')
-        self.add_output('used_rent_expenses', 'used_rent_expenses')
+        self.add_output('staff accommodated', 'workspace#')
+        self.add_output('rent expenses', 'accommodationExpense$')
+        self.add_output('budgetary surplus', 'surplus$')
 
         # Define Properties
         self.add_property(
@@ -438,7 +363,7 @@ class StaffAccommodationProcess(merlin.Process):
             default_area_m2
         )
         self.add_property(
-            'area [m²]/staff [#]',
+            'area [m²]/staff',
             'area_per_staff_m2',
             merlin.ProcessProperty.PropertyType.number_type,
             default_area_per_staff_m2
@@ -460,10 +385,10 @@ class StaffAccommodationProcess(merlin.Process):
         area = self.get_prop_value("area_m2")
         lease_term = self.get_prop_value("lease_term")
 
-        rent_expenses = self.get_input_available("rent_expenses")
+        rent_expenses = self.get_input_available("rent expenses")
 
         try:
-            staff_accommodated = area / area_per_staff
+            staff_accommodated = math.floor(area / area_per_staff)
         except ZeroDivisionError:
             staff_accommodated = 0
 
@@ -481,17 +406,19 @@ class StaffAccommodationProcess(merlin.Process):
                 [self.get_prop('lease_term')]
             )
         if not sufficient_funding:
-            self.notify_insufficient_input("rent_expenses",
+            self.notify_insufficient_input("rent expenses",
                                            rent_expenses,
                                            used_rent_expenses)
 
         if sufficient_funding and lease_still_on:
-            self.consume_input("rent_expenses",
+            self.consume_input("rent expenses",
                                rent_expenses)
 
-            self.provide_output("staff_accommodated",
+            self.provide_output("budgetary surplus",
+                                rent_expenses-used_rent_expenses)
+            self.provide_output("staff accommodated",
                                 staff_accommodated)
-            self.provide_output("used_rent_expenses",
+            self.provide_output("rent expenses",
                                 used_rent_expenses)
         else:
             self.consume_all_inputs(0)
@@ -509,24 +436,25 @@ class StaffProcess(merlin.Process):
             default_line_staff_no=100,
             default_oh_staff_no=10,
             default_hours_per_week=40.0,
-            default_weeks_per_year=52,
-            default_prof_training_percent=20,
-            default_leave_percent=10,
-            default_avg_oh_salary=70e3,
+            default_admin_training_percent=20,
+            default_leave_percent=20,
+            default_avg_oh_salary=75e3,
             default_avg_line_salary=60e3,
             # todo: implement
-            default_hours_training=100
+            default_hours_training=100,
+            default_span_of_control=10
             ):
         super(StaffProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_expenses', 'staff$')
-        self.add_input('staff_accommodated', 'accommodatedStaff#')
+        self.add_input('Staff Budget', 'staff$')
+        self.add_input('Workplaces Available', 'workspace#')
 
         # Define Outputs
-        self.add_output('OHSfte', 'OH_FTE')
-        self.add_output('LSfte', 'LS_FTE')
-        self.add_output('used_staff_expenses', 'used_staff_expenses')
+        self.add_output('Overhead work hrs', 'OH_work_hr')
+        self.add_output('Line staff work hrs', 'LS_work_hr')
+        self.add_output('Budgetary Surplus', 'surplus$')
+        self.add_output('Staff Expenses', 'staffExpense$')
 
         # Define Properties
         self.add_property(
@@ -542,7 +470,6 @@ class StaffProcess(merlin.Process):
             merlin.ProcessProperty.PropertyType.number_type,
             default_line_staff_no
         )
-        # Define Properties
         self.add_property(
             'overhead staff #',
             'oh_staff_no',
@@ -556,16 +483,10 @@ class StaffProcess(merlin.Process):
             default_hours_per_week
         )
         self.add_property(
-            'working weeks per year',
-            'weeks_per_year',
+            'admin & training [%]',
+            'admin_training_percent',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_weeks_per_year
-        )
-        self.add_property(
-            'professional training [%]',
-            'prof_training_percent',
-            merlin.ProcessProperty.PropertyType.number_type,
-            default_prof_training_percent
+            default_admin_training_percent
         )
         self.add_property(
             'annual leave [%]',
@@ -574,16 +495,22 @@ class StaffProcess(merlin.Process):
             default_leave_percent
         )
         self.add_property(
-            'avg overhead salary',
+            'avg annual overhead salary',
             'avgOHSalary',
             merlin.ProcessProperty.PropertyType.number_type,
             default_avg_oh_salary
         )
         self.add_property(
-            'avg line salary',
+            'avg annual line salary',
             'avgLineSalary',
             merlin.ProcessProperty.PropertyType.number_type,
             default_avg_line_salary
+        )
+        self.add_property(
+            'span of control',
+            'span_of_control',
+            merlin.ProcessProperty.PropertyType.number_type,
+            default_span_of_control
         )
         self.add_property(
             'hours of training period',
@@ -600,82 +527,67 @@ class StaffProcess(merlin.Process):
         line_staff_no = self.get_prop_value("line_staff_no")
         overhead_staff_no = self.get_prop_value("oh_staff_no")
         working_hours_per_week = self.get_prop_value("hours_per_week")
-        working_weeks_per_year = self.get_prop_value("weeks_per_year")
+        working_weeks_per_year = 52  # this won't change that quickly, I guess
         professional_training = self.get_prop_value(
-            "prof_training_percent"
+            "admin_training_percent"
         )
         leave = self.get_prop_value("leave_percent")
         avg_line_salary = self.get_prop_value("avgLineSalary")
         avg_overhead_salary = self.get_prop_value("avgOHSalary")
-        training_period = self.get_prop_value("hours_training")
+        training_period = self.get_prop_value("hours_training")  # todo!
+        span_of_control = self.get_prop_value("span_of_control")
 
-        staff_expenses = self.get_input_available("staff_expenses")
-        staff_accommodated = self.get_input_available("staff_accommodated")
+        staff_expenses = self.get_input_available("Staff Budget")
+        staff_accommodated = self.get_input_available("Workplaces Available")
 
-        try:
-            overhead_staff_fte = (
-                (
-                    working_hours_per_week * working_weeks_per_year *
-                    professional_training/100 * leave/100 * overhead_staff_no
-                ) -
-                ((overhead_staff_no / line_staff_no) * training_period)
-            ) / 12.0
-        except ZeroDivisionError:
-            logging.info("Overhead Staff FTE calc Zero Division Error")
-            overhead_staff_fte = 0
+        FTE_hours = (working_hours_per_week * working_weeks_per_year *
+                     (1.0-professional_training/100) * (1.0-leave/100))
 
-        try:
-            line_staff_fte = (
-                (
-                    working_hours_per_week * working_weeks_per_year *
-                    professional_training/100 * leave/100 * line_staff_no
-                ) -
-                (
-                    (1-(overhead_staff_no / line_staff_no)) * training_period
-                )
-            ) / 12.0
-        except ZeroDivisionError:
-            logging.info("Line Staff FTE calc Zero Division Error")
-            line_staff_fte = 0
+        overhead_staff_work_hr = overhead_staff_no * FTE_hours / 12.0
+
+        line_staff_work_hr = (min(line_staff_no,
+                                  overhead_staff_no*span_of_control) *
+                              FTE_hours / 12.0)
 
         used_staff_expenses = (
             (avg_line_salary * line_staff_no) +
-            (avg_overhead_salary * overhead_staff_no)
+            (avg_overhead_salary * overhead_staff_no) / 12.0
         )
 
         sufficient_funding = (
-            staff_expenses >=
-            (
-                ((avg_overhead_salary * overhead_staff_no) +
-                 (avg_line_salary * line_staff_no)) /
-                self.parent.sim.num_steps
-            )
+            staff_expenses >= used_staff_expenses
         )
 
         sufficient_accommodation = (
-            staff_accommodated >= overhead_staff_no + line_staff_no
+            staff_accommodated >= (overhead_staff_no + line_staff_no)
         )
 
         if not sufficient_funding:
             self.notify_insufficient_input(
-                "staff_expenses",
+                "Staff Budget",
                 staff_expenses,
                 used_staff_expenses
             )
 
         if not sufficient_accommodation:
             self.notify_insufficient_input(
-                "staff_accommodated",
+                "Workplaces Available",
                 staff_accommodated,
                 overhead_staff_no + line_staff_no
             )
 
         if sufficient_funding and sufficient_accommodation:
-            self.consume_input("staff_expenses", staff_expenses)
-            self.consume_input("staff_accommodated", staff_accommodated)
-            self.provide_output("OHSfte", overhead_staff_fte)
-            self.provide_output("LSfte", line_staff_fte)
-            self.provide_output("used_staff_expenses", used_staff_expenses)
+            self.consume_input("Staff Budget", staff_expenses)
+            self.consume_input("Workplaces Available", staff_accommodated)
+            self.provide_output("Overhead work hrs",
+                                # this is the remaining oh staff capacity
+                                max(0.0, (overhead_staff_work_hr -
+                                          line_staff_work_hr /
+                                          span_of_control)))
+            self.provide_output("Line staff work hrs", line_staff_work_hr)
+            self.provide_output("Staff Expenses", used_staff_expenses)
+            self.provide_output("Budgetary Surplus",
+                                staff_expenses-used_staff_expenses)
         else:
             self.consume_all_inputs(0)
             self.write_zero_to_all()
@@ -687,18 +599,18 @@ class ICTDesktopContract(merlin.Process):
             self,
             desktops_per_staff=0,
             cost_per_desktop=0,
-            contract_ohfte=1,
+            contract_ohwork_hr=1,
             name="Desktop Contract"):
         super(ICTDesktopContract, self).__init__(name)
 
         # Define Inputs
-        self.add_input('overhead_staff_fte', 'OH_FTE')
+        self.add_input('overhead_staff_work_hr', 'OH_work_hr')
         self.add_input('contract_budget', 'other$')
         self.add_input('staff_accommodated', 'accommodatedStaff#')
 
         # Define Outputs
         self.add_output('desktops_accomodated', 'desktops')
-        self.add_output('desktop_contract_overhead_fte', 'DC_OH_FTE')
+        self.add_output('desktop_contract_overhead_work_hr', 'DC_OH_work_hr')
         self.add_output('budget_surplus', 'DC_other_exp')
 
         # Define Properties
@@ -718,9 +630,9 @@ class ICTDesktopContract(merlin.Process):
 
         self.add_property(
             'Desktop Contract Overhead Staff',
-            'desktop_contract_ohsfte',
+            'desktop_contract_ohswork_hr',
             merlin.ProcessProperty.PropertyType.number_type,
-            contract_ohfte
+            contract_ohwork_hr
         )
 
     def reset(self):
@@ -737,8 +649,8 @@ class ICTDesktopContract(merlin.Process):
 
         # Constraints
         contract_managed = (
-            self.get_input_available('overhead_staff_fte') >=
-            self.get_prop_value('desktop_contract_ohsfte')
+            self.get_input_available('overhead_staff_work_hr') >=
+            self.get_prop_value('desktop_contract_ohswork_hr')
         )
 
         contract_funded = (
@@ -749,9 +661,9 @@ class ICTDesktopContract(merlin.Process):
         # Constraint notifications
         if not contract_managed:
             self.notify_insufficient_input(
-                'overhead_staff_fte',
-                self.get_input_available('overhead_staff_fte'),
-                self.get_prop_value('desktop_contract_ohsfte')
+                'overhead_staff_work_hr',
+                self.get_input_available('overhead_staff_work_hr'),
+                self.get_prop_value('desktop_contract_ohswork_hr')
             )
 
         if not contract_funded:
@@ -766,8 +678,8 @@ class ICTDesktopContract(merlin.Process):
 
             # Consume Inputs
             self.consume_input(
-                'overhead_staff_fte',
-                self.get_prop_value('desktop_contract_ohsfte')
+                'overhead_staff_work_hr',
+                self.get_prop_value('desktop_contract_ohswork_hr')
             )
 
             self.consume_input(
@@ -786,8 +698,8 @@ class ICTDesktopContract(merlin.Process):
             )
 
             self.provide_output(
-                'internal_desktop_overhead_fte',
-                self.get_input_available('overhead_staff_fte')
+                'internal_desktop_overhead_work_hr',
+                self.get_input_available('overhead_staff_work_hr')
             )
 
             self.provide_output(
@@ -805,25 +717,24 @@ class InternalICTDesktopService(merlin.Process):
     def __init__(
             self,
             actual_desktops=0,
-            desktops_per_staff=0,
-            actual_it_staff=0,
-            it_staff_per_desktop=0,
-            value_per_desktop=0,
-            cost_per_desktop=0,
+            it_hrs_per_desktop=0,
+            acq_cost_per_desktop=0,
+            maint_cost_per_desktop=0,
+            depr_period=4,
+            financial_charge_percent=8,
+            life_time=6,
             name="Internal ICT Desktop Service"):
         super(InternalICTDesktopService, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_accommodated', 'accommodatedStaff#')
-        self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('ict_budget', 'other$')
+        self.add_input('line staff work hrs', 'LS_work_hr')
+        self.add_input('IT budget', 'other$')
 
         # Define Outputs
-        self.add_output('desktops_accomodated', 'desktops')
-        self.add_output('internal_desktop_overhead_fte', 'IDS_OH_FTE')
-        self.add_output('budget_surplus', 'IDS_other_exp')
-        self.add_output("IT depreciation expenses",
-                        "it_depreciation_expenses$")
+        self.add_output('desktops provided', 'desktop#')
+        self.add_output('budgetary surplus', 'surplus$')
+        self.add_output("IT expenses", "ITexpense$")
+        self.add_output('remaining line staff work hrs', 'LS_work_hr')
 
         # Define Process Properties
         self.add_property(
@@ -834,38 +745,45 @@ class InternalICTDesktopService(merlin.Process):
         )
 
         self.add_property(
-            'Minimum Desktops / Staff',
-            'min_desktop_per_staff',
+            'Annual Support Hours Per Desktop',
+            'hrs_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            desktops_per_staff
+            it_hrs_per_desktop
         )
 
         self.add_property(
-            'Actual IT Staff',
-            'actual_it_staff',
+            'Acquisition Costs / Desktop',
+            'cost_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            actual_it_staff
+            acq_cost_per_desktop
         )
 
         self.add_property(
-            'Minimum IT Staff / Desktop',
-            'min_it_staff_per_desktop',
+            "Desktop Lifetime",
+            "life_time",
             merlin.ProcessProperty.PropertyType.number_type,
-            it_staff_per_desktop
+            life_time
         )
 
         self.add_property(
-            'Value / Desktop',
-            'value_per_desktop',
-            merlin.ProcessProperty.PropertyType.number_type,
-            value_per_desktop
-        )
-
-        self.add_property(
-            'Maintenance Cost / Desktop',
+            'Annual Maintenance Cost / Desktop',
             'maintenance_cost_per_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            cost_per_desktop
+            maint_cost_per_desktop
+        )
+
+        self.add_property(
+            'depreciation period',
+            'depreciation_period',
+            merlin.ProcessProperty.PropertyType.number_type,
+            depr_period
+        )
+
+        self.add_property(
+            "financial charge %",
+            "fin_charge_percent",
+            merlin.ProcessProperty.PropertyType.number_type,
+            financial_charge_percent
         )
 
     def reset(self):
@@ -873,103 +791,88 @@ class InternalICTDesktopService(merlin.Process):
 
     def compute(self, tick):
 
-        # Calculations
-        overhead_fte_required = (
-            self.get_prop_value('min_it_staff_per_desktop') *
-            self.get_prop_value('actual_desktops')
-        )
+        # get Inputs
+        work_hrs = self.get_input_available('line staff work hrs')
+        it_budget = self.get_input_available('IT budget')
+        # get Process Properties
+        actual_desktops = self.get_prop_value('actual_desktops')
+        it_hrs_per_desktop = self.get_prop_value('hrs_per_desktop')
+        acq_cost_per_desktop = self.get_prop_value('cost_per_desktop')
+        maint_cost_per_desktop = self.get_prop_value(
+                                            'maintenance_cost_per_desktop')
+        depr_period = self.get_prop_value('depreciation_period')
+        financial_charge_percent = self.get_prop_value("fin_charge_percent")
+        # life_time = self.get_prop_value("life_time")
 
-        budget_required = (
-            self.get_prop_value('actual_desktops') *
-            (
-                self.get_prop_value('maintenance_cost_per_desktop') +
-                self.get_prop_value('value_per_desktop')
-            )
-        )
+        desktops_provided = actual_desktops
 
-        ids_oh_ftes = (
-            self.get_input_available('overhead_staff_fte') -
-            self.get_prop_value('actual_it_staff')
-        )
+        work_hrs_required = desktops_provided * it_hrs_per_desktop / 12.0
 
-        # Constraints
-        sufficient_overhead = (
-            self.get_input_available('overhead_staff_fte') >=
-            overhead_fte_required
-        )
+        expenses = (desktops_provided * maint_cost_per_desktop +
+                    # todo: think about that! is contained in depreciation...
+                    # desktops_provided * acq_cost_per_desktop / life_time +
+                    desktops_provided * acq_cost_per_desktop / depr_period +
+                    desktops_provided * acq_cost_per_desktop *
+                    financial_charge_percent / 100.0
+                    ) / 12.0
 
         sufficient_budget = (
-            self.get_input_available('ict_budget') >=
-            budget_required
+            it_budget >= expenses
         )
 
-        sufficient_accomodation = (
-            self.get_input_available('staff_accommodated') >=
-            self.get_prop_value('actual_it_staff')
+        sufficient_staffing = (
+            work_hrs >= work_hrs_required
         )
 
         # Constraint notifications
-        if not sufficient_overhead:
-            self.notify_insufficient_input(
-                'overhead_staff_fte',
-                self.get_input_available('overhead_staff_fte'),
-                overhead_fte_required
-            )
 
         if not sufficient_budget:
             self.notify_insufficient_input(
-                'ict_budget',
-                self.get_input_available('ict_budget'),
-                budget_required
+                "IT budget",
+                it_budget,
+                expenses
             )
 
-        if not sufficient_accomodation:
+        if not sufficient_staffing:
             self.notify_insufficient_input(
-                'staff_accommodated',
-                self.get_input_available('staff_accommodated'),
-                self.get_prop_value('actual_it_staff')
+                'line staff work hrs',
+                work_hrs,
+                work_hrs_required
             )
 
         # Consume inputs and provide outputs
         if (
-                sufficient_accomodation and
-                sufficient_overhead and
+                sufficient_staffing and
                 sufficient_budget
         ):
 
             self.consume_input(
-                'staff_accommodated',
-                self.get_prop_value('actual_it_staff')
+                'line staff work hrs', work_hrs
             )
 
             self.consume_input(
-                'overhead_staff_fte',
-                overhead_fte_required
-            )
-
-            self.consume_input(
-                'ict_budget',
-                budget_required
+                'IT budget',
+                it_budget
             )
 
             self.provide_output(
-                'desktops_accomodated',
-                self.get_prop_value('actual_desktops')
+                'desktops provided',
+                desktops_provided
             )
 
             self.provide_output(
-                'internal_desktop_overhead_fte',
-                ids_oh_ftes
+                'remaining line staff work hrs',
+                work_hrs - work_hrs_required
             )
 
             self.provide_output(
-                'budget_surplus',
-                self.get_input_available('ict_budget')
+                'budgetary surplus',
+                it_budget - expenses
             )
 
             self.provide_output(
-                'IT depreciation expenses',
-                0.0  # todo
+                'IT expenses',
+                expenses
             )
 
         else:
@@ -979,86 +882,148 @@ class InternalICTDesktopService(merlin.Process):
 
 class RegistrationServiceProcess(merlin.Process):
     """
-    started as a modified copy of StorageServiceProcess
-
+    registrations of successfully re-enacted dreams
     """
 
     def __init__(
             self,
-            default_lifecycle=20,
-            default_registration_fee=1,
-            default_ohfte_lsfte_ratio=0.1,
-            default_applications_processed_per_lsfte=10000,
+            default_registration_fee=10.0,
+            default_applications_processed_per_lswork_hr=10,
+            default_applications_submitted=100000,
             name="Storage Service"
             ):
         super(RegistrationServiceProcess, self).__init__(name)
 
         # Define Inputs
-        self.add_input('staff_expenses', 'staff$')
-        self.add_input('rent_expenses', 'rent$')
-        self.add_input('other_expenses', 'other$')
-        self.add_input('line_staff_fte', 'LS_FTE')
-        self.add_input("desktops accommodated", "desktops")
-        self.add_input('overhead_staff_fte', 'OH_FTE')
-        self.add_input('ids_overhead_staff_fte', 'IDS_OH_FTE')
-        # probably not needed in absence of another "File Logistics"
-        # self.add_input('application_count', 'application_count')
-        self.add_input('ids_spare_other_expenses', 'IDS_other_exp')
-        self.add_input('used_rent_expenses', 'used_rent_expenses')
-        self.add_input('used_staff_expenses', 'used_staff_expenses')
-        self.add_input("IT depreciation expenses", "it_depreciation_expenses$")
+        self.add_input('Staff Expenses', 'staffExpense$')
+        self.add_input('Accommodation Expenses', 'accommodationExpense$')
+        self.add_input('IT Expenses', 'ITexpense$')
+        self.add_input('line staff work hours', 'LS_work_hr')
+        self.add_input("desktops provided", "desktop#")
 
         # Define Outputs
-        self.add_output("operational_surplus", 'operational_surplus')
-        self.add_output("applications_processed", 'applications_processed')
-        self.add_output("service_revenue", 'service_revenue')
-        self.add_output("budgetary_surplus", 'budgetary_surplus')
+        self.add_output("Applications Processed", 'appl#')
+        # self.add_output("cost per registration", "cost_per_appl")
+        self.add_output("Service Revenue", 'revenue$')
+        self.add_output("Operational Surplus", 'opsurplus$')
 
         # Define Properties
-        # self.add_property(
-        #     "lifecycle/years",
-        #     'lifecycle',
-        #     merlin.ProcessProperty.PropertyType.number_type,
-        #     default_lifecycle
-        # )
-
         self.add_property(
-            "Registration Service Cost",
-            'registration_cost',
-            merlin.ProcessProperty.PropertyType.number_type,
-            0,
-            read_only=True
-        )
-
-        self.add_property(
-            "Registration Fee",
+            "Registration Fee / $",
             'registration_fee',
             merlin.ProcessProperty.PropertyType.number_type,
             default_registration_fee
         )
 
         self.add_property(
-            "Minimum OH FTEs / LS FTEs",
-            'ohfte_lsfte_ratio',
+            "Applications Processed / LS work_hr",
+            'applications_processed_per_lswork_hr',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_ohfte_lsfte_ratio
+            default_applications_processed_per_lswork_hr
         )
 
         self.add_property(
-            "Applications Processed / LS FTE",
-            'applications_processed_per_lsfte',
+            "Applications Submitted Per Year",
+            'applications_submitted',
             merlin.ProcessProperty.PropertyType.number_type,
-            default_applications_processed_per_lsfte
+            default_applications_submitted
         )
 
     def reset(self):
         pass
 
     def compute(self, tick):
-        # required to provide a value!
-        self.get_prop('registration_cost').set_value(0.0)
-        self.consume_all_inputs()
-        self.write_zero_to_all()
+
+        # get Inputs
+        staff_expenses = self.get_input_available('Staff Expenses')
+        accommodation_expenses = self.get_input_available('Accommodation Expenses')
+        it_expenses = self.get_input_available('IT Expenses')
+        work_hrs = self.get_input_available('line staff work hours')
+        desktops = self.get_input_available("desktops provided")
+
+        # get Properties
+        registration_fee = self.get_prop_value("registration_fee")
+        applications_processed_per_lswork_hr = self.get_prop_value(
+                            'applications_processed_per_lswork_hr')
+        applications_submitted = self.get_prop_value('applications_submitted')
+
+        revenue = applications_submitted * registration_fee / 12.0
+
+        total_expenses = (staff_expenses + accommodation_expenses +
+                          it_expenses)
+
+        sufficient_process_staff = (applications_submitted / 12.0 <=
+                                    applications_processed_per_lswork_hr *
+                                    work_hrs)
+
+        monthly_work_hrs_pp = 52.0*40.0*0.8*0.8/12
+        desktops_required = work_hrs / monthly_work_hrs_pp
+        sufficient_desktops = (desktops >= desktops_required)
+
+        if not sufficient_desktops:
+            self.notify_insufficient_input(
+                'desktops provided',
+                desktops,
+                desktops_required
+            )
+
+        if not sufficient_process_staff:
+            self.notify_insufficient_input(
+                'line staff work hours',
+                work_hrs,
+                (applications_submitted / 12.0 /
+                 applications_processed_per_lswork_hr)
+            )
+
+        # Process inputs and outputs
+        if sufficient_desktops and sufficient_process_staff:
+
+            # Consume inputs
+
+            self.consume_input(
+                'line staff work hours',
+                work_hrs
+            )
+
+            self.consume_input(
+                'Staff Expenses',
+                self.get_input_available('Staff Expenses')
+            )
+
+            self.consume_input(
+                'Accommodation Expenses',
+                self.get_input_available('Accommodation Expenses')
+            )
+
+            self.consume_input(
+                'IT Expenses',
+                self.get_input_available('IT Expenses')
+            )
+
+            self.consume_input(
+                "desktops provided",
+                self.get_input_available("desktops provided")
+            )
+
+            # Provide outputs
+            self.provide_output(
+                'Applications Processed',
+                applications_submitted / 12.0
+            )
+
+            self.provide_output(
+                'Service Revenue',
+                revenue
+            )
+
+            self.provide_output(
+                'Operational Surplus',
+                revenue - total_expenses
+            )
+
+        else:
+            self.consume_all_inputs(0)
+            self.write_zero_to_all()
 
 
 #  create entities for record storage service
@@ -1082,7 +1047,7 @@ def createRecordStorage(sim=None):
 
     # add the budget entities/processes
     # staff budget
-    TheStaffBudget = merlin.Entity(sim, "Staff Budget")
+    TheStaffBudget = merlin.Entity(sim, "Budgeted – Staff Expenses")
     sim.add_entity(TheStaffBudget, is_source_entity=True)
     storage_e.add_child(TheStaffBudget)
     TheStaffBudget.attributes.add("budget")
@@ -1090,12 +1055,12 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "staff budget",
-            'start_amount': 4000000,
+            'start_amount': 400000000,
             'budget_type': "staff$"
         })
 
     # rent budget
-    TheRentBudget = merlin.Entity(sim, "Rent Budget")
+    TheRentBudget = merlin.Entity(sim, "Budgeted – Rent Expenses")
     sim.add_entity(TheRentBudget, is_source_entity=True)
     storage_e.add_child(TheRentBudget)
     TheRentBudget.attributes.add("budget")
@@ -1103,12 +1068,12 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 4000000,
+            'start_amount': 400000000,
             'budget_type': "rent$"
         })
 
     # other budget
-    TheOtherBudget = merlin.Entity(sim, "Other Budget")
+    TheOtherBudget = merlin.Entity(sim, "Budgeted – Other Expenses")
     sim.add_entity(TheOtherBudget, is_source_entity=True)
     storage_e.add_child(TheOtherBudget)
     TheOtherBudget.attributes.add("budget")
@@ -1116,7 +1081,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "other budget",
-            'start_amount': 4000000,
+            'start_amount': 400000000,
             'budget_type': "other$"
         })
 
@@ -1128,11 +1093,12 @@ def createRecordStorage(sim=None):
         OutsourcedFileLogisticsProcess,
         {
             'name': "file logistics process",
-            'contracted_volumes': 100,
-            'actual_volumes': 100,
-            'contract_cost': 1000,
+            'contracted_volumes': 1e4,
+            'actual_volumes': 1.1e4,
+            'contract_cost': 100000,
             'overage_cost_per_file': 10,
-            'required_management_fte': 1
+            'required_management_work_hr': 1,
+            'default_contract_length': 6
         })
 
     FileLogistics.attributes.add("external capability")
@@ -1145,7 +1111,7 @@ def createRecordStorage(sim=None):
         {
             'name': "staff accommodation",
             'default_cost_m2': 400,
-            'default_area_m2': 2000,
+            'default_area_m2': 3500,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1161,12 +1127,12 @@ def createRecordStorage(sim=None):
             'default_line_staff_no': 100,
             'default_oh_staff_no': 11,
             'default_hours_per_week': 40.0,
-            'default_weeks_per_year': 52,
-            'default_prof_training_percent': 20,
+            'default_admin_training_percent': 20,
             'default_leave_percent': 20,
             'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
-            'default_hours_training': 100
+            'default_hours_training': 100,
+            'default_span_of_control': 10
         })
 
     LineStaffRes.attributes.add("resource")
@@ -1178,62 +1144,55 @@ def createRecordStorage(sim=None):
         StorageServiceProcess,
         {
             'name': "storage facility process",
-            'default_lifecycle': 20,
             'default_storage_fee': 1,
-            'default_ohfte_lsfte_ratio': 0.05,
-            'default_files_handled_per_lsfte': 10000
+            'default_files_handled_per_lswork_hr': 20,
+            "default_annual_storage_rent": 1.0e4
         })
 
     StorageFacility.attributes.add("asset")
 
-    opSurplus = merlin.Output("operational_surplus",
-                              name="operational surplus")
+    opSurplus = merlin.Output("opsurplus$",
+                              name="Operational Surplus")
     sim.add_output(opSurplus)
     sim.connect_output(StorageFacility, opSurplus)
 
     # todo: need an expectation
-    filesStored = merlin.Output("files_stored",
-                                name="files stored")
+    filesStored = merlin.Output("file#",
+                                name="Additional Files Stored")
     sim.add_output(filesStored)
     sim.connect_output(StorageFacility, filesStored)
 
     # need an expectation
-    serviceRevenue = merlin.Output("service_revenue",
-                                   name="service revenue")
+    serviceRevenue = merlin.Output("revenue$",
+                                   name="Service Revenue")
     sim.add_output(serviceRevenue)
     sim.connect_output(StorageFacility, serviceRevenue)
 
     # need an expectation
-    budgetarySurplus = merlin.Output("budgetary_surplus",
-                                     name="budgetary surplus")
+    budgetarySurplus = merlin.Output("surplus$",
+                                     name="Budgetary Surplus")
     sim.add_output(budgetarySurplus)
-    sim.connect_output(StorageFacility, budgetarySurplus)
+    sim.connect_output(StorageFacility, budgetarySurplus)  # for other
+    sim.connect_output(LineStaffRes, budgetarySurplus)  # for staff
+    sim.connect_output(StaffAccommodation, budgetarySurplus)  # for rent
 
-    # now connect all inputs of the services
-    sim.connect_entities(TheStaffBudget, StorageFacility, "staff$")
-    sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
-
-    sim.connect_entities(TheRentBudget, StorageFacility, "rent$")
     sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
-    sim.connect_entities(TheOtherBudget, FileLogistics, "other$")
-    sim.connect_entities(TheOtherBudget, StorageFacility, "other$")
-
+    sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
     sim.connect_entities(StaffAccommodation,
                          LineStaffRes,
-                         "accommodatedStaff#")
-    sim.connect_entities(StaffAccommodation,
-                         StorageFacility,
-                         "used_rent_expenses")
+                         "workspace#")
 
-    sim.connect_entities(LineStaffRes, StorageFacility, "OH_FTE")
-    sim.connect_entities(LineStaffRes, FileLogistics, "OH_FTE")
-    sim.connect_entities(LineStaffRes, StorageFacility, "LS_FTE")
-    sim.connect_entities(LineStaffRes, StorageFacility, "used_staff_expenses")
+    sim.connect_entities(LineStaffRes, FileLogistics, "OH_work_hr")
+    sim.connect_entities(TheOtherBudget, FileLogistics, "other$")
 
-    sim.connect_entities(FileLogistics, StorageFacility, "FL_OH_FTE")
-    sim.connect_entities(FileLogistics, StorageFacility, "files")
-    sim.connect_entities(FileLogistics, StorageFacility, "FL_other_exp")
+    sim.connect_entities(FileLogistics, StorageFacility, "other$")
+    sim.connect_entities(FileLogistics, StorageFacility, "file#")
+    sim.connect_entities(LineStaffRes, StorageFacility, "LS_work_hr")
+    sim.connect_entities(StaffAccommodation, StorageFacility,
+                         "accommodationExpense$")
+    sim.connect_entities(LineStaffRes, StorageFacility, "staffExpense$")
+    sim.connect_entities(FileLogistics, StorageFacility, "logisticExpense$")
 
     return sim
 
@@ -1263,7 +1222,7 @@ def createRegistrationService(sim=None):
 
     # add the budget entities/processes
     # staff budget
-    TheStaffBudget = merlin.Entity(sim, "Staff Budget")
+    TheStaffBudget = merlin.Entity(sim, "Budgeted – Staff Expenses")
     sim.add_entity(TheStaffBudget, is_source_entity=True)
     registration_e.add_child(TheStaffBudget)
     TheStaffBudget.attributes.add("budget")
@@ -1271,12 +1230,12 @@ def createRegistrationService(sim=None):
         processes.BudgetProcess,
         {
             'name': "staff budget",
-            'start_amount': 4000000,
+            'start_amount': 80000000,
             'budget_type': "staff$"
         })
 
     # rent budget
-    TheRentBudget = merlin.Entity(sim, "Rent Budget")
+    TheRentBudget = merlin.Entity(sim, "Budgeted – Rent Expenses")
     sim.add_entity(TheRentBudget, is_source_entity=True)
     registration_e.add_child(TheRentBudget)
     TheRentBudget.attributes.add("budget")
@@ -1284,12 +1243,12 @@ def createRegistrationService(sim=None):
         processes.BudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 4000000,
+            'start_amount': 20000000,
             'budget_type': "rent$"
         })
 
     # other budget, provides for IT as well
-    TheOtherBudget = merlin.Entity(sim, "Other Budget")
+    TheOtherBudget = merlin.Entity(sim, "Budgeted – Other Expenses")
     sim.add_entity(TheOtherBudget, is_source_entity=True)
     registration_e.add_child(TheOtherBudget)
     TheOtherBudget.attributes.add("budget")
@@ -1297,7 +1256,7 @@ def createRegistrationService(sim=None):
         processes.BudgetProcess,
         {
             'name': "other budget",
-            'start_amount': 4000000,
+            'start_amount': 8000000,
             'budget_type': "other$"
         })
 
@@ -1311,8 +1270,8 @@ def createRegistrationService(sim=None):
         StaffAccommodationProcess,
         {
             'name': "staff accommodation",
-            'default_cost_m2': 10,
-            'default_area_m2': 2000,
+            'default_cost_m2': 400,
+            'default_area_m2': 3500,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1328,29 +1287,30 @@ def createRegistrationService(sim=None):
             'default_line_staff_no': 100,
             'default_oh_staff_no': 10,
             'default_hours_per_week': 40.0,
-            'default_weeks_per_year': 52,
-            'default_prof_training_percent': 20,
-            'default_leave_percent': 10,
-            'default_avg_oh_salary': 70e3,
+            'default_admin_training_percent': 20,
+            'default_leave_percent': 20,
+            'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
-            'default_hours_training': 100
+            'default_hours_training': 100,
+            'default_span_of_control': 10
         })
 
     LineStaffRes.attributes.add("resource")
 
-    InhouseDesktops = merlin.Entity(sim, "Inhouse Desktop Service")
+    InhouseDesktops = merlin.Entity(sim, "In-house Desktop Service")
     sim.add_entity(InhouseDesktops)
     registration_e.add_child(InhouseDesktops)
     InhouseDesktops.create_process(
         InternalICTDesktopService,
         {
             # todo: set to reasonable values!
-            'actual_desktops': 0,
-            'desktops_per_staff': 0,
-            'actual_it_staff': 0,
-            'it_staff_per_desktop': 0,
-            'value_per_desktop': 0,
-            'cost_per_desktop': 0
+            'actual_desktops': 100,
+            'it_hrs_per_desktop': 40.0,
+            'acq_cost_per_desktop': 4000.0,
+            'maint_cost_per_desktop': 400.0,
+            'depr_period': 4,
+            'financial_charge_percent': 8,
+            'life_time': 6
          })
     InhouseDesktops.attributes.add("resource")
 
@@ -1361,73 +1321,69 @@ def createRegistrationService(sim=None):
         RegistrationServiceProcess,
         {
             'name': "registration facility process",
-            'default_lifecycle': 20,
-            'default_registration_fee': 1,
-            'default_ohfte_lsfte_ratio': 0.1,
-            'default_applications_processed_per_lsfte': 10000
+            'default_registration_fee': 50.0,
+            'default_applications_processed_per_lswork_hr': 10,
+            "default_applications_submitted": 1000000,
         })
 
     RegistrationFacility.attributes.add("asset")
 
-    opSurplus = merlin.Output("operational_surplus",
-                              name="operational surplus")
+    opSurplus = merlin.Output("opsurplus$",
+                              name="Operational Surplus")
     sim.add_output(opSurplus)
     sim.connect_output(RegistrationFacility, opSurplus)
 
-    # todo: need an expectation
-    applProcessed = merlin.Output("applications_processed",
-                                  name="applications processed")
+    # need an expectation
+    applProcessed = merlin.Output("appl#",
+                                  name="Applications Processed")
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
     # need an expectation
-    serviceRevenue = merlin.Output("service_revenue",
-                                   name="service revenue")
+    serviceRevenue = merlin.Output("revenue$",
+                                   name="Service Revenue")
     sim.add_output(serviceRevenue)
     sim.connect_output(RegistrationFacility, serviceRevenue)
 
     # need an expectation
-    budgetarySurplus = merlin.Output("budgetary_surplus",
-                                     name="budgetary surplus")
+    budgetarySurplus = merlin.Output("surplus$",
+                                     name="Budgetary Surplus")
     sim.add_output(budgetarySurplus)
-    sim.connect_output(RegistrationFacility, budgetarySurplus)
+    # sim.connect_output(RegistrationFacility, budgetarySurplus)
+    sim.connect_output(StaffAccommodation, budgetarySurplus)
+    sim.connect_output(LineStaffRes, budgetarySurplus)
+    sim.connect_output(InhouseDesktops, budgetarySurplus)
 
-    # now connect all inputs of the services
+    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
+
     sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
-    sim.connect_entities(StaffAccommodation, LineStaffRes,
-                         "accommodatedStaff#")
+    sim.connect_entities(StaffAccommodation,
+                         LineStaffRes,
+                         "workspace#")
 
     # all inputs from Inhouse Desktop Service
-    sim.connect_entities(StaffAccommodation, InhouseDesktops,
-                         "accommodatedStaff#")
-    sim.connect_entities(LineStaffRes, InhouseDesktops, "OH_FTE")
+    sim.connect_entities(LineStaffRes, InhouseDesktops, "LS_work_hr")
     sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
 
     # all inputs from RegistrationFacility
-    sim.connect_entities(TheStaffBudget, RegistrationFacility, "staff$")
-    sim.connect_entities(TheRentBudget, RegistrationFacility, "rent$")
-    sim.connect_entities(TheOtherBudget, RegistrationFacility, "other$")
-    sim.connect_entities(LineStaffRes, RegistrationFacility, "LS_FTE")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "desktops")
-    sim.connect_entities(LineStaffRes, RegistrationFacility, "OH_FTE")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility, "IDS_OH_FTE")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "IDS_other_exp")
-    sim.connect_entities(StaffAccommodation, RegistrationFacility,
-                         "used_rent_expenses")
-    sim.connect_entities(LineStaffRes, RegistrationFacility,
-                         "used_staff_expenses")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "it_depreciation_expenses$")
 
-    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "LS_work_hr")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "desktop#")
+    sim.connect_entities(StaffAccommodation, RegistrationFacility,
+                         "accommodationExpense$")
+    sim.connect_entities(LineStaffRes, RegistrationFacility,
+                         "staffExpense$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "ITexpense$")
 
     return sim
 
 if __name__ == "__main__":
 
-    sim = createRecordStorage()
+    # sim = createRecordStorage()
+    sim = createRegistrationService()
 
     sim.set_time_span(48)
     sim.run()

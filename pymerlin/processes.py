@@ -28,12 +28,11 @@ class ConstantProvider(merlin.Process):
 class BudgetProcess(merlin.Process):
     """
     Split the budget amount into even parts over a year and provide this
-    amount, keep track of the amount spent.
+    amount.
 
     Assumes, a tick being 1 month, so the annual budget is divided by 12.
 
-    Every 12 month this amount is renewed, the "old" amount is discarded.
-    (This could be changed, introducing another option.)
+    An updated budget value is in effect immediately.
     """
 
     def __init__(self, name='Budget', start_amount=10000.00, budget_type="$"):
