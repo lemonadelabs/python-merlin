@@ -153,20 +153,6 @@ class TestIntegration:
         for i in range(0, len(result)):
             npt.assert_almost_equal(result[i], expected_result[i])
 
-    def test_input_requirement_exception(self, computation_test_harness):
-        sim = computation_test_harness
-        ccs = sim.get_process_by_name('Call Center Staff')
-        salary_prop = ccs.get_prop('staff salary')
-        salary_prop.set_value(6.00)
-        sim.run()
-        errors = sim.get_last_run_errors()
-        first = errors[0]
-        assert len(errors) == 10
-        assert first.process == ccs
-        assert first.process_input == ccs.inputs['$']
-        assert first.input_value == 500.0
-        assert first.value == 600.0
-
 
 class TestSimulation:
 
@@ -222,13 +208,11 @@ class TestSimulation:
         f_budget = sim.find_sim_object(budget.name, 'Entity')
         f_output = sim.find_sim_object(output.name, 'Output')
         f_output_con = sim.find_sim_object(output_con.name, 'OutputConnector')
-        f_input_con = sim.find_sim_object(input_con.name, 'InputConnector')
         f_con = sim.find_sim_object(output_con.name, 'Connector')
         f_process = sim.find_sim_object(call_center_process.name, 'Process')
         f_pp = sim.find_sim_object(staff_process_prop.name, 'ProcessProperty')
         assert f_budget == budget
         assert f_con == output_con
-        assert f_input_con == input_con
         assert f_output_con == output_con
         assert f_pp == staff_process_prop
         assert f_process == call_center_process
@@ -803,23 +787,5 @@ class TestCoreActions:
         a2.execute(sim)
         npt.assert_almost_equal(eps[0].bias, 0.7)
         npt.assert_almost_equal(eps[1].bias, 0.3)
-
-
-class TestMessages:
-
-    def test_message(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        ccs = sim.get_process_by_name('Call Center Staff')
-        salary_prop = ccs.get_prop('staff salary')
-        salary_prop.set_value(6.00)
-        sim.run()
-        messages = sim.get_run_messages()
-        msg = messages[0]
-        assert msg
-        assert msg['time'] == 1
-        assert msg['message_id'] == 'call_center_required_salary'
-        assert len(msg['context']) == 1
-        assert msg['context'][0]['id']
-        assert msg['context'][0]['type'] == 'ProcessInput'
 
 

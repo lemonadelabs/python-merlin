@@ -91,11 +91,11 @@ class Simulation(SimObject):
             self,
             so_id:
             Union[str, int],
-            so_type: str) -> SimObject:
+            so_type: str):
         """
-        Attempts a global find in the sim for a sim object.
-        Will attempt to find by id and, if unsuccessful will
-        use the name parameter instead.
+        Depending on the type of so_id, will attempt a name or an id
+        find. If so_id is an int, an id lookup is performed. If so_id
+        is a str then the name search is performed.
 
         :param so_id: the int id or str name of the object to find
         :param so_type: the type of the object to find
@@ -158,8 +158,10 @@ class Simulation(SimObject):
         if search_dict:
             # Combined connector search
             if so_type == 'Connector':
-                result = search_dict.get('InputConnector', lambda s: [])(so_id) + \
-                         search_dict.get('OutputConnector', lambda s: [])(so_id)
+                result = search_dict.get(
+                    'InputConnector', lambda s: [])(so_id) + \
+                         search_dict.get(
+                             'OutputConnector', lambda s: [])(so_id)
             else:
                 result = search_dict.get(so_type, lambda s: [])(so_id)
 
@@ -1563,6 +1565,13 @@ class Action(SimObject):
     a specific Action.
     """
 
+    def convert_to_id(self, prop: str):
+        try:
+            prop_id = int(prop)
+            return prop_id
+        except ValueError:
+            return None
+
     @classmethod
     def create_from_dict(cls, actions: List[Dict[str, Any]]) -> 'List[Action]':
         output = list()
@@ -2173,17 +2182,13 @@ class RemoveEntityAction(Action):
 
     def __init__(self, entity_id):
         super(RemoveEntityAction, self).__init__()
-        self.entity_id = int(entity_id)
+        self.entity_id = self.convert_to_id(entity_id) or entity_id
+
 
     def execute(self, simulation):
-        entity_to_remove = simulation.get_entity_by_id(self.entity_id)
+        entity_to_remove = simulation.find_sim_object(self.entity_id, 'Entity')
         if entity_to_remove:
             self._remove_entity(entity_to_remove)
-        else:
-            # try name lookup
-            entity_to_remove = simulation.get_entity_by_name(self.entity_id)
-            if entity_to_remove:
-                self._remove_entity(entity_to_remove)
 
     def _remove_entity(self, ent):
         # remove output connections
@@ -2265,13 +2270,16 @@ class RemoveConnectionAction(Action):
             unit_type):
 
         super(RemoveConnectionAction, self).__init__()
-        self.from_entity_id = int(from_entity_id)
-        self.to_entity_id = int(to_entity_id)
-        self.unit_type = unit_type
+
+        self.from_entity_id = self.convert_to_id(from_entity_id) or from_entity_id
+        self.to_entity_id = self.convert_to_id(to_entity_id) or to_entity_id
+        self.unit_type = self.convert_to_id(unit_type) or unit_type
 
     def execute(self, simulation: Simulation):
-        from_entity = simulation.get_entity_by_id(self.from_entity_id)
-        to_entity = simulation.get_entity_by_id(self.to_entity_id)
+
+        from_entity = simulation.find_sim_object(self.from_entity_id, 'Entity')
+        to_entity = simulation.find_sim_object(self.to_entity_id, 'Entity')
+
         if from_entity and to_entity:
             simulation.disconnect_entities(
                 from_entity,
@@ -2312,15 +2320,17 @@ class AddConnectionAction(Action):
         super(AddConnectionAction, self).__init__()
 
         self.unit_type = unit_type
-        self.output_entity_id = int(output_entity_id)
-        self.input_entity_id = int(input_entity_id)
+        self.output_entity_id = self.convert_to_id(output_entity_id) or output_entity_id
+        self.input_entity_id = self.convert_to_id(input_entity_id) or input_entity_id
         self.apportioning = \
             OutputConnector.ApportioningRules(int(apportioning))
         self.additive_write = bool(additive_write)
 
     def execute(self, simulation: Simulation):
-        from_entity = simulation.get_entity_by_id(self.output_entity_id)
-        to_entity = simulation.get_entity_by_id(self.input_entity_id)
+        from_entity = simulation.find_sim_object(
+            self.output_entity_id, 'Entity')
+        to_entity = simulation.find_sim_object(
+            self.input_entity_id, 'Entity')
         simulation.connect_entities(
             from_entity,
             to_entity,
@@ -2358,12 +2368,13 @@ class RemoveProcessAction(Action):
 
     def __init__(self, entity_id, process_id):
         super(RemoveProcessAction, self).__init__()
-        self.process_id = process_id
-        self.entity_id = entity_id
+        self.process_id = self.convert_to_id(process_id) or process_id
+        self.entity_id = self.convert_to_id(entity_id) or entity_id
 
     def execute(self, simulation: Simulation):
-        e = simulation.get_entity_by_id(self.entity_id)
-        e.remove_process(self.process_id)
+        e = simulation.find_sim_object(self.entity_id, 'Entity')
+        p = simulation.find_sim_object(self.process_id, 'Process')
+        e.remove_process(p.id)
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -2396,7 +2407,7 @@ class AddProcessAction(Action):
             process_params=None):
 
         super(AddProcessAction, self).__init__()
-        self.entity_id = int(entity_id)
+        self.entity_id = self.convert_to_id(entity_id) or entity_id
         self.process_class = \
             self.get_process_class_from_fullname(process_class)
         self.process_params = process_params
@@ -2441,7 +2452,7 @@ class AddProcessAction(Action):
         return "{0}.{1}".format(proc_module, proc_classname)
 
     def execute(self, simulation):
-        entity = simulation.get_entity_by_id(self.entity_id)
+        entity = simulation.find_sim_object(self.entity_id, 'Entity')
         if entity:
             entity.create_process(
                 self.process_class,
@@ -2481,16 +2492,18 @@ class ModifyProcessPropertyAction(Action):
             value,
             additive=False):
         super(ModifyProcessPropertyAction, self).__init__()
-        self.entity_id = int(entity_id)
-        self.property_id = int(property_id)
+        self.entity_id = self.convert_to_id(entity_id) or entity_id
+        self.property_id = self.convert_to_id(property_id) or property_id
         self.value = float(value)
         self.additive = additive
 
     def execute(self, simulation: Simulation):
-        e = simulation.get_entity_by_id(self.entity_id)
+        e = simulation.find_sim_object(self.entity_id, 'Entity')
+        found_prop = simulation.find_sim_object(
+            self.property_id, 'ProcessProperty')
         for p in e.get_processes():
             for prop in p.get_properties():
-                if prop.id == self.property_id:
+                if prop.id == found_prop.id:
                     if self.additive:
                         prop.set_value(prop.get_value() + self.value)
                     else:
@@ -2524,8 +2537,8 @@ class ParentEntityAction(Action):
             parent_entity_id
             ):
         super(ParentEntityAction, self).__init__()
-        self.parent_entity_id = int(parent_entity_id)
-        self.child_entity_id = int(child_entity_id)
+        self.parent_entity_id = self.convert_to_id(parent_entity_id) or parent_entity_id
+        self.child_entity_id = self.convert_to_id(child_entity_id) or child_entity_id
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -2545,8 +2558,10 @@ class ParentEntityAction(Action):
         }
 
     def execute(self, simulation: Simulation):
-        parent_entity = simulation.get_entity_by_id(self.parent_entity_id)
-        child_entity = simulation.get_entity_by_id(self.child_entity_id)
+        parent_entity = simulation.find_sim_object(
+            self.parent_entity_id, 'Entity')
+        child_entity = simulation.find_sim_object(
+            self.child_entity_id, 'Entity')
         if parent_entity and child_entity:
             simulation.parent_entity(parent_entity, child_entity)
 
@@ -2560,8 +2575,8 @@ class ModifyOutputMinimumAction(Action):
             additive=False
             ):
         super(ModifyOutputMinimumAction, self).__init__()
-        self.output_id = int(output_id)
-        self.minimum = minimum
+        self.output_id = self.convert_to_id(output_id) or output_id
+        self.minimum = float(minimum)
         self.additive = additive
 
     def serialize(self) -> Dict[str, Any]:
@@ -2579,21 +2594,20 @@ class ModifyOutputMinimumAction(Action):
         }
 
     def execute(self, simulation: Simulation):
-        for o in simulation.outputs:
-            if o.id == self.output_id:
-                if self.additive:
-                    o.minimum += self.minimum
-                else:
-                    o.minimum = self.minimum
-                break
+        output = simulation.find_sim_object(self.output_id, 'Output')
+        if output:
+            if self.additive:
+                output.minimum += self.minimum
+            else:
+                output.minimum = self.minimum
 
 
 class ModifyEndpointBiasAction(Action):
 
     def __init__(self, entity_id, endpoint_id, bias=0.0, additive=False):
         super(ModifyEndpointBiasAction, self).__init__()
-        self.entity_id = int(entity_id)
-        self.endpoint_id = int(endpoint_id)
+        self.entity_id = self.convert_to_id(entity_id) or entity_id
+        self.endpoint_id = self.convert_to_id(endpoint_id) or endpoint_id
         self.bias = bias
         self.additive = additive
 
@@ -2616,10 +2630,11 @@ class ModifyEndpointBiasAction(Action):
         }
 
     def execute(self, simulation: Simulation):
-        e = simulation.get_entity_by_id(self.entity_id)
+        e = simulation.find_sim_object(self.entity_id, 'Entity')
+        found_ep = simulation.find_sim_object(self.endpoint_id, 'Endpoint')
         for o in e.outputs:
             for ep in o.get_endpoint_objects():
-                if ep.id == self.endpoint_id:
+                if ep.id == found_ep.id:
                     if self.additive:
                         ep.bias += self.bias
                     else:
