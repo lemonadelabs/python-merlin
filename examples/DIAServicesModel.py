@@ -272,7 +272,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         # Constraints
         contract_managed = (
             self.get_input_available('overhead staff work hrs') >=
-            self.get_prop_value('file_logistics_OHSwork_hr'))
+            self.get_prop_value('file_logistics_OHSwork_hr') / 12.0)
 
         contract_funded = (
             self.get_input_available('Monthly Contract Budget') >=
@@ -578,7 +578,11 @@ class StaffProcess(merlin.Process):
         if sufficient_funding and sufficient_accommodation:
             self.consume_input("Staff Budget", staff_expenses)
             self.consume_input("Workplaces Available", staff_accommodated)
-            self.provide_output("Overhead work hrs", overhead_staff_work_hr)
+            self.provide_output("Overhead work hrs",
+                                # this is the remaining oh staff capacity
+                                max(0.0, (overhead_staff_work_hr -
+                                          line_staff_work_hr /
+                                          span_of_control)))
             self.provide_output("Line staff work hrs", line_staff_work_hr)
             self.provide_output("Staff Expenses", used_staff_expenses)
             self.provide_output("Budgetary Surplus",
@@ -903,7 +907,6 @@ class RegistrationServiceProcess(merlin.Process):
         self.add_output("Operational Surplus", 'opsurplus$')
 
         # Define Properties
-
         self.add_property(
             "Registration Fee / $",
             'registration_fee',
@@ -1329,7 +1332,7 @@ def createRegistrationService(sim=None):
     sim.add_output(opSurplus)
     sim.connect_output(RegistrationFacility, opSurplus)
 
-    # todo: need an expectation
+    # need an expectation
     applProcessed = merlin.Output("appl#",
                                   name="Applications Processed")
     sim.add_output(applProcessed)
