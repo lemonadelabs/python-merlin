@@ -170,6 +170,70 @@ class TestIntegration:
 
 class TestSimulation:
 
+    def test_search_by_id(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        budget = sim.get_entity_by_name('Budget')
+        assert budget is not None
+        call_center = sim.get_entity_by_name('call center')
+        assert call_center is not None
+        output = list(sim.outputs)[0]
+        assert output is not None
+        output_con = budget.get_output_by_type('$')
+        assert output_con is not None
+        input_con = call_center.get_input_by_type('$')
+        assert  input_con is not None
+        call_center_process = call_center.get_process_by_name('Call Center Staff')
+        assert call_center_process is not None
+        staff_process_prop = call_center_process.get_prop('staff number')
+        assert staff_process_prop is not None
+        f_budget = sim.find_sim_object(budget.id, 'Entity')
+        f_output = sim.find_sim_object(output.id, 'Output')
+        f_output_con = sim.find_sim_object(output_con.id, 'OutputConnector')
+        f_input_con = sim.find_sim_object(input_con.id, 'InputConnector')
+        f_con = sim.find_sim_object(output_con.id, 'Connector')
+        f_process = sim.find_sim_object(call_center_process.id, 'Process')
+        f_pp = sim.find_sim_object(staff_process_prop.id, 'ProcessProperty')
+        assert f_budget == budget
+        assert f_con == output_con
+        assert f_input_con == input_con
+        assert f_output_con == output_con
+        assert f_pp == staff_process_prop
+        assert f_process == call_center_process
+        assert f_output == output
+
+
+    def test_search_by_name(self, computation_test_harness):
+        sim = computation_test_harness  # type: merlin.Simulation
+        budget = sim.get_entity_by_name('Budget')
+        assert budget is not None
+        call_center = sim.get_entity_by_name('call center')
+        assert call_center is not None
+        output = list(sim.outputs)[0]
+        assert output is not None
+        output_con = budget.get_output_by_type('$')
+        assert output_con is not None
+        input_con = call_center.get_input_by_type('$')
+        assert input_con is not None
+        call_center_process = call_center.get_process_by_name(
+            'Call Center Staff')
+        assert call_center_process is not None
+        staff_process_prop = call_center_process.get_prop('staff number')
+        assert staff_process_prop is not None
+        f_budget = sim.find_sim_object(budget.name, 'Entity')
+        f_output = sim.find_sim_object(output.name, 'Output')
+        f_output_con = sim.find_sim_object(output_con.name, 'OutputConnector')
+        f_input_con = sim.find_sim_object(input_con.name, 'InputConnector')
+        f_con = sim.find_sim_object(output_con.name, 'Connector')
+        f_process = sim.find_sim_object(call_center_process.name, 'Process')
+        f_pp = sim.find_sim_object(staff_process_prop.name, 'ProcessProperty')
+        assert f_budget == budget
+        assert f_con == output_con
+        assert f_input_con == input_con
+        assert f_output_con == output_con
+        assert f_pp == staff_process_prop
+        assert f_process == call_center_process
+        assert f_output == output
+
     def test_telemetry_output(self, record_storage_example):
         sim = record_storage_example # type: merlin.Simulation
         sim.run()

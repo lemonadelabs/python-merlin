@@ -6,7 +6,7 @@ the system as well as some bootstrap and helper functions.
 
 .. moduleauthor:: Sam Win-Mason <sam@lemonadelabs.io>
 """
-
+import itertools
 import logging
 import warnings
 import uuid
@@ -86,6 +86,89 @@ class Simulation(SimObject):
             'id': so.id,
             'name': so.name,
             'data': so.get_telemetry_data()}
+
+    def find_sim_object(
+            self,
+            so_id:
+            Union[str, int],
+            so_type: str) -> SimObject:
+        """
+        Attempts a global find in the sim for a sim object.
+        Will attempt to find by id and, if unsuccessful will
+        use the name parameter instead.
+
+        :param so_id: the int id or str name of the object to find
+        :param so_type: the type of the object to find
+        :return: the SimObject or None if it could not be found
+        """
+
+        search_dict = None
+
+        if type(so_id) is int:
+            id_search = {
+                'Entity': lambda s_id: [self.get_entity_by_id(s_id)],
+                'Output': lambda s_id: [
+                    o for o in self.outputs if o.id == s_id],
+                'Process': lambda s_id: [self.get_process_by_id(s_id)],
+                'ProcessProperty': lambda s_id: [
+                    pp for pp in itertools.chain.from_iterable(
+                        [p.get_properties() for p in self.get_processes()])
+                    if pp.id == s_id],
+                'OutputConnector': lambda s_id: [
+                    o for o in itertools.chain.from_iterable(
+                        [e.outputs for e in self._entities])
+                    if o.id == s_id],
+                'InputConnector': lambda s_id: [
+                    i for i in itertools.chain.from_iterable(
+                        [e.inputs for e in self._entities])
+                    if i.id == s_id],
+                'Endpoint': lambda s_id: [
+                    ep for ep in itertools.chain.from_iterable(
+                        [o.get_endpoint_objects() for o in itertools.chain.from_iterable(
+                            [e.outputs for e in self._entities])]) if ep.id == s_id]
+            }
+            search_dict = id_search
+
+        elif type(so_id) is str:
+            name_search = {
+                'Entity': lambda s_name: [self.get_entity_by_name(s_name)],
+                'Output': lambda s_name: [
+                    o for o in self.outputs if o.name == s_name
+                    ],
+                'Process': lambda s_name: [self.get_process_by_name(s_name)],
+                'ProcessProperty': lambda s_name: [
+                    pp for pp in itertools.chain.from_iterable(
+                        [p.get_properties() for p in self.get_processes()])
+                    if pp.name == s_name],
+                'OutputConnector': lambda s_name: [
+                    o for o in itertools.chain.from_iterable(
+                        [e.outputs for e in self._entities])
+                    if o.name == s_name],
+                'InputConnector': lambda s_name: [
+                    i for i in itertools.chain.from_iterable(
+                        [e.inputs for e in self._entities])
+                    if i.name == s_name],
+                'Endpoint': lambda s_name: [
+                    ep for ep in itertools.chain.from_iterable(
+                        [o.get_endpoint_objects() for o in itertools.chain.from_iterable(
+                            [e.outputs for e in self._entities])]) if ep.name == s_name]
+            }
+            search_dict = name_search
+
+        if search_dict:
+            # Combined connector search
+            if so_type == 'Connector':
+                result = search_dict.get('InputConnector', lambda s: [])(so_id) + \
+                         search_dict.get('OutputConnector', lambda s: [])(so_id)
+            else:
+                result = search_dict.get(so_type, lambda s: [])(so_id)
+
+            if len(result) == 0 or result[0] is None:
+                return None
+            else:
+                return result[0]
+        else:
+            return None
 
     def parent_entity(
             self,
@@ -326,6 +409,10 @@ class Simulation(SimObject):
             if e.id == e_id:
                 return e
         return None
+
+    def get_processes(self) -> List['Process']:
+        return itertools.chain.from_iterable(
+            [e.get_processes() for e in self._entities])
 
     def get_process_by_name(self, name):
         for e in self._entities:
