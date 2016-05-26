@@ -597,42 +597,68 @@ class ICTDesktopContract(merlin.Process):
 
     def __init__(
             self,
-            desktops_per_staff=0,
-            cost_per_desktop=0,
-            contract_ohwork_hr=1,
+            actual_desktops=0,
+            cost_per_extra_desktop=0,
+            contract_ohwork_hr=100,
+            min_contract_no=0,
+            base_contract_costs=0,
+            contract_duration=6,
             name="Desktop Contract"):
         super(ICTDesktopContract, self).__init__(name)
 
         # Define Inputs
+        self.add_input("desktops from other providers", "desktop#")
+        self.add_input("IT expenses other providers", "ITexpense$")
         self.add_input('overhead_staff_work_hr', 'OH_work_hr')
-        self.add_input('contract_budget', 'other$')
-        self.add_input('staff_accommodated', 'accommodatedStaff#')
+        self.add_input('contract_budget', 'surplus$')
 
         # Define Outputs
-        self.add_output('desktops_accomodated', 'desktops')
-        self.add_output('desktop_contract_overhead_work_hr', 'DC_OH_work_hr')
-        self.add_output('budget_surplus', 'DC_other_exp')
+        self.add_output('desktops provided', 'desktop#')
+        self.add_output('IT expenses', "ITexpense$")
+        self.add_output('budget_surplus', 'surplus$')
+        self.add_output('remaining OH work hours', 'OH_work_hr')
 
         # Define Properties
         self.add_property(
-            'Desktops / Staff',
-            'desktops_per_staff',
+            'actual desktops',
+            'actual_desktops',
             merlin.ProcessProperty.PropertyType.number_type,
-            desktops_per_staff
+            actual_desktops
         )
 
         self.add_property(
-            'Cost / Desktop',
-            'cost_per_desktop',
+            'Cost / extra Desktop',
+            'cost_per_extra_desktop',
             merlin.ProcessProperty.PropertyType.number_type,
-            cost_per_desktop
+            cost_per_extra_desktop
         )
 
         self.add_property(
-            'Desktop Contract Overhead Staff',
-            'desktop_contract_ohswork_hr',
+            'Contract Management OH hours',
+            'desktop_contract_oh_work_hr',
             merlin.ProcessProperty.PropertyType.number_type,
             contract_ohwork_hr
+        )
+
+        self.add_property(
+            "min desktops contracted",
+            "min_desktop_contracted",
+            merlin.ProcessProperty.PropertyType.number_type,
+            min_contract_no
+        )
+
+        self.add_property(
+            "annual base contract costs",
+            "base_contract_costs",
+            merlin.ProcessProperty.PropertyType.number_type,
+            base_contract_costs
+        )
+
+        self.add_property(
+            "contract duration/yrs",
+            "contract_duration",
+            merlin.ProcessProperty.PropertyType.number_type,
+            contract_duration
         )
 
     def reset(self):
@@ -640,23 +666,30 @@ class ICTDesktopContract(merlin.Process):
 
     def compute(self, tick):
 
-        # Calculations
-        budget_consumed = (
-            self.get_prop_value('desktops_per_staff') *
-            self.get_prop_value('cost_per_desktop') *
-            self.get_input_available('staff_accommodated')
-        )
+        # pull in all values available
+        desktops_from_others = self.get_input_available(
+                                        "desktops from other providers")
+        IT_expenses_others = self.get_input_available(
+                                        "IT expenses other providers")
+        oh_work_hrs = self.get_input_available(
+                                        'overhead_staff_work_hr')
+        budget = self.get_input_available('contract_budget')
 
-        # Constraints
-        contract_managed = (
-            self.get_input_available('overhead_staff_work_hr') >=
-            self.get_prop_value('desktop_contract_ohswork_hr')
-        )
+        contract_duration = self.get_prop_value("contract_duration")
+        base_contract_costs = self.get_prop_value("base_contract_costs")
+        min_contract_no = self.get_prop_value("min_desktop_contracted")
+        contract_ohwork_hr = self.get_prop_value("desktop_contract_oh_work_hr")
+        cost_per_extra_desktop = self.get_prop_value("cost_per_extra_desktop")
+        actual_desktops = self.get_prop_value("actual_desktops")
 
-        contract_funded = (
-            self.get_input_available('contract_budget') >=
-            budget_consumed
-        )
+        # calculations
+        expenses = (base_contract_costs +
+                    max(0, actual_desktops-min_contract_no) *
+                    cost_per_extra_desktop) / 12.0
+
+        # constraints
+        contract_managed = (oh_work_hrs >= contract_ohwork_hr / 12.0)
+        sufficient_funding = (budget >= expenses)
 
         # Constraint notifications
         if not contract_managed:
@@ -666,46 +699,39 @@ class ICTDesktopContract(merlin.Process):
                 self.get_prop_value('desktop_contract_ohswork_hr')
             )
 
-        if not contract_funded:
-            self.notify_insufficient_input(
-                'contract_budget',
-                self.get_input_available('contract_budget'),
-                budget_consumed
-            )
-
         # Process inputs and outputs
-        if contract_managed and contract_funded:
+        if contract_managed and sufficient_funding:
 
             # Consume Inputs
             self.consume_input(
-                'overhead_staff_work_hr',
-                self.get_prop_value('desktop_contract_ohswork_hr')
+                "desktops from other providers",
+                desktops_from_others
             )
 
             self.consume_input(
-                'contract_budget',
-                budget_consumed
+                "IT expenses other providers",
+                IT_expenses_others
+            )
+
+            self.consume_input(
+                   "overhead_staff_work_hr",
+                   oh_work_hrs
+            )
+
+            self.consume_input(
+                "contract_budget",
+                budget
             )
 
             # Provide Outputs
-
-            self.provide_output(
-                'desktops_accomodated',
-                (
-                    self.get_input_available('staff_accommodated') *
-                    self.get_prop_value('desktops_per_staff')
-                )
-            )
-
-            self.provide_output(
-                'internal_desktop_overhead_work_hr',
-                self.get_input_available('overhead_staff_work_hr')
-            )
-
-            self.provide_output(
-                'budget_surplus',
-                self.get_input_available('contract_budget')
-            )
+            self.provide_output('desktops provided',
+                                desktops_from_others+actual_desktops)
+            self.provide_output('IT expenses',
+                                IT_expenses_others+expenses)
+            self.provide_output('budget_surplus',
+                                budget-expenses)
+            self.provide_output('remaining OH work hours',
+                                oh_work_hrs-contract_ohwork_hr)
 
         else:
             self.consume_all_inputs(0)
@@ -1197,7 +1223,7 @@ def createRecordStorage(sim=None):
     return sim
 
 
-def createRegistrationService(sim=None):
+def createRegistrationService(sim=None, with_external_provider=False):
     # right now this is the registration service with inhouse desktops.
     # this function will change to have optionally the external and
     # later both.
@@ -1312,7 +1338,7 @@ def createRegistrationService(sim=None):
             'financial_charge_percent': 8,
             'life_time': 6
          })
-    InhouseDesktops.attributes.add("resource")
+    InhouseDesktops.attributes.add("asset")
 
     RegistrationFacility = merlin.Entity(sim, "Registration Service")
     sim.add_entity(RegistrationFacility)
@@ -1325,7 +1351,6 @@ def createRegistrationService(sim=None):
             'default_applications_processed_per_lswork_hr': 10,
             "default_applications_submitted": 1000000,
         })
-
     RegistrationFacility.attributes.add("asset")
 
     opSurplus = merlin.Output("opsurplus$",
@@ -1352,7 +1377,6 @@ def createRegistrationService(sim=None):
     # sim.connect_output(RegistrationFacility, budgetarySurplus)
     sim.connect_output(StaffAccommodation, budgetarySurplus)
     sim.connect_output(LineStaffRes, budgetarySurplus)
-    sim.connect_output(InhouseDesktops, budgetarySurplus)
 
     sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
@@ -1365,25 +1389,62 @@ def createRegistrationService(sim=None):
     sim.connect_entities(LineStaffRes, InhouseDesktops, "LS_work_hr")
     sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
 
-    # all inputs from RegistrationFacility
+    if with_external_provider:
+        ExternalDesktops = merlin.Entity(sim, "External Desktop Service")
+        sim.add_entity(ExternalDesktops)
+        registration_e.add_child(ExternalDesktops)
+        ExternalDesktops.create_process(
+            ICTDesktopContract,
+            {
+                # todo: set to reasonable values!
+                "actual_desktops": 0,
+                "cost_per_extra_desktop": 0,
+                "contract_ohwork_hr": 100,
+                "min_contract_no": 0,
+                "base_contract_costs": 0,
+                "contract_duration": 6,
+             })
+        ExternalDesktops.attributes.add("external capability")
 
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "LS_work_hr")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "desktop#")
+        sim.connect_entities(InhouseDesktops, ExternalDesktops, "desktop#")
+        sim.connect_entities(LineStaffRes, ExternalDesktops, "OH_work_hr")
+        sim.connect_entities(InhouseDesktops, ExternalDesktops, "surplus$")
+        sim.connect_entities(InhouseDesktops, ExternalDesktops, "ITexpense$")
+
+        # the output "remaining OH work hours" is left open.
+
+        sim.connect_output(ExternalDesktops, budgetarySurplus)
+        # inputs for RegistrationFacility
+        sim.connect_entities(ExternalDesktops, RegistrationFacility,
+                             "desktop#")
+        sim.connect_entities(ExternalDesktops, RegistrationFacility,
+                             "ITexpense$")
+    else:
+        # No external desktop provider
+        sim.connect_output(InhouseDesktops, budgetarySurplus)
+        # inputs for RegistrationFacility
+        sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                             "desktop#")
+        sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                             "ITexpense$")
+
     sim.connect_entities(StaffAccommodation, RegistrationFacility,
                          "accommodationExpense$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "LS_work_hr")
     sim.connect_entities(LineStaffRes, RegistrationFacility,
                          "staffExpense$")
-    sim.connect_entities(InhouseDesktops, RegistrationFacility,
-                         "ITexpense$")
 
     return sim
+
+
+def createRegistrationServiceWExternalDesktops(sim=None):
+    return createRegistrationService(sim, with_external_provider=True)
 
 if __name__ == "__main__":
 
     # sim = createRecordStorage()
-    sim = createRegistrationService()
+    sim = createRegistrationService(with_external_provider=True)
 
     sim.set_time_span(48)
     sim.run()
