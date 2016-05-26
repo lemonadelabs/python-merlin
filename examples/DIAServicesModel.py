@@ -1399,7 +1399,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
                 # todo: set to reasonable values!
                 "actual_desktops": 0,
                 "cost_per_extra_desktop": 0,
-                "contract_ohwork_hr": 100,
+                "contract_ohwork_hr": 0,
                 "min_contract_no": 0,
                 "base_contract_costs": 0,
                 "contract_duration": 6,
