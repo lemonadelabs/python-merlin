@@ -837,6 +837,7 @@ class InternalICTDesktopService(merlin.Process):
     def create_desktop_simulation(self):
 
         # Create starting cohorts
+        # TODO: refactor this!
         num_starting_cohorts = self.starting_cohort_range * self.cohorts_per_year
         for i in range(0, (self.starting_cohort_range * 12)):
             cohort = dict()
