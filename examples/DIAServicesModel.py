@@ -827,6 +827,13 @@ class InternalICTDesktopService(merlin.Process):
         # data structure to hold cohorts for depreciating
         self.cohorts = list()
 
+        # random seed value for testing predictability leave None for
+        # default random.seed() gen
+        self.random_seed = 123456
+
+        # A flag used to generate an initial scenario
+        self._generated = False
+
     def create_desktop_simulation(self):
 
         # Create starting cohorts
@@ -853,6 +860,9 @@ class InternalICTDesktopService(merlin.Process):
                     i = 0
 
     def reset(self):
+        self._generated = False
+        if self.random_seed:
+            random.seed(self.random_seed)
         self.cohorts.clear()
 
     def compute(self, tick):
@@ -871,11 +881,11 @@ class InternalICTDesktopService(merlin.Process):
         financial_charge_percent = self.get_prop_value("fin_charge_percent")
         life_time = self.get_prop_value("life_time")
 
-        if tick == 1:
+        if not self._generated:
+            self._generated = True
             self.create_desktop_simulation()
 
-        # Do the depreciation steps
-
+        # Do the disposal steps
         legacy_desktops = sum([c['desktops'] for c in self.cohorts])
 
         # Dispose of end-of-life desktop cohort
