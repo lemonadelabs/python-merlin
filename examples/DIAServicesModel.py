@@ -1185,6 +1185,7 @@ def createRecordStorage(sim=None):
     # todo: need an expectation
     filesStored = merlin.Output("file#",
                                 name="Additional Files Stored")
+    filesStored.minimum = 12e4/12
     sim.add_output(filesStored)
     sim.connect_output(StorageFacility, filesStored)
 
@@ -1364,6 +1365,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
     # need an expectation
     applProcessed = merlin.Output("appl#",
                                   name="Applications Processed")
+    applProcessed.minimum = 360e3/12
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
