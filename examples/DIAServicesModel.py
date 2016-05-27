@@ -12,6 +12,7 @@ from pymerlin import merlin
 from pymerlin import processes
 import logging
 import math
+import random
 
 # Global logging settings
 logging_level = logging.INFO
@@ -812,14 +813,54 @@ class InternalICTDesktopService(merlin.Process):
             financial_charge_percent
         )
 
+        # Currently non-exposed desktop depeciation/disposal settings
+        # Starting desktop cohort assigning method
+        self.random_cohort_spread = True
+
+        # Starting desktop lifespan range in years, must be <= life_time
+        self.starting_cohort_range = 6.0
+
+        # The number of times starting desktops were purchased per year
+        # must perfectly divide by 12
+        self.cohorts_per_year = 3.0
+
+        # data structure to hold cohorts for depreciating
+        self.cohorts = list()
+
+    def create_desktop_simulation(self):
+
+        # Create starting cohorts
+        num_starting_cohorts = self.starting_cohort_range * self.cohorts_per_year
+        for i in range(1, num_starting_cohorts+1):
+            cohort = dict()
+            cohort['age'] = i
+            cohort['desktops'] = 0
+            self.cohorts.append(cohort)
+
+        # Distribute existing desktops amongst starting cohorts
+        desktops_to_distribute = self.get_prop_value('actual_desktops')
+        if self.random_cohort_spread:
+            for i in range(0, desktops_to_distribute):
+                [c for c in self.cohorts if c['age'] == random.randint(
+                    1, num_starting_cohorts)][0]['desktops'] += 1
+        else:
+            i = 0
+            while desktops_to_distribute > 0:
+                self.cohorts[i]['desktops'] += 1
+                desktops_to_distribute -= 1
+                i += 1
+                if i == len(self.cohorts):
+                    i = 0
+
     def reset(self):
-        pass
+        self.cohorts.clear()
 
     def compute(self, tick):
 
         # get Inputs
         work_hrs = self.get_input_available('line staff work hrs')
         it_budget = self.get_input_available('IT budget')
+
         # get Process Properties
         actual_desktops = self.get_prop_value('actual_desktops')
         it_hrs_per_desktop = self.get_prop_value('hrs_per_desktop')
@@ -828,15 +869,41 @@ class InternalICTDesktopService(merlin.Process):
                                             'maintenance_cost_per_desktop')
         depr_period = self.get_prop_value('depreciation_period')
         financial_charge_percent = self.get_prop_value("fin_charge_percent")
-        # life_time = self.get_prop_value("life_time")
+        life_time = self.get_prop_value("life_time")
 
-        desktops_provided = actual_desktops
+        if tick == 1:
+            self.create_desktop_simulation()
+
+        # Do the depreciation steps
+
+        legacy_desktops = sum([c['desktops'] for c in self.cohorts])
+
+        # Dispose of end-of-life desktop cohort
+        cohorts_to_dispose = [c for c in self.cohorts if c['age'] > (life_time * 12.0)]
+        for c in cohorts_to_dispose:
+            self.cohorts.remove(c)
+
+        # Get the number of desktops to dispose
+        desktops_to_dispose = sum([c['desktops'] for c in cohorts_to_dispose])
+
+        if (legacy_desktops - desktops_to_dispose) < actual_desktops:
+            # We need to purchase a new cohort of pcs this month
+            desktops_to_purchase = actual_desktops - (legacy_desktops - desktops_to_dispose)
+            new_cohort = dict()
+            new_cohort['desktops'] = desktops_to_purchase
+            new_cohort['age'] = 0
+            self.cohorts.append(new_cohort)
+            desktops_provided = actual_desktops
+        else:
+            desktops_provided = (legacy_desktops - desktops_to_dispose)
+
+        # age cohorts
+        for c in self.cohorts:
+            c['age'] += 1
 
         work_hrs_required = desktops_provided * it_hrs_per_desktop / 12.0
 
         expenses = (desktops_provided * maint_cost_per_desktop +
-                    # todo: think about that! is contained in depreciation...
-                    # desktops_provided * acq_cost_per_desktop / life_time +
                     desktops_provided * acq_cost_per_desktop / depr_period +
                     desktops_provided * acq_cost_per_desktop *
                     financial_charge_percent / 100.0
