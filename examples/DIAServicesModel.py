@@ -1241,7 +1241,10 @@ def createRegistrationService(sim=None, with_external_provider=False):
     branch_e.attributes.add("branch")
 
     # add the registration service
-    registration_e = merlin.Entity(sim, "Registration Service")
+    service_name = "Registration Service"
+    if with_external_provider:
+        service_name += " using DaaS"
+    registration_e = merlin.Entity(sim, service_name)
     sim.add_entity(registration_e, parent=branch_e)
     branch_e.add_child(registration_e)
     registration_e.attributes.add("service")
