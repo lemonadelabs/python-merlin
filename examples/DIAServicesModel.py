@@ -838,7 +838,7 @@ class InternalICTDesktopService(merlin.Process):
 
         # Create starting cohorts
         num_starting_cohorts = self.starting_cohort_range * self.cohorts_per_year
-        for i in range(1, num_starting_cohorts+1):
+        for i in range(0, (self.starting_cohort_range * 12)):
             cohort = dict()
             cohort['age'] = i
             cohort['desktops'] = 0
