@@ -249,7 +249,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         )
 
         self.add_property(
-            "lenght of contrcat/yrs",
+            "length of contract/yrs",
             "contract_yrs",
             merlin.ProcessProperty.PropertyType.number_type,
             default_contract_length
