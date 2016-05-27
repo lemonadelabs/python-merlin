@@ -818,11 +818,11 @@ class InternalICTDesktopService(merlin.Process):
         self.random_cohort_spread = True
 
         # Starting desktop lifespan range in years, must be <= life_time
-        self.starting_cohort_range = 6.0
+        self.starting_cohort_range = 6
 
         # The number of times starting desktops were purchased per year
         # must perfectly divide by 12
-        self.cohorts_per_year = 3.0
+        self.cohorts_per_year = 3
 
         # data structure to hold cohorts for depreciating
         self.cohorts = list()
@@ -837,11 +837,12 @@ class InternalICTDesktopService(merlin.Process):
     def create_desktop_simulation(self):
 
         # Create starting cohorts
-        # TODO: refactor this!
         num_starting_cohorts = self.starting_cohort_range * self.cohorts_per_year
-        for i in range(0, (self.starting_cohort_range * 12)):
+        months_per_cohort =  (self.starting_cohort_range * 12) / num_starting_cohorts
+
+        for i in range(0, num_starting_cohorts):
             cohort = dict()
-            cohort['age'] = i
+            cohort['age'] = i * months_per_cohort
             cohort['desktops'] = 0
             self.cohorts.append(cohort)
 
@@ -849,8 +850,8 @@ class InternalICTDesktopService(merlin.Process):
         desktops_to_distribute = self.get_prop_value('actual_desktops')
         if self.random_cohort_spread:
             for i in range(0, desktops_to_distribute):
-                [c for c in self.cohorts if c['age'] == random.randint(
-                    1, num_starting_cohorts)][0]['desktops'] += 1
+                rand_index = random.randint(0, num_starting_cohorts - 1)
+                self.cohorts[rand_index]['desktops'] += 1
         else:
             i = 0
             while desktops_to_distribute > 0:
@@ -859,6 +860,10 @@ class InternalICTDesktopService(merlin.Process):
                 i += 1
                 if i == len(self.cohorts):
                     i = 0
+
+        assert desktops_to_distribute == \
+               sum([c['desktops'] for c in self.cohorts])
+
 
     def reset(self):
         self._generated = False
