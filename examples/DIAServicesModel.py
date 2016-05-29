@@ -847,7 +847,11 @@ class InternalICTDesktopService(merlin.Process):
             self.cohorts.append(cohort)
 
         # Distribute existing desktops amongst starting cohorts
-        desktops_to_distribute = self.get_prop_value('actual_desktops')
+        try:
+            desktops_to_distribute = int(self.get_prop_value('actual_desktops'))
+        except ValueError:
+            desktops_to_distribute = 0
+
         if self.random_cohort_spread:
             for i in range(0, desktops_to_distribute):
                 rand_index = random.randint(0, num_starting_cohorts - 1)
