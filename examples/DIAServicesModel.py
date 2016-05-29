@@ -250,7 +250,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
         )
 
         self.add_property(
-            "lenght of contrcat/yrs",
+            "length of contract/yrs",
             "contract_yrs",
             merlin.ProcessProperty.PropertyType.number_type,
             default_contract_length
@@ -1268,6 +1268,7 @@ def createRecordStorage(sim=None):
     # todo: need an expectation
     filesStored = merlin.Output("file#",
                                 name="Additional Files Stored")
+    filesStored.minimum = 12e4/12
     sim.add_output(filesStored)
     sim.connect_output(StorageFacility, filesStored)
 
@@ -1324,7 +1325,10 @@ def createRegistrationService(sim=None, with_external_provider=False):
     branch_e.attributes.add("branch")
 
     # add the registration service
-    registration_e = merlin.Entity(sim, "Registration Service")
+    service_name = "Registration Service"
+    if with_external_provider:
+        service_name += " using DaaS"
+    registration_e = merlin.Entity(sim, service_name)
     sim.add_entity(registration_e, parent=branch_e)
     branch_e.add_child(registration_e)
     registration_e.attributes.add("service")
@@ -1444,6 +1448,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
     # need an expectation
     applProcessed = merlin.Output("appl#",
                                   name="Applications Processed")
+    applProcessed.minimum = 360e3/12
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
