@@ -851,6 +851,7 @@ class InternalICTDesktopService(merlin.Process):
         # Distribute existing desktops amongst starting cohorts
         try:
             desktops_to_distribute = int(self.get_prop_value('actual_desktops'))
+            desktops_to_distribute = 0 if desktops_to_distribute < 0 else desktops_to_distribute
         except ValueError:
             desktops_to_distribute = 0
 
