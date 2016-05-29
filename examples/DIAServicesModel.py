@@ -132,12 +132,14 @@ class StorageServiceProcess(merlin.Process):
             # Consume inputs
             self.consume_input(
                 'monthly line staff work hrs',
-                self.get_input_available('monthly line staff work hrs')
+                (files_stored/self.get_prop_value('files_handled_per_lswork_hr')
+                 if self.get_prop_value('files_handled_per_lswork_hr') > 0
+                 else 0.0)
             )
 
             self.consume_input(
                 'monthly operational budget',
-                self.get_input_available('monthly operational budget')
+                self.get_prop_value('storage_rent')/12.0
             )
 
             self.consume_input(
