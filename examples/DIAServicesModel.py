@@ -584,8 +584,13 @@ class StaffProcess(merlin.Process):
                     if lp['duration'] == self.ls_adjustment_month:
                         layoff_phase = lp
                 if layoff_phase:
+
                     staff_to_reduce = math.ceil(
                         float(self.ls_reduction_baseline) * layoff_phase['reduction'])
+                    # print('ls_adjustment_month: {0}'.format(self.ls_adjustment_month))
+                    # print('staff to reduce: {0}'.format(staff_to_reduce))
+                    # print('reduction %: {0}'.format(layoff_phase['reduction']))
+                    # print('tick: {0}'.format(tick))
                     self.actual_line_staff -= staff_to_reduce
                     # If due to rounding we have gone below out target then clamp to target
                     self.actual_line_staff = line_staff_no \
@@ -593,8 +598,10 @@ class StaffProcess(merlin.Process):
                         self.actual_line_staff
             else:
                 # hire staff...
+                # print('hiring staff')
                 if self.ls_adjustment_month < self.staff_hire_period:
                     staff_hired = random.randint(0, (line_staff_no - self.actual_line_staff))
+                    # print('ls staff_hired: {0}'.format(staff_hired))
                     self.actual_line_staff += staff_hired
                 elif self.ls_adjustment_month == self.staff_hire_period:
                     self.actual_line_staff = line_staff_no
@@ -602,6 +609,52 @@ class StaffProcess(merlin.Process):
         else:
             # No adjustments nessesary, reset variable
             self.ls_adjustment_month = 0
+
+        # Check for line staff adjustments
+        # TODO: refactor into a reusuable function rather than this dupilication
+        if self.actual_overhead_staff != overhead_staff_no:
+            if overhead_staff_no < self.actual_overhead_staff:
+
+                # reducing staff...
+                if self.ohs_adjustment_month == 0:
+                    self.ohs_reduction_baseline = self.actual_overhead_staff
+
+                layoff_phase = None
+
+                # See if this is a month we are laying off staff
+                for lp in self.layoff_phases:
+                    if lp['duration'] == self.ohs_adjustment_month:
+                        layoff_phase = lp
+                if layoff_phase:
+                    staff_to_reduce = math.ceil(
+                        float(self.ohs_reduction_baseline) * layoff_phase[
+                            'reduction'])
+                    # print('oh_adjustment_month: {0}'.format(self.ohs_adjustment_month))
+                    # print('staff to reduce: {0}'.format(staff_to_reduce))
+                    # print('reduction %: {0}'.format(layoff_phase['reduction']))
+                    # print('tick: {0}'.format(tick))
+                    self.actual_overhead_staff -= staff_to_reduce
+                    # If due to rounding we have gone below out target then clamp to target
+                    self.actual_overhead_staff = overhead_staff_no \
+                        if self.actual_overhead_staff < overhead_staff_no else \
+                        self.actual_overhead_staff
+            else:
+                # hire staff...
+                # print('hiring staff')
+                if self.ohs_adjustment_month < self.staff_hire_period:
+                    staff_hired = random.randint(0, (
+                    overhead_staff_no - self.actual_overhead_staff))
+                    # print('oh staff_hired: {0}'.format(staff_hired))
+                    self.actual_overhead_staff += staff_hired
+                elif self.ohs_adjustment_month == self.staff_hire_period:
+                    self.actual_overhead_staff = overhead_staff_no
+            self.ohs_adjustment_month += 1
+        else:
+            # No adjustments nessesary, reset variable
+            self.ohs_adjustment_month = 0
+
+        # print('actual: {0}'.format(self.actual_line_staff))
+        # print('ls: {0}'.format(line_staff_no))
 
         working_hours_per_week = self.get_prop_value("hours_per_week")
         working_weeks_per_year = 52  # this won't change that quickly, I guess
