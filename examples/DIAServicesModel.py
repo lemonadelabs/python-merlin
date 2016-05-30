@@ -323,7 +323,8 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
             self.consume_input(
                 'overhead staff work hrs',
-                self.get_prop_value('file_logistics_OHSwork_hr'))/12
+                self.get_prop_value('file_logistics_OHSwork_hr')/12
+            )
 
         else:
             self.consume_all_inputs(0)
