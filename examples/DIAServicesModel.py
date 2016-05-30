@@ -132,10 +132,10 @@ class StorageServiceProcess(merlin.Process):
             # Consume inputs
             self.consume_input(
                 'monthly line staff work hrs',
-                self.get_input_available('monthly line staff work hrs')
-#                 (files_stored/self.get_prop_value('files_handled_per_lswork_hr')
-#                  if self.get_prop_value('files_handled_per_lswork_hr') > 0
-#                  else 0.0)
+#                self.get_input_available('monthly line staff work hrs')
+                (files_stored/self.get_prop_value('files_handled_per_lswork_hr')
+                 if self.get_prop_value('files_handled_per_lswork_hr') > 0
+                 else 0.0)
             )
 
             self.consume_input(
@@ -323,7 +323,7 @@ class OutsourcedFileLogisticsProcess(merlin.Process):
 
             self.consume_input(
                 'overhead staff work hrs',
-                self.get_prop_value('file_logistics_OHSwork_hr'))
+                self.get_prop_value('file_logistics_OHSwork_hr'))/12
 
         else:
             self.consume_all_inputs(0)
