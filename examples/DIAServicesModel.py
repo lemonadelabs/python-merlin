@@ -524,13 +524,85 @@ class StaffProcess(merlin.Process):
             default_hours_training
         )
 
+        self.layoff_phases = [
+            {
+                'duration': 3,
+                'reduction': 0.6
+            },
+            {
+                'duration': 4,
+                'reduction': 0.3
+            },
+            {
+                'duration': 5,
+                'reduction': 0.1
+            }
+        ]
+
+        self.staff_hire_period = 4
+        self.ls_adjustment_month = 0
+        self.ohs_adjustment_month = 0
+        self.actual_line_staff = -1
+        self.actual_overhead_staff = -1
+        self.ls_reduction_baseline = 0
+        self.ohs_reduction_baseline = 0
+
+
     def reset(self):
-        pass
+        self.ls_adjustment_month = 0
+        self.ohs_adjustment_month = 0
+        self.actual_line_staff = -1
+        self.actual_overhead_staff = -1
+        self.ohs_reduction_baseline = -1
+        self.ls_reduction_baseline = -1
+
 
     def compute(self, tick):
 
+        # first tick init stuff
+        if self.actual_overhead_staff == -1:
+            self.actual_overhead_staff = self.get_prop_value('oh_staff_no')
+            self.actual_line_staff = self.get_prop_value('line_staff_no')
+            self.ohs_reduction_baseline = -1
+            self.ls_reduction_baseline = -1
+
         line_staff_no = self.get_prop_value("line_staff_no")
         overhead_staff_no = self.get_prop_value("oh_staff_no")
+
+        # Check for line staff adjustments
+        if self.actual_line_staff != line_staff_no:
+            if line_staff_no < self.actual_line_staff:
+
+                # reducing staff...
+                if self.ls_adjustment_month == 0:
+                    self.ls_reduction_baseline = self.actual_line_staff
+
+                layoff_phase = None
+
+                # See if this is a month we are laying off staff
+                for lp in self.layoff_phases:
+                    if lp['duration'] == self.ls_adjustment_month:
+                        layoff_phase = lp
+                if layoff_phase:
+                    staff_to_reduce = math.ceil(
+                        float(self.ls_reduction_baseline) * layoff_phase['reduction'])
+                    self.actual_line_staff -= staff_to_reduce
+                    # If due to rounding we have gone below out target then clamp to target
+                    self.actual_line_staff = line_staff_no \
+                        if self.actual_line_staff < line_staff_no else\
+                        self.actual_line_staff
+            else:
+                # hire staff...
+                if self.ls_adjustment_month < self.staff_hire_period:
+                    staff_hired = random.randint(0, (line_staff_no - self.actual_line_staff))
+                    self.actual_line_staff += staff_hired
+                elif self.ls_adjustment_month == self.staff_hire_period:
+                    self.actual_line_staff = line_staff_no
+            self.ls_adjustment_month += 1
+        else:
+            # No adjustments nessesary, reset variable
+            self.ls_adjustment_month = 0
+
         working_hours_per_week = self.get_prop_value("hours_per_week")
         working_weeks_per_year = 52  # this won't change that quickly, I guess
         professional_training = self.get_prop_value(
@@ -548,15 +620,17 @@ class StaffProcess(merlin.Process):
         FTE_hours = (working_hours_per_week * working_weeks_per_year *
                      (1.0-professional_training/100) * (1.0-leave/100))
 
-        overhead_staff_work_hr = overhead_staff_no * FTE_hours / 12.0
+        overhead_staff_work_hr = self.actual_overhead_staff * FTE_hours / 12.0
 
-        line_staff_work_hr = (min(line_staff_no,
-                                  overhead_staff_no*span_of_control) *
+        line_staff_work_hr = (min(self.actual_line_staff,
+                                  self.actual_overhead_staff*span_of_control) *
                               FTE_hours / 12.0)
 
+
+
         used_staff_expenses = (
-            (avg_line_salary * line_staff_no) +
-            (avg_overhead_salary * overhead_staff_no) / 12.0
+            (avg_line_salary * self.actual_line_staff) +
+            (avg_overhead_salary * self.actual_overhead_staff) / 12.0
         )
 
         sufficient_funding = (
@@ -564,7 +638,7 @@ class StaffProcess(merlin.Process):
         )
 
         sufficient_accommodation = (
-            staff_accommodated >= (overhead_staff_no + line_staff_no)
+            staff_accommodated >= (self.actual_overhead_staff + self.actual_line_staff)
         )
 
         if not sufficient_funding:
@@ -578,7 +652,7 @@ class StaffProcess(merlin.Process):
             self.notify_insufficient_input(
                 "Workplaces Available",
                 staff_accommodated,
-                overhead_staff_no + line_staff_no
+                self.actual_overhead_staff + self.actual_line_staff
             )
 
         if sufficient_funding and sufficient_accommodation:
