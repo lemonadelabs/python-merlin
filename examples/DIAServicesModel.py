@@ -1173,7 +1173,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "staff budget",
-            'start_amount': 400000000,
+            'start_amount': 10.8e6,
             'budget_type': "staff$"
         })
 
@@ -1186,7 +1186,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 400000000,
+            'start_amount': 4.0e6,
             'budget_type': "rent$"
         })
 
@@ -1199,7 +1199,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "other budget",
-            'start_amount': 400000000,
+            'start_amount': 1e6,
             'budget_type': "other$"
         })
 
@@ -1211,11 +1211,11 @@ def createRecordStorage(sim=None):
         OutsourcedFileLogisticsProcess,
         {
             'name': "file logistics process",
-            'contracted_volumes': 1e4,
-            'actual_volumes': 1.1e4,
-            'contract_cost': 100000,
+            'contracted_volumes': 150e3,
+            'actual_volumes': 125e3,
+            'contract_cost': 150000,
             'overage_cost_per_file': 10,
-            'required_management_work_hr': 1,
+            'required_management_work_hr': 1640,
             'default_contract_length': 6
         })
 
@@ -1229,7 +1229,7 @@ def createRecordStorage(sim=None):
         {
             'name': "staff accommodation",
             'default_cost_m2': 400,
-            'default_area_m2': 3500,
+            'default_area_m2': 500,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1242,15 +1242,15 @@ def createRecordStorage(sim=None):
         StaffProcess,
         {
             'name': "line staff resource process",
-            'default_line_staff_no': 100,
-            'default_oh_staff_no': 11,
+            'default_line_staff_no': 20,
+            'default_oh_staff_no': 3,
             'default_hours_per_week': 40.0,
             'default_admin_training_percent': 20,
             'default_leave_percent': 20,
-            'default_avg_oh_salary': 75e3,
-            'default_avg_line_salary': 60e3,
+            'default_avg_oh_salary': 60e3,
+            'default_avg_line_salary': 40e3,
             'default_hours_training': 100,
-            'default_span_of_control': 10
+            'default_span_of_control': 12
         })
 
     LineStaffRes.attributes.add("resource")
@@ -1262,9 +1262,9 @@ def createRecordStorage(sim=None):
         StorageServiceProcess,
         {
             'name': "storage facility process",
-            'default_storage_fee': 1,
-            'default_files_handled_per_lswork_hr': 20,
-            "default_annual_storage_rent": 1.0e4
+            'default_storage_fee': 98,
+            'default_files_handled_per_lswork_hr': 2000,
+            "default_annual_storage_rent": 500e3
         })
 
     StorageFacility.attributes.add("asset")
