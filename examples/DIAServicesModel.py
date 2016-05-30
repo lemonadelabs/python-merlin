@@ -460,13 +460,13 @@ class StaffProcess(merlin.Process):
         self.add_output('Staff Expenses', 'staffExpense$')
 
         # Define Properties
-        self.add_property(
-            'staff #',
-            'total_staff_no',
-            merlin.ProcessProperty.PropertyType.number_type,
-            default_line_staff_no+default_oh_staff_no,
-            read_only=True
-        )
+        # self.add_property(
+        #     'staff #',
+        #     'total_staff_no',
+        #     merlin.ProcessProperty.PropertyType.number_type,
+        #     default_line_staff_no+default_oh_staff_no,
+        #     read_only=True
+        # )
         self.add_property(
             'line staff #',
             'line_staff_no',
