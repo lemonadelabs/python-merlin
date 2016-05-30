@@ -864,7 +864,7 @@ class InternalICTDesktopService(merlin.Process):
         )
 
         self.add_property(
-            "Desktop Lifetime",
+            "Desktop Lifetime [yrs]",
             "life_time",
             merlin.ProcessProperty.PropertyType.number_type,
             life_time
@@ -878,14 +878,14 @@ class InternalICTDesktopService(merlin.Process):
         )
 
         self.add_property(
-            'depreciation period',
+            'depreciation Period [yrs]',
             'depreciation_period',
             merlin.ProcessProperty.PropertyType.number_type,
             depr_period
         )
 
         self.add_property(
-            "financial charge %",
+            "Financial Charge %",
             "fin_charge_percent",
             merlin.ProcessProperty.PropertyType.number_type,
             financial_charge_percent
@@ -1247,7 +1247,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "staff budget",
-            'start_amount': 400000000,
+            'start_amount': 10.8e6,
             'budget_type': "staff$"
         })
 
@@ -1260,7 +1260,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 400000000,
+            'start_amount': 4.0e6,
             'budget_type': "rent$"
         })
 
@@ -1273,7 +1273,7 @@ def createRecordStorage(sim=None):
         processes.BudgetProcess,
         {
             'name': "other budget",
-            'start_amount': 400000000,
+            'start_amount': 1e6,
             'budget_type': "other$"
         })
 
@@ -1285,11 +1285,11 @@ def createRecordStorage(sim=None):
         OutsourcedFileLogisticsProcess,
         {
             'name': "file logistics process",
-            'contracted_volumes': 1e4,
-            'actual_volumes': 1.1e4,
-            'contract_cost': 100000,
+            'contracted_volumes': 150e3,
+            'actual_volumes': 125e3,
+            'contract_cost': 150000,
             'overage_cost_per_file': 10,
-            'required_management_work_hr': 1,
+            'required_management_work_hr': 1640,
             'default_contract_length': 6
         })
 
@@ -1303,7 +1303,7 @@ def createRecordStorage(sim=None):
         {
             'name': "staff accommodation",
             'default_cost_m2': 400,
-            'default_area_m2': 3500,
+            'default_area_m2': 500,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1316,15 +1316,15 @@ def createRecordStorage(sim=None):
         StaffProcess,
         {
             'name': "line staff resource process",
-            'default_line_staff_no': 100,
-            'default_oh_staff_no': 11,
+            'default_line_staff_no': 20,
+            'default_oh_staff_no': 3,
             'default_hours_per_week': 40.0,
             'default_admin_training_percent': 20,
             'default_leave_percent': 20,
-            'default_avg_oh_salary': 75e3,
-            'default_avg_line_salary': 60e3,
+            'default_avg_oh_salary': 60e3,
+            'default_avg_line_salary': 40e3,
             'default_hours_training': 100,
-            'default_span_of_control': 10
+            'default_span_of_control': 12
         })
 
     LineStaffRes.attributes.add("resource")
@@ -1336,9 +1336,9 @@ def createRecordStorage(sim=None):
         StorageServiceProcess,
         {
             'name': "storage facility process",
-            'default_storage_fee': 1,
-            'default_files_handled_per_lswork_hr': 20,
-            "default_annual_storage_rent": 1.0e4
+            'default_storage_fee': 98,
+            'default_files_handled_per_lswork_hr': 2000,
+            "default_annual_storage_rent": 500e3
         })
 
     StorageFacility.attributes.add("asset")
@@ -1426,7 +1426,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
         processes.BudgetProcess,
         {
             'name': "staff budget",
-            'start_amount': 80000000,
+            'start_amount': 73e6,
             'budget_type': "staff$"
         })
 
@@ -1439,7 +1439,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
         processes.BudgetProcess,
         {
             'name': "rent budget",
-            'start_amount': 20000000,
+            'start_amount': 18e6,
             'budget_type': "rent$"
         })
 
@@ -1452,7 +1452,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
         processes.BudgetProcess,
         {
             'name': "other budget",
-            'start_amount': 8000000,
+            'start_amount': 800e3,
             'budget_type': "other$"
         })
 
@@ -1467,7 +1467,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
         {
             'name': "staff accommodation",
             'default_cost_m2': 400,
-            'default_area_m2': 3500,
+            'default_area_m2': 1650,
             'default_area_per_staff_m2': 15.0,
             'default_lease_term': 5
         })
@@ -1488,7 +1488,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
             'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
             'default_hours_training': 100,
-            'default_span_of_control': 10
+            'default_span_of_control': 12
         })
 
     LineStaffRes.attributes.add("resource")
@@ -1500,7 +1500,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
         InternalICTDesktopService,
         {
             # todo: set to reasonable values!
-            'actual_desktops': 100,
+            'actual_desktops': 110,
             'it_hrs_per_desktop': 40.0,
             'acq_cost_per_desktop': 4000.0,
             'maint_cost_per_desktop': 400.0,
@@ -1517,9 +1517,9 @@ def createRegistrationService(sim=None, with_external_provider=False):
         RegistrationServiceProcess,
         {
             'name': "registration facility process",
-            'default_registration_fee': 50.0,
+            'default_registration_fee': 85.0,
             'default_applications_processed_per_lswork_hr': 10,
-            "default_applications_submitted": 1000000,
+            "default_applications_submitted": 1e6,
         })
     RegistrationFacility.attributes.add("asset")
 
