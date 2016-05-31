@@ -498,6 +498,7 @@ class Simulation(SimObject):
                     for x in master_consume:
                         i.set_telemetry_value('consume', x)
 
+                # logging.info("id: {0}, name: {1}".format(i.id, i.name))
                 output.append(self._get_object_telemetry(i))
 
             for o in e.outputs:
@@ -605,6 +606,7 @@ class Output(SimObject):
             self.current_time = time
 
         if time == self.current_time and not self.processed:
+            self.processed = True
             # need to check if we have all inputs updated before processing
             up_to_date = True
             for i in self.inputs:

@@ -7,7 +7,12 @@ from pymerlin.processes import (BudgetProcess,
                                 BuildingMaintainenceProcess,
                                 ConstantProvider)
 from examples import RecordStorageFacility
+from examples import DIAServicesModel
 
+
+@pytest.fixture()
+def dia_record_storage_model() -> merlin.Simulation:
+    return DIAServicesModel.createRecordStorage()
 
 @pytest.fixture()
 def record_storage_example() -> merlin.Simulation:
@@ -222,11 +227,23 @@ class TestSimulation:
         sim = record_storage_example # type: merlin.Simulation
         sim.run()
         tel = sim.get_sim_telemetry()
-
         for to in tel:
             if 'data' in to:
                 if 'value' in to['data']:
                     assert len(to['data']['value']) == sim.num_steps
+
+
+    def test_consistant_telemetry_output(self, dia_record_storage_model):
+        sim = dia_record_storage_model  # type: merlin.Simulation
+        sim.num_steps = 10
+        for i in range(0, 5):
+            sim.run()
+            tel = sim.get_sim_telemetry()
+            for to in tel:
+                if 'data' in to:
+                    if 'value' in to['data']:
+                        print(to['name'])
+                        assert len(to['data']['value']) == sim.num_steps
 
     def test_source_entities(self, computation_test_harness):
         sim = computation_test_harness
@@ -411,6 +428,7 @@ class TestOutputConnector:
                 npt.assert_almost_equal(e[1], 0.9)
             else:
                 npt.assert_almost_equal(e[1], 0.1)
+
 
 class TestEvents:
 
