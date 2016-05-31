@@ -582,7 +582,6 @@ class Output(SimObject):
         super(Output, self).__init__(name)
         self.inputs = set()  # type: Set[InputConnector]
         self.current_time = None  # type: int
-        self.processed = False
         self.type = unit_type
         self.result = list()  # type: MutableSequence[float]
         self.sim = None  # type: Union[Simulation, None]
@@ -591,7 +590,6 @@ class Output(SimObject):
 
     def reset(self):
         self.result.clear()
-        self.processed = False
         self.current_time = None
         self.reset_telemetry()
         for i in self.inputs:
@@ -602,11 +600,9 @@ class Output(SimObject):
             return
 
         if (self.current_time is None) or (time > self.current_time):
-            self.processed = False
             self.current_time = time
 
-        if time == self.current_time and not self.processed:
-            self.processed = True
+        if time == self.current_time:
             # need to check if we have all inputs updated before processing
             up_to_date = True
             for i in self.inputs:
