@@ -445,8 +445,7 @@ class StaffProcess(merlin.Process):
             default_leave_percent=20,
             default_avg_oh_salary=75e3,
             default_avg_line_salary=60e3,
-            # todo: implement
-            default_hours_training=100,
+            default_hours_training=2400,
             default_span_of_control=10
             ):
         super(StaffProcess, self).__init__(name)
@@ -524,6 +523,9 @@ class StaffProcess(merlin.Process):
             default_hours_training
         )
 
+        # Layoff phase structure
+        # duration = layoff event time offset
+        # reduction % decrease from original pre-event number
         self.layoff_phases = [
             {
                 'duration': 3,
@@ -539,7 +541,23 @@ class StaffProcess(merlin.Process):
             }
         ]
 
+        # The period over which new staff come on board
         self.staff_hire_period = 4
+
+        # Training function parameters
+        self.training_hours_per_month = 400.0
+
+        # logistic function parameters
+        self.m = 5.0 # curve slope
+        self.k = 1.0 # function height
+        self.b = 0.0 # y intercept
+        self.c = 0.5 # inflection point offset
+
+        # A list of tuples t where t[0] = number of staff
+        # and t[1] = months trained so far
+        self.training_cohorts = list()
+
+        # internal flags and counters
         self.ls_adjustment_month = 0
         self.ohs_adjustment_month = 0
         self.actual_line_staff = -1
@@ -549,12 +567,67 @@ class StaffProcess(merlin.Process):
 
 
     def reset(self):
+        self.training_cohorts.clear()
         self.ls_adjustment_month = 0
         self.ohs_adjustment_month = 0
         self.actual_line_staff = -1
         self.actual_overhead_staff = -1
         self.ohs_reduction_baseline = -1
         self.ls_reduction_baseline = -1
+
+    def _calculate_staff_fte(self,
+                             baseline_fte_hours,
+                             overhead_staff=False) -> float:
+        # ((1 * k) / (1 + (EXP(-1 * m * (x - c))))) + b
+        max_train_hours = self.get_prop_value('hours_training')
+        staff_type = 'oh_staff' if overhead_staff else 'ls_staff'
+        total_staff = self.actual_overhead_staff if overhead_staff else self.actual_line_staff
+        staff_in_training = sum([c[staff_type] for c in self.training_cohorts])
+        trained_staff = total_staff - staff_in_training
+
+        # span of control handling
+        if not overhead_staff:
+            staff_controlled = self.get_prop_value("span_of_control") * self.actual_overhead_staff
+            staff_uncontroled = max(0, (total_staff - staff_controlled))
+
+            # remove uncontrolled staff from trained staff
+            trained_staff_removed = min(trained_staff, staff_uncontroled)
+            trained_staff -= trained_staff_removed
+            staff_uncontroled -= trained_staff_removed
+        else:
+            staff_uncontroled = 0
+
+        trained_staff_fte = (baseline_fte_hours * trained_staff) / 12.0
+        training_staff_fte = 0.0
+
+        for c in self.training_cohorts:
+            assert c['train'] * self.training_hours_per_month <= max_train_hours
+
+            if overhead_staff:
+                effective_staff = c[staff_type]
+            else:
+                assert staff_uncontroled >= 0
+                rem_staff = min(c[staff_type], staff_uncontroled)
+                effective_staff = c[staff_type] - rem_staff
+                staff_uncontroled -= rem_staff
+                staff_uncontroled = max(0, staff_uncontroled)
+
+            # logistic function implementation expects a normalised value between 0-1
+            normalised_train_time = (c['train'] * self.training_hours_per_month) / max_train_hours
+
+            # see constructor for expalnation of b,c,m,k logistic variables
+            fte_modifier = (
+                (1.0 * self.k) /
+                (1.0 + math.exp(-1.0 * self.m * (normalised_train_time - self.c)))
+            )
+
+            # clamp result (should not be nessesary)
+            fte_modifier = max(0, fte_modifier)
+            fte_modifier = min(1.0, fte_modifier)
+
+            training_staff_fte += (((baseline_fte_hours * effective_staff) / 12.0) * fte_modifier)
+        return (training_staff_fte + trained_staff_fte)
+
 
 
     def compute(self, tick):
@@ -568,6 +641,9 @@ class StaffProcess(merlin.Process):
 
         line_staff_no = self.get_prop_value("line_staff_no")
         overhead_staff_no = self.get_prop_value("oh_staff_no")
+        hours_training = self.get_prop_value("hours_training")
+
+        new_training_cohort = None
 
         # Check for line staff adjustments
         if self.actual_line_staff != line_staff_no:
@@ -603,8 +679,18 @@ class StaffProcess(merlin.Process):
                     staff_hired = random.randint(0, (line_staff_no - self.actual_line_staff))
                     # print('ls staff_hired: {0}'.format(staff_hired))
                     self.actual_line_staff += staff_hired
+                    new_training_cohort = {
+                        'ls_staff' : staff_hired,
+                        'oh_staff': 0,
+                        'train': 0
+                    }
                 elif self.ls_adjustment_month == self.staff_hire_period:
                     self.actual_line_staff = line_staff_no
+                    new_training_cohort = {
+                        'ls_staff' : line_staff_no - self.actual_line_staff,
+                        'oh_staff': 0,
+                        'train': 0
+                    }
             self.ls_adjustment_month += 1
         else:
             # No adjustments nessesary, reset variable
@@ -646,12 +732,42 @@ class StaffProcess(merlin.Process):
                     overhead_staff_no - self.actual_overhead_staff))
                     # print('oh staff_hired: {0}'.format(staff_hired))
                     self.actual_overhead_staff += staff_hired
+                    if new_training_cohort:
+                        new_training_cohort['oh_staff'] = staff_hired
+                    else:
+                        new_training_cohort = {
+                            'oh_staff' : staff_hired,
+                            'ls_staff': 0,
+                            'train': 0
+                        }
                 elif self.ohs_adjustment_month == self.staff_hire_period:
                     self.actual_overhead_staff = overhead_staff_no
+                    if new_training_cohort:
+                        new_training_cohort['oh_staff'] = (overhead_staff_no - self.actual_overhead_staff)
+                    else:
+                        new_training_cohort = {
+                            'oh_staff': (overhead_staff_no - self.actual_overhead_staff),
+                            'ls_staff': 0,
+                            'train': 0
+                        }
+
             self.ohs_adjustment_month += 1
         else:
             # No adjustments nessesary, reset variable
             self.ohs_adjustment_month = 0
+
+        # age existing training cohorts
+        for c in self.training_cohorts:
+            c['train'] += 1
+
+        # remove fully trained staff cohorts
+        self.training_cohorts = \
+            [c for c in self.training_cohorts
+             if (c['train'] * self.training_hours_per_month) < hours_training]
+
+        # add new cohort
+        if new_training_cohort:
+            self.training_cohorts.append(new_training_cohort)
 
         # print('actual: {0}'.format(self.actual_line_staff))
         # print('ls: {0}'.format(line_staff_no))
@@ -664,7 +780,6 @@ class StaffProcess(merlin.Process):
         leave = self.get_prop_value("leave_percent")
         avg_line_salary = self.get_prop_value("avgLineSalary")
         avg_overhead_salary = self.get_prop_value("avgOHSalary")
-        training_period = self.get_prop_value("hours_training")  # todo!
         span_of_control = self.get_prop_value("span_of_control")
 
         staff_expenses = self.get_input_available("Staff Budget")
@@ -673,13 +788,8 @@ class StaffProcess(merlin.Process):
         FTE_hours = (working_hours_per_week * working_weeks_per_year *
                      (1.0-professional_training/100) * (1.0-leave/100))
 
-        overhead_staff_work_hr = self.actual_overhead_staff * FTE_hours / 12.0
-
-        line_staff_work_hr = (min(self.actual_line_staff,
-                                  self.actual_overhead_staff*span_of_control) *
-                              FTE_hours / 12.0)
-
-
+        overhead_staff_work_hr = self._calculate_staff_fte(FTE_hours, overhead_staff=True)
+        line_staff_work_hr = self._calculate_staff_fte(FTE_hours)
 
         used_staff_expenses = (
             (avg_line_salary * self.actual_line_staff) +
@@ -1540,7 +1650,7 @@ def createRegistrationService(sim=None, with_external_provider=False):
             'default_leave_percent': 20,
             'default_avg_oh_salary': 75e3,
             'default_avg_line_salary': 60e3,
-            'default_hours_training': 100,
+            'default_hours_training': 2400,
             'default_span_of_control': 12
         })
 
