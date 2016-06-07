@@ -587,11 +587,13 @@ class Output(SimObject):
         self.sim = None  # type: Union[Simulation, None]
         self.minimum = None
         self.attributes = set()  # type: Set[str]
+        self.updated = False
 
     def reset(self):
         self.result.clear()
         self.current_time = None
         self.reset_telemetry()
+        self.updated = False
         for i in self.inputs:
             i.reset_telemetry()
 
@@ -601,6 +603,7 @@ class Output(SimObject):
 
         if (self.current_time is None) or (time > self.current_time):
             self.current_time = time
+            self.updated = False
 
         if time == self.current_time:
             # need to check if we have all inputs updated before processing
@@ -608,7 +611,8 @@ class Output(SimObject):
             for i in self.inputs:
                 up_to_date = up_to_date and (i.time == self.current_time)
 
-            if up_to_date:
+            if up_to_date and not self.updated:
+                self.updated = True
                 o = 0.0
                 for i in self.inputs:
                     o += i.value
@@ -1259,7 +1263,6 @@ class ProcessProperty(SimObject):
         self.readonly = readonly
 
     def set_value(self, value):
-        self.set_telemetry_value('value', value)
         self._value = value
 
     def get_value(self) -> float:
