@@ -1775,10 +1775,204 @@ def createRegistrationService(sim=None, with_external_provider=False):
 def createRegistrationServiceWExternalDesktops(sim=None):
     return createRegistrationService(sim, with_external_provider=True)
 
+
+def createIdentificationService(sim=None):
+    # right now this is the registration service with inhouse desktops.
+    # this function will change to have optionally the external and
+    # later both.
+
+    # this procedure might add this branch to an existing model.
+
+    if sim is None:
+        sim = merlin.Simulation()
+    else:
+        assert isinstance(sim, merlin.Simulation)
+
+    # add a branch
+    branch_e = merlin.Entity(sim, "Identification Services Branch")
+    sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
+
+    # add the registration service
+    service_name = "Identification Service"
+    registration_e = merlin.Entity(sim, service_name)
+    sim.add_entity(registration_e, parent=branch_e)
+    branch_e.add_child(registration_e)
+    registration_e.attributes.add("service")
+
+    # add the budget entities/processes
+    # staff budget
+    TheStaffBudget = merlin.Entity(sim, "Budgeted – Staff Expenses")
+    sim.add_entity(TheStaffBudget, is_source_entity=True)
+    registration_e.add_child(TheStaffBudget)
+    TheStaffBudget.attributes.add("budget")
+    TheStaffBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "staff budget",
+            'start_amount': 36e6,
+            'budget_type': "staff$"
+        })
+
+    # rent budget
+    TheRentBudget = merlin.Entity(sim, "Budgeted – Rent Expenses")
+    sim.add_entity(TheRentBudget, is_source_entity=True)
+    registration_e.add_child(TheRentBudget)
+    TheRentBudget.attributes.add("budget")
+    TheRentBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "rent budget",
+            'start_amount': 15e6,
+            'budget_type': "rent$"
+        })
+
+    # other budget, provides for IT as well
+    TheOtherBudget = merlin.Entity(sim, "Budgeted – Other Expenses")
+    sim.add_entity(TheOtherBudget, is_source_entity=True)
+    registration_e.add_child(TheOtherBudget)
+    TheOtherBudget.attributes.add("budget")
+    TheOtherBudget.create_process(
+        processes.BudgetProcess,
+        {
+            'name': "other budget",
+            'start_amount': 800e3,
+            'budget_type': "other$"
+        })
+
+    # file logistics is no longer existing
+    # FileLogistics = merlin.Entity(sim, "File Logistics")
+
+    StaffAccommodation = merlin.Entity(sim, "Staff Accommodation")
+    sim.add_entity(StaffAccommodation)
+    registration_e.add_child(StaffAccommodation)
+    StaffAccommodation.create_process(
+        StaffAccommodationProcess,
+        {
+            'name': "staff accommodation",
+            'default_cost_m2': 300,
+            'default_area_m2': 1050,
+            'default_area_per_staff_m2': 15.0,
+            'default_lease_term': 5
+        })
+    StaffAccommodation.attributes.add("resource")
+
+    LineStaffRes = merlin.Entity(sim, "Staff")
+    sim.add_entity(LineStaffRes)
+    registration_e.add_child(LineStaffRes)
+    LineStaffRes.create_process(
+        StaffProcess,
+        {
+            'name': "line staff resource process",
+            'default_line_staff_no': 60,
+            'default_oh_staff_no': 7,
+            'default_hours_per_week': 40.0,
+            'default_admin_training_percent': 20,
+            'default_leave_percent': 20,
+            'default_avg_oh_salary': 60e3,
+            'default_avg_line_salary': 45e3,
+            'default_hours_training': 100,
+            'default_span_of_control': 10
+        })
+
+    LineStaffRes.attributes.add("resource")
+
+    InhouseDesktops = merlin.Entity(sim, "In-house Desktop Service")
+    sim.add_entity(InhouseDesktops)
+    registration_e.add_child(InhouseDesktops)
+    InhouseDesktops.create_process(
+        InternalICTDesktopService,
+        {
+            # todo: set to reasonable values!
+            'actual_desktops': 70,
+            'it_hrs_per_desktop': 40.0,
+            'acq_cost_per_desktop': 4000.0,
+            'maint_cost_per_desktop': 400.0,
+            'depr_period': 4,
+            'financial_charge_percent': 8,
+            'life_time': 6
+         })
+    InhouseDesktops.attributes.add("asset")
+
+    RegistrationFacility = merlin.Entity(sim, "Identification Service")
+    sim.add_entity(RegistrationFacility)
+    registration_e.add_child(RegistrationFacility)
+    RegistrationFacility.create_process(
+        RegistrationServiceProcess,
+        {
+            'name': "registration facility process",
+            'default_registration_fee': 49.0,
+            'default_applications_processed_per_lswork_hr': 10,
+            "default_applications_submitted": 0.75e6,
+        })
+    RegistrationFacility.attributes.add("asset")
+
+    opSurplus = merlin.Output("opsurplus$",
+                              name="Operational Surplus")
+    sim.add_output(opSurplus)
+    sim.connect_output(RegistrationFacility, opSurplus)
+
+    # need an expectation
+    applProcessed = merlin.Output("appl#",
+                                  name="Applications Processed")
+    applProcessed.minimum = 60e3
+    sim.add_output(applProcessed)
+    sim.connect_output(RegistrationFacility, applProcessed)
+
+    # need an expectation
+    serviceRevenue = merlin.Output("revenue$",
+                                   name="Service Revenue")
+    sim.add_output(serviceRevenue)
+    sim.connect_output(RegistrationFacility, serviceRevenue)
+
+    # need an expectation
+    budgetarySurplus = merlin.Output("surplus$",
+                                     name="Budgetary Surplus")
+    sim.add_output(budgetarySurplus)
+    # sim.connect_output(RegistrationFacility, budgetarySurplus)
+    sim.connect_output(StaffAccommodation, budgetarySurplus)
+    sim.connect_output(LineStaffRes, budgetarySurplus)
+
+    sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
+
+    sim.connect_entities(TheStaffBudget, LineStaffRes, "staff$")
+    sim.connect_entities(StaffAccommodation,
+                         LineStaffRes,
+                         "workspace#")
+
+    # all inputs from Inhouse Desktop Service
+    sim.connect_entities(LineStaffRes, InhouseDesktops, "LS_work_hr")
+    sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
+
+    # No external desktop provider
+    sim.connect_output(InhouseDesktops, budgetarySurplus)
+    # inputs for RegistrationFacility
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "desktop#")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "ITexpense$")
+
+    sim.connect_entities(StaffAccommodation, RegistrationFacility,
+                         "accommodationExpense$")
+    sim.connect_entities(InhouseDesktops, RegistrationFacility,
+                         "LS_work_hr")
+    sim.connect_entities(LineStaffRes, RegistrationFacility,
+                         "staffExpense$")
+
+    return sim
+
+
+def createAllServicesInOneModel():
+    sim = merlin.Simulation()
+    createIdentificationService(sim)
+    createRecordStorage(sim)
+    createRegistrationServiceWExternalDesktops(sim)
+    return sim
+
 if __name__ == "__main__":
 
     # sim = createRecordStorage()
-    sim = createRegistrationService(with_external_provider=True)
+    sim = createAllServicesInOneModel()
 
     sim.set_time_span(48)
     sim.run()
