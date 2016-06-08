@@ -380,8 +380,11 @@ class StaffAccommodationProcess(merlin.Process):
             default_lease_term
         )
 
+        self.rent_inflation = 0.03 / 12.0
+        self.current_cost_per_area = 0.0
+
     def reset(self):
-        pass
+        self.current_cost_per_area = 0.0
 
     def compute(self, tick):
 
@@ -389,15 +392,21 @@ class StaffAccommodationProcess(merlin.Process):
         area_per_staff = self.get_prop_value("area_per_staff_m2")
         area = self.get_prop_value("area_m2")
         lease_term = self.get_prop_value("lease_term")
-
         rent_expenses = self.get_input_available("rent expenses")
+
+        if self.current_cost_per_area < cost_per_area:
+            self.current_cost_per_area = cost_per_area
+
+        # Calculate inflation
+        self.current_cost_per_area += (
+            self.rent_inflation * self.current_cost_per_area)
 
         try:
             staff_accommodated = math.floor(area / area_per_staff)
         except ZeroDivisionError:
             staff_accommodated = 0
 
-        used_rent_expenses = cost_per_area*area
+        used_rent_expenses = self.current_cost_per_area*area
 
         lease_still_on = (lease_term >= 1)
         sufficient_funding = (rent_expenses >= used_rent_expenses)
