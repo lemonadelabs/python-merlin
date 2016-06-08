@@ -1383,6 +1383,13 @@ class RegistrationServiceProcess(merlin.Process):
 
 #  create entities for record storage service
 def createRecordStorage(branch_e=None):
+    """
+    :param Enitity branch_e: the branch to add the service to
+
+    If `branch_e` is `None`, a simulation object with the
+    "Information Services Branch" entity containing the service is
+    created and returned.
+    """
 
     if branch_e is None:
         sim = merlin.Simulation()
@@ -1555,11 +1562,21 @@ def createRecordStorage(branch_e=None):
 
 
 def createRegistrationService(branch_e=None, with_external_provider=False):
+    """
+    :param Enitity branch_e: the branch to add the service to
+    :param Bool with_external_provider: enables the external desktop provider
+
+    If `branch_e` is `None`, a simulation object with the
+    "Registration Services Branch" entity containing the service is
+    created and the simulation object returned.
+
+    if `with_external_provider` is True another entity "External Desktop
+    Service" with process is added to the service.
+    """
+
     # right now this is the registration service with inhouse desktops.
     # this function will change to have optionally the external and
     # later both.
-
-    # this procedure might add this branch to an existing model.
 
     if branch_e is None:
         sim = merlin.Simulation()
@@ -1779,6 +1796,14 @@ def createRegistrationServiceWExternalDesktops(sim=None):
 
 
 def createIdentificationService(branch_e=None):
+    """
+    :param Enitity branch_e: the branch to add the service to
+
+    If `branch_e` is `None`, a simulation object with the
+    "Identification Services Branch" entity containing the service is
+    created and the simulation object returned.
+    """
+
     # right now this is the registration service with inhouse desktops.
     # this function will change to have optionally the external and
     # later both.
@@ -1966,6 +1991,23 @@ def createIdentificationService(branch_e=None):
 
 
 def createAllServicesInOneModel():
+    """
+    creates a simulation with all three services nested as follows
+
+    sim
+       registration branch (attr branch)
+          service registration service (attr service)
+              nodes (div attrs)
+       information service branch (attr branch)
+           storage service (attr service)
+                nodes (div attrs)
+       identity service branch (attr branch)
+            identity service (attr service)
+                 nodes (div attrs)
+    outputs from all services (as they are not entities, they have no containment)
+
+    """
+
     sim = merlin.Simulation()
 
     branch_e = merlin.Entity(sim, "Identification Services Branch")
@@ -1987,6 +2029,19 @@ def createAllServicesInOneModel():
 
 
 def createRegistrationAndKnowledgeBranch():
+    """
+    creates a simulation with all three services nested as follows
+
+    sim
+       Registration and Knowledge Services (attr branch)
+          service registration service (attr service)
+              nodes (div attrs)
+           storage service (attr service)
+                nodes (div attrs)
+            identity service (attr service)
+                 nodes (div attrs)
+    outputs from all services (as they are not entities, they have no containment)
+    """
     sim = merlin.Simulation()
     # add the one branch
     branch_e = merlin.Entity(sim, "Registration and Knowledge Services")
