@@ -1098,7 +1098,7 @@ class InternalICTDesktopService(merlin.Process):
 
         # random seed value for testing predictability leave None for
         # default random.seed() gen
-        self.random_seed = 123456
+        self.random_seed = 7891011
 
         # A flag used to generate an initial scenario
         self._generated = False
@@ -1322,10 +1322,10 @@ class RegistrationServiceProcess(merlin.Process):
             default_applications_submitted
         )
 
-        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION
+        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.DECLINE
 
         # Settings for the different application trends
-        self.rate = 0.005
+        self.rate = 0.1
         self.random_range = 100000
         self.current_applications = None
 
@@ -1335,14 +1335,15 @@ class RegistrationServiceProcess(merlin.Process):
         if (self.current_applications is None) or (self.get_prop('applications_submitted').changed):
             self.current_applications = applications_submitted
 
-        at = self.application_trend
+        if tick % 12 == 0:
+            at = self.application_trend
 
-        if at == RegistrationServiceProcess.ApplicationsTrend.DECLINE:
-            self.current_applications -= (self.current_applications * self.rate)
-        elif at == RegistrationServiceProcess.ApplicationsTrend.INCREASE:
-            self.current_applications += (self.current_applications * self.rate)
-        elif at == RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION:
-            self.current_applications += (random.randint(-self.random_range, self.random_range))
+            if at == RegistrationServiceProcess.ApplicationsTrend.DECLINE:
+                self.current_applications -= (self.current_applications * self.rate)
+            elif at == RegistrationServiceProcess.ApplicationsTrend.INCREASE:
+                self.current_applications += (self.current_applications * self.rate)
+            elif at == RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION:
+                self.current_applications += (random.randint(-self.random_range, self.random_range))
 
 
     def reset(self):
