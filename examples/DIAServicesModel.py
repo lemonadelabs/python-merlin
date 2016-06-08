@@ -1382,17 +1382,18 @@ class RegistrationServiceProcess(merlin.Process):
 
 
 #  create entities for record storage service
-def createRecordStorage(sim=None):
+def createRecordStorage(branch_e=None):
 
-    if sim is None:
+    if branch_e is None:
         sim = merlin.Simulation()
+        # add a branch
+        branch_e = merlin.Entity(sim, "Information Services Branch")
+        sim.add_entity(branch_e, parent=None)
+        branch_e.attributes.add("branch")
     else:
-        assert isinstance(sim, merlin.Simulation)
-
-    # add a branch
-    branch_e = merlin.Entity(sim, "Information Services Branch")
-    sim.add_entity(branch_e, parent=None)
-    branch_e.attributes.add("branch")
+        assert (isinstance(branch_e, merlin.Entity) and
+                "branch" in branch_e.attributes)
+        sim = branch_e.sim
 
     # add the govRecordStorage capability
     storage_e = merlin.Entity(sim, "Storage Service")
@@ -1553,22 +1554,23 @@ def createRecordStorage(sim=None):
     return sim
 
 
-def createRegistrationService(sim=None, with_external_provider=False):
+def createRegistrationService(branch_e=None, with_external_provider=False):
     # right now this is the registration service with inhouse desktops.
     # this function will change to have optionally the external and
     # later both.
 
     # this procedure might add this branch to an existing model.
 
-    if sim is None:
+    if branch_e is None:
         sim = merlin.Simulation()
+        # add a branch
+        branch_e = merlin.Entity(sim, "Registration Services Branch")
+        sim.add_entity(branch_e, parent=None)
+        branch_e.attributes.add("branch")
     else:
-        assert isinstance(sim, merlin.Simulation)
-
-    # add a branch
-    branch_e = merlin.Entity(sim, "Registration Services Branch")
-    sim.add_entity(branch_e, parent=None)
-    branch_e.attributes.add("branch")
+        assert (isinstance(branch_e, merlin.Entity) and
+                "branch" in branch_e.attributes)
+        sim = branch_e.sim
 
     # add the registration service
     service_name = "Registration Service"
@@ -1776,22 +1778,23 @@ def createRegistrationServiceWExternalDesktops(sim=None):
     return createRegistrationService(sim, with_external_provider=True)
 
 
-def createIdentificationService(sim=None):
+def createIdentificationService(branch_e=None):
     # right now this is the registration service with inhouse desktops.
     # this function will change to have optionally the external and
     # later both.
 
-    # this procedure might add this branch to an existing model.
+    # this procedure might add this service to an existing model.
 
-    if sim is None:
+    if branch_e is None:
         sim = merlin.Simulation()
+        # add a branch
+        branch_e = merlin.Entity(sim, "Identification Services Branch")
+        sim.add_entity(branch_e, parent=None)
+        branch_e.attributes.add("branch")
     else:
-        assert isinstance(sim, merlin.Simulation)
-
-    # add a branch
-    branch_e = merlin.Entity(sim, "Identification Services Branch")
-    sim.add_entity(branch_e, parent=None)
-    branch_e.attributes.add("branch")
+        assert (isinstance(branch_e, merlin.Entity) and
+                "branch" in branch_e.attributes)
+        sim = branch_e.sim
 
     # add the registration service
     service_name = "Identification Service"
@@ -1964,9 +1967,36 @@ def createIdentificationService(sim=None):
 
 def createAllServicesInOneModel():
     sim = merlin.Simulation()
-    createIdentificationService(sim)
-    createRecordStorage(sim)
-    createRegistrationServiceWExternalDesktops(sim)
+
+    branch_e = merlin.Entity(sim, "Identification Services Branch")
+    sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
+    createIdentificationService(branch_e)
+
+    # add a branch
+    branch_e = merlin.Entity(sim, "Information Services Branch")
+    sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
+    createRecordStorage(branch_e)
+
+    branch_e = merlin.Entity(sim, "Registration Services Branch")
+    sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
+    createRegistrationServiceWExternalDesktops(branch_e)
+    return sim
+
+
+def createRegistrationAndKnowledgeBranch():
+    sim = merlin.Simulation()
+    # add the one branch
+    branch_e = merlin.Entity(sim, "Registration and Knowledge Services")
+    sim.add_entity(branch_e, parent=None)
+    branch_e.attributes.add("branch")
+
+    createIdentificationService(branch_e)
+    createRecordStorage(branch_e)
+    createRegistrationServiceWExternalDesktops(branch_e)
+
     return sim
 
 if __name__ == "__main__":
