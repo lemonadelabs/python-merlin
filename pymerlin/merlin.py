@@ -918,6 +918,8 @@ class Entity(SimObject):
                     logging.debug(
                         "Computing level {0} process {1}".format(i, proc.name))
                     proc.compute(self.current_time)
+                    for pp in proc.get_properties():
+                        pp.changed = False
         for o in self.outputs:
             o.tick()
 
@@ -1261,9 +1263,11 @@ class ProcessProperty(SimObject):
         self.parent = parent
         self._value = self.default
         self.readonly = readonly
+        self.changed = False
 
     def set_value(self, value):
         self._value = value
+        self.changed = True
 
     def get_value(self) -> float:
         return self._value

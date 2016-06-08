@@ -380,11 +380,12 @@ class StaffAccommodationProcess(merlin.Process):
             default_lease_term
         )
 
-        self.rent_inflation = 0.03 / 12.0
-        self.current_cost_per_area = 0.0
+        self.enable_rent_inflation = True
+        self.rent_inflation = 0.03
+        self.current_cost_per_area = None
 
     def reset(self):
-        self.current_cost_per_area = 0.0
+        self.current_cost_per_area = None
 
     def compute(self, tick):
 
@@ -394,12 +395,12 @@ class StaffAccommodationProcess(merlin.Process):
         lease_term = self.get_prop_value("lease_term")
         rent_expenses = self.get_input_available("rent expenses")
 
-        if self.current_cost_per_area < cost_per_area:
+        if (self.current_cost_per_area is None) or (self.get_prop('cost_per_m2').changed):
             self.current_cost_per_area = cost_per_area
 
         # Calculate inflation
-        self.current_cost_per_area += (
-            self.rent_inflation * self.current_cost_per_area)
+        if tick % 12.0 == 0.0 and self.enable_rent_inflation:
+            self.current_cost_per_area += (self.rent_inflation * self.current_cost_per_area)
 
         try:
             staff_accommodated = math.floor(area / area_per_staff)
@@ -566,6 +567,9 @@ class StaffProcess(merlin.Process):
         # and t[1] = months trained so far
         self.training_cohorts = list()
 
+        self.salary_growth = 0.012
+        self.enable_salary_growth = True
+
         # internal flags and counters
         self.ls_adjustment_month = 0
         self.ohs_adjustment_month = 0
@@ -573,9 +577,13 @@ class StaffProcess(merlin.Process):
         self.actual_overhead_staff = -1
         self.ls_reduction_baseline = 0
         self.ohs_reduction_baseline = 0
+        self.current_line_salary = None
+        self.current_oh_salary = None
 
 
     def reset(self):
+        self.current_line_salary = None
+        self.current_oh_salary = None
         self.training_cohorts.clear()
         self.ls_adjustment_month = 0
         self.ohs_adjustment_month = 0
@@ -791,6 +799,17 @@ class StaffProcess(merlin.Process):
         avg_overhead_salary = self.get_prop_value("avgOHSalary")
         span_of_control = self.get_prop_value("span_of_control")
 
+        if (self.current_line_salary is None) or (self.get_prop('avgLineSalary').changed):
+            self.current_line_salary = avg_line_salary
+
+        if (self.current_oh_salary is None) or (self.get_prop('avgOHSalary').changed):
+            self.current_oh_salary = avg_overhead_salary
+
+        # Calculate wage rises after 12 months
+        if tick % 12.0 == 0.0 and self.enable_salary_growth:
+            self.current_line_salary += (self.current_line_salary * self.salary_growth)
+            self.current_oh_salary += (self.current_oh_salary * self.salary_growth)
+
         staff_expenses = self.get_input_available("Staff Budget")
         staff_accommodated = self.get_input_available("Workplaces Available")
 
@@ -801,8 +820,8 @@ class StaffProcess(merlin.Process):
         line_staff_work_hr = self._calculate_staff_fte(FTE_hours)
 
         used_staff_expenses = (
-            (avg_line_salary * self.actual_line_staff) +
-            (avg_overhead_salary * self.actual_overhead_staff) / 12.0
+            (self.current_line_salary * self.actual_line_staff) +
+            (self.current_oh_salary * self.actual_overhead_staff) / 12.0
         )
 
         sufficient_funding = (
@@ -1084,6 +1103,10 @@ class InternalICTDesktopService(merlin.Process):
         # A flag used to generate an initial scenario
         self._generated = False
 
+        # Should desktops be auto-purchased to make up numbers?
+        self.auto_purchase_cohorts = False
+
+
     def create_desktop_simulation(self):
 
         # Create starting cohorts
@@ -1157,7 +1180,7 @@ class InternalICTDesktopService(merlin.Process):
         # Get the number of desktops to dispose
         desktops_to_dispose = sum([c['desktops'] for c in cohorts_to_dispose])
 
-        if (legacy_desktops - desktops_to_dispose) < actual_desktops:
+        if ((legacy_desktops - desktops_to_dispose) < actual_desktops) and self.auto_purchase_cohorts:
             # We need to purchase a new cohort of pcs this month
             desktops_to_purchase = actual_desktops - (legacy_desktops - desktops_to_dispose)
             new_cohort = dict()
