@@ -7,7 +7,7 @@ This module provides an example services model for the first
 phase of the Merlin project. It uses some classes from the other
 exmaple files.
 """
-
+from enum import Enum
 from pymerlin import merlin
 from pymerlin import processes
 import logging
@@ -1104,7 +1104,7 @@ class InternalICTDesktopService(merlin.Process):
         self._generated = False
 
         # Should desktops be auto-purchased to make up numbers?
-        self.auto_purchase_cohorts = False
+        self.auto_purchase_cohorts = True
 
 
     def create_desktop_simulation(self):
@@ -1272,6 +1272,12 @@ class RegistrationServiceProcess(merlin.Process):
     registrations of successfully re-enacted dreams
     """
 
+    class ApplicationsTrend(Enum):
+        CONSTANT = 0
+        DECLINE = 1
+        INCREASE = 2
+        RANDOM_FLUCTUATION = 3
+
     def __init__(
             self,
             default_registration_fee=10.0,
@@ -1316,8 +1322,31 @@ class RegistrationServiceProcess(merlin.Process):
             default_applications_submitted
         )
 
+        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION
+
+        # Settings for the different application trends
+        self.rate = 0.005
+        self.random_range = 100000
+        self.current_applications = None
+
+    def _compute_applications(self, tick):
+        applications_submitted = self.get_prop_value('applications_submitted')
+
+        if (self.current_applications is None) or (self.get_prop('applications_submitted').changed):
+            self.current_applications = applications_submitted
+
+        at = self.application_trend
+
+        if at == RegistrationServiceProcess.ApplicationsTrend.DECLINE:
+            self.current_applications -= (self.current_applications * self.rate)
+        elif at == RegistrationServiceProcess.ApplicationsTrend.INCREASE:
+            self.current_applications += (self.current_applications * self.rate)
+        elif at == RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION:
+            self.current_applications += (random.randint(-self.random_range, self.random_range))
+
+
     def reset(self):
-        pass
+        self.current_applications = None
 
     def compute(self, tick):
 
@@ -1332,14 +1361,15 @@ class RegistrationServiceProcess(merlin.Process):
         registration_fee = self.get_prop_value("registration_fee")
         applications_processed_per_lswork_hr = self.get_prop_value(
                             'applications_processed_per_lswork_hr')
-        applications_submitted = self.get_prop_value('applications_submitted')
 
-        revenue = applications_submitted * registration_fee / 12.0
+        self._compute_applications(tick)
+
+        revenue = self.current_applications * registration_fee / 12.0
 
         total_expenses = (staff_expenses + accommodation_expenses +
                           it_expenses)
 
-        sufficient_process_staff = (applications_submitted / 12.0 <=
+        sufficient_process_staff = (self.current_applications / 12.0 <=
                                     applications_processed_per_lswork_hr *
                                     work_hrs)
 
@@ -1358,7 +1388,7 @@ class RegistrationServiceProcess(merlin.Process):
             self.notify_insufficient_input(
                 'line staff work hours',
                 work_hrs,
-                (applications_submitted / 12.0 /
+                (self.current_applications / 12.0 /
                  applications_processed_per_lswork_hr)
             )
 
@@ -1395,7 +1425,7 @@ class RegistrationServiceProcess(merlin.Process):
             # Provide outputs
             self.provide_output(
                 'Applications Processed',
-                applications_submitted / 12.0
+                self.current_applications / 12.0
             )
 
             self.provide_output(
