@@ -380,8 +380,8 @@ class StaffAccommodationProcess(merlin.Process):
             default_lease_term
         )
 
-        self.enable_rent_inflation = True
-        self.rent_inflation = 0.03
+        self.enable_rent_inflation = False
+        self.rent_inflation = 0.012
         self.current_cost_per_area = None
 
     def reset(self):
