@@ -568,7 +568,7 @@ class StaffProcess(merlin.Process):
         self.training_cohorts = list()
 
         self.salary_growth = 0.012
-        self.enable_salary_growth = True
+        self.enable_salary_growth = False
 
         # internal flags and counters
         self.ls_adjustment_month = 0
@@ -1104,7 +1104,7 @@ class InternalICTDesktopService(merlin.Process):
         self._generated = False
 
         # Should desktops be auto-purchased to make up numbers?
-        self.auto_purchase_cohorts = True
+        self.auto_purchase_cohorts = False
 
 
     def create_desktop_simulation(self):
@@ -1323,9 +1323,12 @@ class RegistrationServiceProcess(merlin.Process):
         )
 
         self.application_trend = RegistrationServiceProcess.ApplicationsTrend.DECLINE
+        # sin + decline + jitter
 
         # Settings for the different application trends
         self.rate = 0.1
+        self.jitter = 50000.0
+        self.sin_magnitude = 10000
         self.random_range = 100000
         self.current_applications = None
 
@@ -1337,13 +1340,17 @@ class RegistrationServiceProcess(merlin.Process):
 
         if tick % 12 == 0:
             at = self.application_trend
-
             if at == RegistrationServiceProcess.ApplicationsTrend.DECLINE:
                 self.current_applications -= (self.current_applications * self.rate)
             elif at == RegistrationServiceProcess.ApplicationsTrend.INCREASE:
                 self.current_applications += (self.current_applications * self.rate)
             elif at == RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION:
                 self.current_applications += (random.randint(-self.random_range, self.random_range))
+
+
+        self.current_applications += float(random.randint(-self.jitter, self.jitter))
+        self.current_applications += math.sin(tick) * self.sin_magnitude
+
 
 
     def reset(self):
@@ -1374,6 +1381,7 @@ class RegistrationServiceProcess(merlin.Process):
                                     applications_processed_per_lswork_hr *
                                     work_hrs)
 
+
         monthly_work_hrs_pp = 52.0*40.0*0.8*0.8/12
         desktops_required = work_hrs / monthly_work_hrs_pp
         sufficient_desktops = (desktops >= desktops_required)
@@ -1393,55 +1401,60 @@ class RegistrationServiceProcess(merlin.Process):
                  applications_processed_per_lswork_hr)
             )
 
+        if not sufficient_desktops:
+            # reduce applications processed if lacking desktops and by extension, staff
+            desktop_deficit = desktops_required - desktops
+            work_hour_deficit = float(desktop_deficit) * monthly_work_hrs_pp
+            application_deficit = work_hour_deficit * applications_processed_per_lswork_hr
+            self.current_applications -= application_deficit
+            self.current_applications = max(0, self.current_applications)
+
         # Process inputs and outputs
-        if sufficient_desktops and sufficient_process_staff:
 
-            # Consume inputs
+        # Consume inputs
 
-            self.consume_input(
-                'line staff work hours',
-                work_hrs
-            )
+        self.consume_input(
+            'line staff work hours',
+            work_hrs
+        )
 
-            self.consume_input(
-                'Staff Expenses',
-                self.get_input_available('Staff Expenses')
-            )
+        self.consume_input(
+            'Staff Expenses',
+            self.get_input_available('Staff Expenses')
+        )
 
-            self.consume_input(
-                'Accommodation Expenses',
-                self.get_input_available('Accommodation Expenses')
-            )
+        self.consume_input(
+            'Accommodation Expenses',
+            self.get_input_available('Accommodation Expenses')
+        )
 
-            self.consume_input(
-                'IT Expenses',
-                self.get_input_available('IT Expenses')
-            )
+        self.consume_input(
+            'IT Expenses',
+            self.get_input_available('IT Expenses')
+        )
 
-            self.consume_input(
-                "desktops provided",
-                self.get_input_available("desktops provided")
-            )
+        self.consume_input(
+            "desktops provided",
+            self.get_input_available("desktops provided")
+        )
 
-            # Provide outputs
-            self.provide_output(
-                'Applications Processed',
-                self.current_applications / 12.0
-            )
+        # Provide outputs
+        self.provide_output(
+            'Applications Processed',
+            self.current_applications / 12.0
+        )
 
-            self.provide_output(
-                'Service Revenue',
-                revenue
-            )
+        self.provide_output(
+            'Service Revenue',
+            revenue
+        )
 
-            self.provide_output(
-                'Operational Surplus',
-                revenue - total_expenses
-            )
+        self.provide_output(
+            'Operational Surplus',
+            revenue - total_expenses
+        )
 
-        else:
-            self.consume_all_inputs(0)
-            self.write_zero_to_all()
+
 
 
 #  create entities for record storage service
