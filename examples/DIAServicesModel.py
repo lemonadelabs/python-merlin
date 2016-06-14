@@ -965,8 +965,8 @@ class ICTDesktopContract(merlin.Process):
         if not contract_managed:
             self.notify_insufficient_input(
                 'overhead_staff_work_hr',
-                self.get_input_available('overhead_staff_work_hr'),
-                self.get_prop_value('desktop_contract_ohswork_hr')
+                oh_work_hrs,
+                contract_ohwork_hr
             )
 
         # Process inputs and outputs
