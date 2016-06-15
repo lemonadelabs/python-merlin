@@ -15,6 +15,10 @@ def dia_record_storage_model() -> merlin.Simulation:
     return DIAServicesModel.createRecordStorage()
 
 @pytest.fixture()
+def dia_reg_service() -> merlin.Simulation:
+    return DIAServicesModel.createRegistrationServiceWExternalDesktops()
+
+@pytest.fixture()
 def record_storage_example() -> merlin.Simulation:
     return RecordStorageFacility.manyBudgetModel()
 
@@ -233,7 +237,7 @@ class TestSimulation:
                     assert len(to['data']['value']) == sim.num_steps
 
 
-    def test_consistant_telemetry_output(self, dia_record_storage_model):
+    def test_consistant_telemetry_output_size(self, dia_record_storage_model):
         sim = dia_record_storage_model  # type: merlin.Simulation
         sim.num_steps = 10
         for i in range(0, 5):
@@ -244,6 +248,27 @@ class TestSimulation:
                     if 'value' in to['data']:
                         print(to['name'])
                         assert len(to['data']['value']) == sim.num_steps
+
+
+    def test_consistant_telemetry_output_values(self, dia_reg_service):
+        sim = dia_reg_service  # type: merlin.Simulation
+        sim.num_steps = 48
+        sim.run(end=48)
+        output_1 = sim.get_sim_telemetry()
+        sim.run(end=48)
+        output_2 = sim.get_sim_telemetry()
+
+        for t1 in output_1:
+            if 'messages' in t1:
+                continue
+            for t2 in output_2:
+                if 'messages' in t2:
+                    continue
+                if t2['id'] == t1['id']:
+                    assert len(t1['data']['value']) == len(t2['data']['value'])
+                    for i in range(0, len(t1['data']['value'])):
+                        assert t1['data']['value'][i] == t2['data']['value'][i]
+
 
     def test_source_entities(self, computation_test_harness):
         sim = computation_test_harness

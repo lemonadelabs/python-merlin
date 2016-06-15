@@ -773,6 +773,7 @@ class Entity(SimObject):
 
                 for pprop in p.get_properties():
                     pprop.reset_telemetry()
+                    pprop.reset()
 
     def remove_process(self, proc_id):
         proc = self.get_process_by_id(proc_id)
@@ -1271,6 +1272,9 @@ class ProcessProperty(SimObject):
 
     def get_value(self) -> float:
         return self._value
+
+    def reset(self):
+        self._value = self.default
 
 
 class Connector(SimObject):
