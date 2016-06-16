@@ -16,7 +16,7 @@ from datetime import datetime
 from enum import Enum
 from json.decoder import JSONDecodeError
 from typing import (Iterable, Set, Mapping, Any,
-                    List, MutableSequence, Dict,  # @UnusedImports
+                    List, Dict,  # @UnusedImports
                     Union, MutableSet, MutableMapping)  # @UnusedImports
 
 
@@ -67,7 +67,7 @@ class Simulation(SimObject):
         self.ruleset = ruleset  # type: Ruleset
         self.initial_state = config or []
         self.source_entities = set()  # type: MutableSet[Entity]
-        self.outputs = outputs or set()  # type: MutableSet[Output]
+        self.outputs = outputs or set()  # type: MutableSet[Entity]
         self.num_steps = 1  # type: int
         self.current_step = 1  # type: int
         self.run_errors = list()  # type: List[MerlinException]
@@ -239,44 +239,6 @@ class Simulation(SimObject):
         from_entity.add_output(o_con)
         to_entity.add_input(i_con)
 
-    def connect_output(
-            self,
-            entity,
-            output,
-            input_additive_write=False,
-            apportioning=None):
-        """
-        :param Entity entity:
-        :param Output output:
-        :param bool input_additive_write: sets ``additive write`` for the
-            :py:class:`InputConnector` (only if not already exists!)
-        :param ApportioningRules apportioning: sets apportioning rule for
-           :py:class:`.OutputConnector` (only if not already exists!)
-        """
-
-        if output not in self.outputs:
-            return
-
-        o_con = entity.get_output_by_type(output.type)
-
-        if not o_con:
-            o_con = OutputConnector(
-                output.type,
-                entity,
-                name='{0}_output'.format(output.type),
-                apportioning=apportioning)
-
-        i_con = InputConnector(
-            output.type,
-            output,
-            name='{0}_input_from_{1}'.format(output.type, entity.id),
-            additive_write=input_additive_write)
-
-        i_con.source = o_con
-        o_con.add_input(i_con)
-        entity.add_output(o_con)
-        if i_con not in output.inputs:
-            output.inputs.add(i_con)
 
     def set_time_span(self, num_months):
         """
@@ -330,7 +292,6 @@ class Simulation(SimObject):
         return attributes as a set of strings (not iterator).
         """
         units = set()
-        units |= {o.type for o in self.outputs}
 
         # get units/unit_types/types from output and input connectors
         for e in self.get_entities():
@@ -369,9 +330,8 @@ class Simulation(SimObject):
             self.add_entity(e)
 
     def add_output(self, o):
-        if o not in self.outputs:
-            self.outputs.add(o)
-            o.sim = self
+        warnings.warn("Simulation.add_output is now redundant",
+                      DeprecationWarning)
 
     def add_entity(self, e, is_source_entity=False, parent=None):
         """
@@ -390,6 +350,8 @@ class Simulation(SimObject):
             e.sim = self
             if is_source_entity:
                 self.source_entities.add(e)
+            if e.is_output and e not in self.outputs:
+                self.outputs.add(e)
 
     def remove_entity(self, e):
         """
@@ -560,78 +522,6 @@ class Simulation(SimObject):
                 datetime.now() - start_time))
 
 
-class Output(SimObject):
-    """
-    A network flow sink.
-    """
-    def __init__(self, unit_type, name=''):
-        """
-        :param str unit_type: the string identifying the unit of the
-            output value
-        :param str name: the name string for the base class.
-
-        This collects the outputs for a branch or department from the different
-        entities containing :py:class:`pymerlin.merlin.Process`.
-
-        ``unit_type`` needs to be added to the simulation with
-        :py:meth:`pymerlin.merlin.add_unit_types`.
-
-        :attr:`minimum` sets a minimum expectation to the output value,
-           which needs to be met or a warning will be flagged.
-        """
-        super(Output, self).__init__(name)
-        self.inputs = set()  # type: Set[InputConnector]
-        self.current_time = None  # type: int
-        self.type = unit_type
-        self.result = list()  # type: MutableSequence[float]
-        self.sim = None  # type: Union[Simulation, None]
-        self.minimum = None
-        self.attributes = set()  # type: Set[str]
-        self.updated = False
-
-    def reset(self):
-        self.result.clear()
-        self.current_time = None
-        self.reset_telemetry()
-        self.updated = False
-        for i in self.inputs:
-            i.reset_telemetry()
-
-    def tick(self, time):
-        if self.current_time and time < self.current_time:
-            return
-
-        if (self.current_time is None) or (time > self.current_time):
-            self.current_time = time
-            self.updated = False
-
-        if time == self.current_time:
-            # need to check if we have all inputs updated before processing
-            up_to_date = True
-            for i in self.inputs:
-                up_to_date = up_to_date and (i.time == self.current_time)
-
-            if up_to_date and not self.updated:
-                self.updated = True
-                o = 0.0
-                for i in self.inputs:
-                    o += i.value
-                self.result.append(o)
-                if self.minimum and o < self.minimum:
-                    self.sim.log_message(
-                        MerlinMessage.MessageType.warn,
-                        self,
-                        "{0}_output_below_min".format(self.id),
-                        ("Output value {0} of type {1} has fallen " +
-                         "below the minimum of {2}").format(
-                            o,
-                            self.type,
-                            self.minimum)
-                    )
-
-                self.set_telemetry_value('value', o)
-
-
 class Entity(SimObject):
     """
     A node in the network.
@@ -646,7 +536,8 @@ class Entity(SimObject):
             self,
             simulation: Simulation=None,
             name: str='',
-            attributes: Set[str]=set()):
+            attributes: Set[str]=set(),
+            is_output: bool=False):
         super(Entity, self).__init__(name)
         self._processes = dict()  # type: Dict[int, Set['Process']]
         self.sim = simulation  # type: Simulation
@@ -657,6 +548,7 @@ class Entity(SimObject):
         self._children = set()  # type: MutableSet[Entity]
         self.current_time = None  # type: int
         self.processed = False  # type: bool
+        self.is_output = is_output
 
     def __str__(self):
         return """
@@ -1455,7 +1347,7 @@ class OutputConnector(Connector):
         for ep, dist_value in ep_output:
             logging.debug("dist_value: {0}".format(dist_value))
             ep.connector.write(dist_value)
-            ep.connector.time = self.time
+            #ep.connector.time = self.time
 
     def _get_endpoint(self, input_connector):
         result = None
@@ -1536,11 +1428,11 @@ class InputConnector(Connector):
             unit_type,
             parent,
             name='',
-            source=None,
+            sources=list(),
             additive_write=False):
 
         super(InputConnector, self).__init__(unit_type, parent, name)
-        self.source = source
+        self.sources = sources
         self.additive_write = additive_write
         self.value = 0.0
 
@@ -1559,10 +1451,21 @@ class InputConnector(Connector):
             self.parent,
             self.time,
             self.additive_write,
-            self.source)
+            self.sources)
 
     def write(self, value):
-        self.value = (self.value + value) if self.additive_write else value
+        # Check that all sources are up to date before setting time
+        up_to_date = True
+        new_time = self.time
+        for s in self.sources:
+            up_to_date &= s.time > self.time
+            if s.time > self.time:
+                new_time = max(new_time, s.time)
+
+        if up_to_date:
+            self.time = new_time
+
+        self.value += value
         self.set_telemetry_value('value', self.value)
 
 
@@ -1716,16 +1619,6 @@ class Action(SimObject):
                 elif a['operand_1']['type'] == 'UnitType':
                     raise MerlinScriptException(
                         "Operation RemoveUnitType not supported")
-            elif a['op'] == ':=':
-                if a['operand_1']['type'] == 'Output':
-                    return ModifyOutputMinimumAction(
-                        a['operand_1']['params'][0],
-                        **(a['operand_1']['props']))
-                else:
-                    raise MerlinScriptException(
-                        "Invalid type for unary assignment operator"
-                    )
-
             else:
                 raise MerlinScriptException(
                     ("Invalid operator for unary expression, " +
@@ -2573,42 +2466,6 @@ class ParentEntityAction(Action):
             self.child_entity_id, 'Entity')
         if parent_entity and child_entity:
             simulation.parent_entity(parent_entity, child_entity)
-
-
-class ModifyOutputMinimumAction(Action):
-    
-    def __init__(
-            self,
-            output_id,
-            minimum=None,
-            additive=False
-            ):
-        super(ModifyOutputMinimumAction, self).__init__()
-        self.output_id = self.convert_to_id(output_id) or output_id
-        self.minimum = float(minimum)
-        self.additive = additive
-
-    def serialize(self) -> Dict[str, Any]:
-        return {
-            'op': ":=",
-            'operand_1': {
-                'type': "Output",
-                'params': [self.output_id],
-                "props": {
-                    'minimum': self.minimum,
-                    'additive': self.additive
-                }
-            },
-            'operand_2': None
-        }
-
-    def execute(self, simulation: Simulation):
-        output = simulation.find_sim_object(self.output_id, 'Output')
-        if output:
-            if self.additive:
-                output.minimum += self.minimum
-            else:
-                output.minimum = self.minimum
 
 
 class ModifyEndpointBiasAction(Action):

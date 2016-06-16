@@ -1,6 +1,10 @@
 from pymerlin import merlin
 
 
+class AccumulatorProcess(merlin.Process):
+    pass
+
+
 class ConstantProvider(merlin.Process):
     """
     always return the same number
