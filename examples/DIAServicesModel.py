@@ -1786,10 +1786,10 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
     sim.add_output(opSurplus)
     sim.connect_output(RegistrationFacility, opSurplus)
 
-    # need an expectation
+    # provide an expectation
     applProcessed = merlin.Output("appl#",
                                   name="Applications Processed")
-    applProcessed.minimum = 360e3/12
+    applProcessed.minimum = 360e3/12*2.82
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
