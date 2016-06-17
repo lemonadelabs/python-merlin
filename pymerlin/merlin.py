@@ -197,7 +197,7 @@ class Simulation(SimObject):
 
         if i_con and o_con:
             o_con.remove_input(i_con)
-            to_entity.inputs.remove(i_con)
+            i_con.remove_source(o_con)
 
     def connect_entities(
             self,
@@ -226,6 +226,7 @@ class Simulation(SimObject):
                 from_entity,
                 name='{0}_output'.format(unit_type),
                 apportioning=apportioning)
+            from_entity.add_output(o_con)
 
         if not i_con:
             i_con = InputConnector(
@@ -233,11 +234,10 @@ class Simulation(SimObject):
                 to_entity,
                 name='{0}_input'.format(unit_type),
                 additive_write=input_additive_write)
+            to_entity.add_input(i_con)
 
-        i_con.source = o_con
+        i_con.add_source(o_con)
         o_con.add_input(i_con)
-        from_entity.add_output(o_con)
-        to_entity.add_input(i_con)
 
 
     def set_time_span(self, num_months):
@@ -310,7 +310,7 @@ class Simulation(SimObject):
     def is_unit_type(self, ut):
         return ut in self.get_unit_types()
 
-    def set_source_entities(self, entities):
+    def set_source_entities(self, entities: List[Entity]):
         """
         these entities are set as source entities, i.e. started first
         """
@@ -361,6 +361,8 @@ class Simulation(SimObject):
         """
         if e in self._entities:
             self._entities.remove(e)
+            if e in self.outputs:
+                self.outputs.remove(e)
 
     def get_entity_by_name(self, name) -> 'Entity':
         for e in self._entities:
@@ -399,10 +401,6 @@ class Simulation(SimObject):
     def get_last_run_errors(self):
         return list(self.run_errors)
 
-    def validate(self):
-        # TODO: Write basic validation function for sim
-        return True
-
     def log_message(
             self,
             message_type: 'MerlinMessage.MessageType',
@@ -426,8 +424,6 @@ class Simulation(SimObject):
 
     def get_sim_telemetry(self) -> List[Dict[str, Any]]:
         output = list()
-        for o in self.outputs:
-            output.append(self._get_object_telemetry(o))
 
         for e in self.get_entities():
 
@@ -496,10 +492,6 @@ class Simulation(SimObject):
 
         sim_start = start if start > 1 else 1
         sim_end = end if (0 < end < self.num_steps) else self.num_steps
-
-        # clear data from the last run
-        for o in self.outputs:
-            o.reset()
 
         # call reset on all processes
         for e in self._entities:
@@ -1347,7 +1339,7 @@ class OutputConnector(Connector):
         for ep, dist_value in ep_output:
             logging.debug("dist_value: {0}".format(dist_value))
             ep.connector.write(dist_value)
-            #ep.connector.time = self.time
+
 
     def _get_endpoint(self, input_connector):
         result = None
@@ -1428,7 +1420,7 @@ class InputConnector(Connector):
             unit_type,
             parent,
             name='',
-            sources=list(),
+            sources=set(),
             additive_write=False):
 
         super(InputConnector, self).__init__(unit_type, parent, name)
@@ -1453,20 +1445,35 @@ class InputConnector(Connector):
             self.additive_write,
             self.sources)
 
+    def add_source(self, source: OutputConnector):
+        if source not in self.sources:
+            self.sources.add(source)
+
+    def remove_source(self, source: OutputConnector):
+        if source in self.sources:
+            self.sources.remove(source)
+            if not self.sources:
+                self.parent.inputs.remove(self)
+
     def write(self, value):
         # Check that all sources are up to date before setting time
-        up_to_date = True
+        up_to_date = 0
         new_time = self.time
+
         for s in self.sources:
-            up_to_date &= s.time > self.time
             if s.time > self.time:
+                up_to_date += 1
                 new_time = max(new_time, s.time)
 
-        if up_to_date:
-            self.time = new_time
+        if (up_to_date == 1) and (not self.additive_write):
+            self.value = value
+        else:
+            self.value += value
 
-        self.value += value
-        self.set_telemetry_value('value', self.value)
+        if up_to_date == len(self.sources):
+            self.time = new_time
+            self.set_telemetry_value('value', self.value)
+
 
 
 class Action(SimObject):
@@ -1810,7 +1817,6 @@ class Action(SimObject):
             'UnitType',
             'Process',
             'Property',
-            'Output',
             'Endpoint'
         ]:
             return token

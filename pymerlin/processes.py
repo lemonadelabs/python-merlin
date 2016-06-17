@@ -1,8 +1,91 @@
 from pymerlin import merlin
 
 
-class AccumulatorProcess(merlin.Process):
-    pass
+class OutputProcess(merlin.Process):
+
+    def __init__(
+            self,
+            name='Output',
+            unit='',
+            minimum=None,
+            target=None):
+
+        super(OutputProcess, self).__init__(name)
+
+        # Define Output
+        self.add_output(unit, unit)
+
+        # Define Input
+        self.add_input(unit, unit)
+
+        self.unit = unit
+        self.has_min = minimum is not None
+        self.has_target = target is not None
+
+        # Define Properties
+        if self.has_min:
+            self.add_property(
+                'Minimum',
+                'minimum',
+                merlin.ProcessProperty.PropertyType.number_type,
+                minimum
+            )
+
+        if self.has_target:
+            self.add_property(
+                'Target',
+                'target',
+                merlin.ProcessProperty.PropertyType.number_type,
+                target
+            )
+
+        self.add_property(
+            'Total',
+            'total',
+            merlin.ProcessProperty.PropertyType.number_type,
+            0,
+            read_only=True
+        )
+
+    def reset(self):
+        pass
+
+    def compute(self, tick):
+        input_val = self.get_input_available(self.unit)
+
+        total = self.get_prop_value('total')
+        self.get_prop('total').set_value(total + input_val)
+
+        if self.has_min:
+            minimum = self.get_prop_value('minimum')
+            if input_val < minimum:
+                self.parent.sim.log_message(
+                    merlin.MerlinMessage.MessageType.warn,
+                    self,
+                    '{0}_minimum'.format(self.id),
+                    'The {{{{output}}}} {0} has fallen below the {{{{minimum}}}} of {1}'.format(
+                        self.name,
+                        minimum
+                    ),
+                    [self, self.get_prop('minimum')]
+                )
+
+        if self.has_target:
+            target = self.get_prop_value('target')
+            if input_val < target:
+                self.parent.sim.log_message(
+                    merlin.MerlinMessage.MessageType.info,
+                    self,
+                    '{0}_target'.format(self.id),
+                    'The {{{{output}}}} {0} has not reached the {{{{target}}}} of {1}'.format(
+                        self.name,
+                        target
+                    ),
+                    [self, self.get_prop('target')]
+                )
+
+        self.consume_input(self.unit, input_val)
+        self.provide_output(self.unit, input_val)
 
 
 class ConstantProvider(merlin.Process):
