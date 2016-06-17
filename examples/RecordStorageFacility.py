@@ -322,8 +322,6 @@ def govRecordStorageCore():
     LineStaffRes = merlin.Entity(sim, "line staff resource")
     sim.add_entity(LineStaffRes)
     storage_e.add_child(LineStaffRes)
-    # the_line_staff_process = LineStaffProcess("line staff resource process")
-    # LineStaffRes.add_process(the_line_staff_process)
     LineStaffRes.create_process(
         LineStaffProcess,
         {
@@ -337,8 +335,6 @@ def govRecordStorageCore():
     storage_e.add_child(StorageFacility)
     sim.connect_entities(FileLogistics, StorageFacility, "file count")
     sim.connect_entities(LineStaffRes, StorageFacility, "lineFTE")
-    # the_stor_fac_process = StorageFacilityProcess("storage facility process")
-    # StorageFacility.add_process(the_stor_fac_process)
     StorageFacility.create_process(
         StorageFacilityProcess,
         {
@@ -349,17 +345,29 @@ def govRecordStorageCore():
 
     # do these outputs go into a capability or branch?
     # need an expectation
-    filesStored = merlin.Output("files stored",
-                                name="files stored")
-    sim.add_output(filesStored)
-    sim.connect_output(StorageFacility, filesStored)
+    filesStored = merlin.Entity(sim, "files stored", is_output=True)
+    filesStored.create_process(
+        processes.OutputProcess,
+        {
+            'name': 'Output - Files Stored',
+            'unit': 'files stored',
+        }
+    )
+
+    sim.add_entity(filesStored)
+    sim.connect_entities(StorageFacility, filesStored, 'files stored')
 
     # need an expectation
-    filesAccessed = merlin.Output("files handled",
-                                  name="files accessed")
-    sim.add_output(filesAccessed)
-    sim.connect_output(StorageFacility, filesAccessed)
-
+    filesAccessed = merlin.Entity(sim, "files handled", is_output=True)
+    filesAccessed.create_process(
+        processes.OutputProcess,
+        {
+            'name': 'Output - Files Handled',
+            'unit': 'files handled'
+        }
+    )
+    sim.add_entity(filesAccessed)
+    sim.connect_entities(StorageFacility, filesAccessed, "files handled")
     return sim
 
 
@@ -605,5 +613,6 @@ if __name__ == "__main__":
 
     sim.set_time_span(48)
     sim.run()
-    result = list(sim.outputs)
-    print(result[0].result, result[1].result)
+    telem = sim.get_sim_telemetry()
+
+

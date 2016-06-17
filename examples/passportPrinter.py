@@ -8,7 +8,7 @@ A printer with minimal staff required.
 
 import logging
 from pymerlin import merlin
-from pymerlin.processes import BudgetProcess
+from pymerlin.processes import BudgetProcess, OutputProcess
 
 # Global logging settings
 logging_level = logging.DEBUG
@@ -131,9 +131,15 @@ def IPSbranch():
     sim = merlin.Simulation()
 
     # define outputs
-    pp_delivered = merlin.Output("count",
-                                 name="passports printed")
-    sim.add_output(pp_delivered)
+    pp_delivered = merlin.Entity(name="passports printed", is_output=True)
+    pp_delivered.create_process(
+        OutputProcess,
+        {
+            'name': 'Output - Passports Printed',
+            'unit': 'count'
+        }
+    )
+    sim.add_entity(pp_delivered)
 
     e_budget = merlin.Entity(name="budget",
                              attributes={'budget'})
@@ -149,7 +155,7 @@ def IPSbranch():
     sim.connect_entities(e_budget, e_staff, "$")
     sim.connect_entities(e_budget, e_printer, "$")
     sim.connect_entities(e_staff, e_printer, "FTE")
-    sim.connect_output(e_printer, pp_delivered)
+    sim.connect_entities(e_printer, pp_delivered, 'count')
 
     # and finally add the processes to the entities
     # so the processes are automatically hooked up to the
@@ -190,5 +196,5 @@ if __name__ == "__main__":
     sim = IPSbranch()
     sim.set_time_span(12)
     sim.run()
-    result = list(sim.outputs)[0].result
+    result = sim.get_sim_telemetry()
     print(result)

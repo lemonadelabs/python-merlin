@@ -310,7 +310,7 @@ class Simulation(SimObject):
     def is_unit_type(self, ut):
         return ut in self.get_unit_types()
 
-    def set_source_entities(self, entities: List[Entity]):
+    def set_source_entities(self, entities: List['Entity']):
         """
         these entities are set as source entities, i.e. started first
         """
