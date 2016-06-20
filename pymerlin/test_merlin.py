@@ -5,7 +5,8 @@ from pymerlin import merlin
 from pymerlin.processes import (BudgetProcess,
                                 CallCenterStaffProcess,
                                 BuildingMaintainenceProcess,
-                                ConstantProvider)
+                                ConstantProvider,
+                                OutputProcess)
 from examples import RecordStorageFacility
 from examples import DIAServicesModel
 
@@ -31,8 +32,16 @@ def computation_test_harness(sim) -> merlin.Simulation:
     sim.add_attributes(['budget', 'capability', 'fixed_asset'])
     sim.add_unit_types(['$', 'desks', 'requests_handled'])
 
-    sim_output = merlin.Output('requests_handled', name='requests handled')
-    sim.outputs.add(sim_output)
+    # sim_output = merlin.Output('requests_handled', name='requests handled')
+    sim_output = merlin.Entity(name='requests handled', is_output=True)
+    sim_output.create_process(
+        OutputProcess,
+        {
+            'unit': 'requests_handled'
+        }
+    )
+
+    sim.add_entities(sim_output)
 
     # Create Entities
     e_budget = merlin.Entity(
@@ -56,7 +65,7 @@ def computation_test_harness(sim) -> merlin.Simulation:
     sim.connect_entities(e_budget, e_office, '$')
 
     # Call center connections
-    sim.connect_output(e_call_center, sim_output)
+    sim.connect_entities(e_call_center, sim_output, 'requests_handled')
 
     # Office connections
     sim.connect_entities(e_office, e_call_center, 'desks')
@@ -149,7 +158,7 @@ class TestIntegration:
         sim.num_steps = 10
         sim.run()
         sim.run()
-        assert len(list(sim.outputs)[0].result) != 0
+        assert False
 
 
     def test_output(self, computation_test_harness):
@@ -159,8 +168,9 @@ class TestIntegration:
         expected_result = \
             [20.0, 40.0, 60.0, 80.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
 
-        for i in range(0, len(result)):
-            npt.assert_almost_equal(result[i], expected_result[i])
+        # for i in range(0, len(result)):
+        #     npt.assert_almost_equal(result[i], expected_result[i])
+        assert False
 
 
 class TestSimulation:
@@ -327,7 +337,7 @@ class TestSimulation:
         assert o_con.type == 'unit_type'
         assert i_con.type == 'unit_type'
         assert len(o_con.get_endpoints()) == 1
-        assert i_con.source == o_con
+        assert i_con.sources[0] == o_con
 
     def test_disconnect_entities(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
@@ -341,17 +351,23 @@ class TestSimulation:
 
 
     def test_add_output(self, sim):
-        o = merlin.Output('unit_type', name='output')
-        sim.add_output(o)
+        o = merlin.Entity(name='output', is_output=True)
+        sim.add_entity(o)
         assert len(sim.outputs) == 1
-        assert o.sim == sim
+
 
     def test_connect_output(self, sim):
         e1 = merlin.Entity(name='e1')
-        o = merlin.Output('unit_type', name='output')
+        o = merlin.Entity(name='output', is_output=True)
+        o.create_process(
+            OutputProcess,
+            {
+                'unit': 'unit_type'
+            }
+        )
         sim.add_entity(e1)
-        sim.add_output(o)
-        sim.connect_output(e1, o)
+        sim.add_entity(o)
+        sim.connect_entities(e1, o, 'unit_type')
         o_con = e1.get_output_by_type('unit_type')
         i_con = list(o.inputs)[0]
         assert o_con
@@ -809,13 +825,6 @@ class TestCoreActions:
         a.execute(sim)
         assert prop.get_value() == 3.0
 
-    def test_modify_output_minimum(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        output = list(sim.outputs)[0]
-        output.minimum = 0
-        a = merlin.ModifyOutputMinimumAction(output.id, 10)
-        a.execute(sim)
-        assert output.minimum == 10
 
     def test_modify_endpoint_bias(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
