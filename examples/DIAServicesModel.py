@@ -1590,31 +1590,66 @@ def createRecordStorage(branch_e=None):
 
     StorageFacility.attributes.add("asset")
 
-    opSurplus = merlin.Output("opsurplus$",
-                              name="Operational Surplus")
-    sim.add_output(opSurplus)
-    sim.connect_output(StorageFacility, opSurplus)
+    # opSurplus = merlin.Output("opsurplus$",
+    #                          name="Operational Surplus")
 
-    # todo: need an expectation
-    filesStored = merlin.Output("file#",
-                                name="Additional Files Stored")
-    filesStored.minimum = 12e4/12
-    sim.add_output(filesStored)
-    sim.connect_output(StorageFacility, filesStored)
+    opSurplus = merlin.Entity(name="Operational Surplus", is_output=True)
+    opSurplus.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'opsurplus$',
+        }
+    )
 
-    # need an expectation
-    serviceRevenue = merlin.Output("revenue$",
-                                   name="Service Revenue")
-    sim.add_output(serviceRevenue)
-    sim.connect_output(StorageFacility, serviceRevenue)
+    sim.add_entity(opSurplus)
+    sim.connect_entities(StorageFacility, opSurplus, 'opsurplus$')
 
-    # need an expectation
-    budgetarySurplus = merlin.Output("surplus$",
-                                     name="Budgetary Surplus")
-    sim.add_output(budgetarySurplus)
-    sim.connect_output(StorageFacility, budgetarySurplus)  # for other
-    sim.connect_output(LineStaffRes, budgetarySurplus)  # for staff
-    sim.connect_output(StaffAccommodation, budgetarySurplus)  # for rent
+    # filesStored = merlin.Output("file#",
+    #                             name="Additional Files Stored")
+
+    filesStored = merlin.Entity(name="Additional Files Stored", is_output=True)
+
+    filesStored.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'file#',
+            'minimum': 12e4/12
+        }
+    )
+
+    # filesStored.minimum = 12e4/12
+    sim.add_entity(filesStored)
+    sim.connect_entities(StorageFacility, filesStored, 'file#')
+
+    # serviceRevenue = merlin.Output("revenue$",
+    #                                name="Service Revenue")
+
+    serviceRevenue = merlin.Entity(name="Service Revenue", is_output=True)
+    serviceRevenue.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'revenue$'
+        }
+    )
+
+    sim.add_entity(serviceRevenue)
+    sim.connect_entities(StorageFacility, serviceRevenue, 'revenue$')
+
+    # budgetarySurplus = merlin.Output("surplus$",
+    #                                  name="Budgetary Surplus")
+
+    budgetarySurplus = merlin.Entity(name="Budgetary Surplus", is_output=True)
+    budgetarySurplus.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'surplus$'
+        }
+    )
+
+    sim.add_entity(budgetarySurplus)
+    sim.connect_entities(StorageFacility, budgetarySurplus, 'surplus$')  # for other
+    sim.connect_entities(LineStaffRes, budgetarySurplus, 'surplus$')  # for staff
+    sim.connect_entities(StaffAccommodation, budgetarySurplus, 'surplus$')  # for rent
 
     sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
@@ -1781,31 +1816,66 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
         })
     RegistrationFacility.attributes.add("asset")
 
-    opSurplus = merlin.Output("opsurplus$",
-                              name="Operational Surplus")
-    sim.add_output(opSurplus)
-    sim.connect_output(RegistrationFacility, opSurplus)
+    # opSurplus = merlin.Output("opsurplus$",
+    #                           name="Operational Surplus")
 
-    # need an expectation
-    applProcessed = merlin.Output("appl#",
-                                  name="Applications Processed")
-    applProcessed.minimum = 360e3/12
-    sim.add_output(applProcessed)
-    sim.connect_output(RegistrationFacility, applProcessed)
+    opSurplus = merlin.Entity(name="Operational Surplus", is_output=True)
+    opSurplus.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'opsurplus$'
+        }
+    )
 
-    # need an expectation
-    serviceRevenue = merlin.Output("revenue$",
-                                   name="Service Revenue")
-    sim.add_output(serviceRevenue)
-    sim.connect_output(RegistrationFacility, serviceRevenue)
+    sim.add_entity(opSurplus)
+    sim.connect_entities(RegistrationFacility, opSurplus, 'opsurplus$')
 
-    # need an expectation
-    budgetarySurplus = merlin.Output("surplus$",
-                                     name="Budgetary Surplus")
-    sim.add_output(budgetarySurplus)
+    # applProcessed = merlin.Output("appl#",
+    #                               name="Applications Processed")
+
+
+    applProcessed = merlin.Entity(name="Applications Processed", is_output=True)
+    applProcessed.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'appl#',
+            'minimum': 360e3/12
+        }
+    )
+
+    # applProcessed.minimum = 360e3/12
+    sim.add_entity(applProcessed)
+    sim.connect_entities(RegistrationFacility, applProcessed, 'appl#')
+
+    # serviceRevenue = merlin.Output("revenue$",
+    #                                name="Service Revenue")
+
+    serviceRevenue = merlin.Entity(name="Service Revenue", is_output=True)
+    serviceRevenue.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'revenue$',
+        }
+    )
+
+    sim.add_entity(serviceRevenue)
+    sim.connect_entities(RegistrationFacility, serviceRevenue, 'revenue$')
+
+    # budgetarySurplus = merlin.Output("surplus$",
+    #                                  name="Budgetary Surplus")
+
+    budgetarySurplus = merlin.Entity(name="Budgetary Surplus", is_output=True)
+    budgetarySurplus.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'surplus$'
+        }
+    )
+
+    sim.add_entity(budgetarySurplus)
     # sim.connect_output(RegistrationFacility, budgetarySurplus)
-    sim.connect_output(StaffAccommodation, budgetarySurplus)
-    sim.connect_output(LineStaffRes, budgetarySurplus)
+    sim.connect_entities(StaffAccommodation, budgetarySurplus, 'surplus$')
+    sim.connect_entities(LineStaffRes, budgetarySurplus, 'surplus$')
 
     sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
@@ -1842,7 +1912,7 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
 
         # the output "remaining OH work hours" is left open.
 
-        sim.connect_output(ExternalDesktops, budgetarySurplus)
+        sim.connect_entities(ExternalDesktops, budgetarySurplus, 'surplus$')
         # inputs for RegistrationFacility
         sim.connect_entities(ExternalDesktops, RegistrationFacility,
                              "desktop#")
@@ -1850,7 +1920,7 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
                              "ITexpense$")
     else:
         # No external desktop provider
-        sim.connect_output(InhouseDesktops, budgetarySurplus)
+        sim.connect_entities(InhouseDesktops, budgetarySurplus, 'surplus$')
         # inputs for RegistrationFacility
         sim.connect_entities(InhouseDesktops, RegistrationFacility,
                              "desktop#")
@@ -2011,31 +2081,64 @@ def createIdentificationService(branch_e=None):
         })
     RegistrationFacility.attributes.add("asset")
 
-    opSurplus = merlin.Output("opsurplus$",
-                              name="Operational Surplus")
-    sim.add_output(opSurplus)
-    sim.connect_output(RegistrationFacility, opSurplus)
+    # opSurplus = merlin.Output("opsurplus$",
+    #                           name="Operational Surplus")
 
-    # need an expectation
-    applProcessed = merlin.Output("appl#",
-                                  name="Applications Processed")
-    applProcessed.minimum = 60e3
-    sim.add_output(applProcessed)
-    sim.connect_output(RegistrationFacility, applProcessed)
+    opSurplus = merlin.Entity(name="Operational Surplus", is_output=True)
+    opSurplus.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'opsurplus$'
+        }
+    )
+    sim.add_entity(opSurplus)
+    sim.connect_entities(RegistrationFacility, opSurplus, 'opsurplus$')
 
-    # need an expectation
-    serviceRevenue = merlin.Output("revenue$",
-                                   name="Service Revenue")
-    sim.add_output(serviceRevenue)
-    sim.connect_output(RegistrationFacility, serviceRevenue)
+    # applProcessed = merlin.Output("appl#",
+    #                               name="Applications Processed")
 
-    # need an expectation
-    budgetarySurplus = merlin.Output("surplus$",
-                                     name="Budgetary Surplus")
-    sim.add_output(budgetarySurplus)
+    applProcessed = merlin.Entity(name="Applications Processed", is_output=True)
+    applProcessed.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'appl#',
+            'minimum': 60e3
+        }
+    )
+    # applProcessed.minimum = 60e3
+    sim.add_entity(applProcessed)
+    sim.connect_entities(RegistrationFacility, applProcessed, 'appl#')
+
+    # serviceRevenue = merlin.Output("revenue$",
+    #                                name="Service Revenue")
+
+    serviceRevenue = merlin.Entity(name="Service Revenue", is_output=True)
+    serviceRevenue.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'revenue$'
+        }
+    )
+
+    sim.add_entity(serviceRevenue)
+    sim.connect_entities(RegistrationFacility, serviceRevenue, 'revenue$')
+
+
+    # budgetarySurplus = merlin.Output("surplus$",
+    #                                  name="Budgetary Surplus")
+
+    budgetarySurplus = merlin.Entity(name="Budgetary Surplus", is_output=True)
+    budgetarySurplus.create_process(
+        processes.OutputProcess,
+        {
+            'unit': 'surplus$'
+        }
+    )
+
+    sim.add_entity(budgetarySurplus)
     # sim.connect_output(RegistrationFacility, budgetarySurplus)
-    sim.connect_output(StaffAccommodation, budgetarySurplus)
-    sim.connect_output(LineStaffRes, budgetarySurplus)
+    sim.connect_entities(StaffAccommodation, budgetarySurplus, 'surplus$')
+    sim.connect_entities(LineStaffRes, budgetarySurplus, 'surplus$')
 
     sim.connect_entities(TheRentBudget, StaffAccommodation, "rent$")
 
@@ -2049,7 +2152,7 @@ def createIdentificationService(branch_e=None):
     sim.connect_entities(TheOtherBudget, InhouseDesktops, "other$")
 
     # No external desktop provider
-    sim.connect_output(InhouseDesktops, budgetarySurplus)
+    sim.connect_entities(InhouseDesktops, budgetarySurplus, 'surplus$')
     # inputs for RegistrationFacility
     sim.connect_entities(InhouseDesktops, RegistrationFacility,
                          "desktop#")
@@ -2137,5 +2240,5 @@ if __name__ == "__main__":
 
     sim.set_time_span(48)
     sim.run()
-    result = list(sim.outputs)
-    print(result[0].result, result[1].result)
+    result = sim.get_sim_telemetry()
+    print(result)
