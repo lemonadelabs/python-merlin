@@ -41,7 +41,7 @@ def computation_test_harness(sim) -> merlin.Simulation:
         }
     )
 
-    sim.add_entities(sim_output)
+    sim.add_entity(sim_output)
 
     # Create Entities
     e_budget = merlin.Entity(
@@ -110,11 +110,13 @@ def simple_entity_graph():
         'unit_type',
         source,
         name='output')
-    in_con.source = out_con
+    in_con.sources.add(out_con)
     out_con.add_input(in_con)
     source.outputs.add(out_con)
     sink.inputs.add(in_con)
-    return (source, sink, out_con, in_con)
+    assert len(in_con.sources) == 1
+    assert len(out_con.get_endpoints()) == 1
+    return list([source, sink, out_con, in_con])
 
 
 @pytest.fixture()
@@ -247,12 +249,13 @@ class TestSimulation:
                     assert len(to['data']['value']) == sim.num_steps
 
 
-    def test_consistant_telemetry_output_size(self, dia_record_storage_model):
+    def test_consistent_telemetry_output_size(self, dia_record_storage_model):
         sim = dia_record_storage_model  # type: merlin.Simulation
         sim.num_steps = 10
         for i in range(0, 5):
             sim.run()
             tel = sim.get_sim_telemetry()
+            print(tel)
             for to in tel:
                 if 'data' in to:
                     if 'value' in to['data']:
@@ -260,7 +263,7 @@ class TestSimulation:
                         assert len(to['data']['value']) == sim.num_steps
 
 
-    def test_consistant_telemetry_output_values(self, dia_reg_service):
+    def test_consistent_telemetry_output_values(self, dia_reg_service):
         sim = dia_reg_service  # type: merlin.Simulation
         sim.num_steps = 48
         sim.run(end=48)
@@ -337,7 +340,10 @@ class TestSimulation:
         assert o_con.type == 'unit_type'
         assert i_con.type == 'unit_type'
         assert len(o_con.get_endpoints()) == 1
-        assert i_con.sources[0] == o_con
+        print(o_con)
+        print(list(i_con.sources)[0])
+        assert list(i_con.sources)[0] == o_con
+
 
     def test_disconnect_entities(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation
@@ -434,7 +440,8 @@ class TestOutputConnector:
 
     def test_write(self, simple_entity_graph):
         seg = simple_entity_graph
-        seg[0].current_time = datetime.now()
+        # print(seg[3].sources)
+        seg[0].current_time = 1
         seg[2].write(100.0)
         assert seg[3].value == 100.0
         assert seg[3].time == seg[2].time
@@ -680,15 +687,6 @@ class TestEvents:
         assert child_ent in parent_ent.get_children()
         assert child_ent.parent == parent_ent
 
-
-    def test_modify_output_minimum_event(self, computation_test_harness):
-        sim = computation_test_harness  # type: merlin.Simulation
-        output = list(sim.outputs)[0]
-        output.minimum = 0
-        a = merlin.Action.create(":= Output {0}, minimum:float = {1}".format(output.id, 10))
-        assert len(a) == 1
-        a[0].execute(sim)
-        assert output.minimum == 10
 
     def test_modify_endpoint_bias(self, computation_test_harness):
         sim = computation_test_harness  # type: merlin.Simulation

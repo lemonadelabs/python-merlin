@@ -1420,11 +1420,10 @@ class InputConnector(Connector):
             unit_type,
             parent,
             name='',
-            sources=set(),
             additive_write=False):
 
         super(InputConnector, self).__init__(unit_type, parent, name)
-        self.sources = sources
+        self.sources = set() # sources
         self.additive_write = additive_write
         self.value = 0.0
 
@@ -1461,9 +1460,14 @@ class InputConnector(Connector):
         new_time = self.time
 
         for s in self.sources:
-            if s.time > self.time:
-                up_to_date += 1
-                new_time = max(new_time, s.time)
+            if s.time is not None:
+                if self.time is None:
+                    up_to_date += 1
+                    new_time = s.time
+                else:
+                    if s.time > self.time:
+                        up_to_date += 1
+                        new_time = max(new_time, s.time)
 
         if (up_to_date == 1) and (not self.additive_write):
             self.value = value
@@ -2107,7 +2111,8 @@ class RemoveEntityAction(Action):
 
         # remove input connections
         for i in ent.inputs:
-            i.source.remove_input(i)
+            for s in i.sources:
+                s.remove_input(i)
 
         if ent.parent is None:
             ent.sim.remove_entity(ent)
