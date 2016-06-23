@@ -1001,7 +1001,7 @@ class ICTDesktopContract(merlin.Process):
             self.provide_output('budget_surplus',
                                 budget-expenses)
             self.provide_output('remaining OH work hours',
-                                oh_work_hrs-contract_ohwork_hr)
+                                oh_work_hrs-contract_ohwork_hr / 12)
 
         else:
             self.consume_all_inputs(0)
