@@ -1602,13 +1602,13 @@ def createRecordStorage(branch_e=None):
     )
 
     sim.add_entity(opSurplus)
+    storage_e.add_child(opSurplus)
     sim.connect_entities(StorageFacility, opSurplus, 'opsurplus$')
 
     # filesStored = merlin.Output("file#",
     #                             name="Additional Files Stored")
 
     filesStored = merlin.Entity(name="Additional Files Stored", is_output=True)
-
     filesStored.create_process(
         processes.OutputProcess,
         {
@@ -1619,12 +1619,14 @@ def createRecordStorage(branch_e=None):
 
     # filesStored.minimum = 12e4/12
     sim.add_entity(filesStored)
+    storage_e.add_child(filesStored)
     sim.connect_entities(StorageFacility, filesStored, 'file#')
 
     # serviceRevenue = merlin.Output("revenue$",
     #                                name="Service Revenue")
 
     serviceRevenue = merlin.Entity(name="Service Revenue", is_output=True)
+
     serviceRevenue.create_process(
         processes.OutputProcess,
         {
@@ -1633,12 +1635,14 @@ def createRecordStorage(branch_e=None):
     )
 
     sim.add_entity(serviceRevenue)
+    storage_e.add_child(serviceRevenue)
     sim.connect_entities(StorageFacility, serviceRevenue, 'revenue$')
 
     # budgetarySurplus = merlin.Output("surplus$",
     #                                  name="Budgetary Surplus")
 
     budgetarySurplus = merlin.Entity(name="Budgetary Surplus", is_output=True)
+
     budgetarySurplus.create_process(
         processes.OutputProcess,
         {
@@ -1647,6 +1651,7 @@ def createRecordStorage(branch_e=None):
     )
 
     sim.add_entity(budgetarySurplus)
+    storage_e.add_child(budgetarySurplus)
     sim.connect_entities(StorageFacility, budgetarySurplus, 'surplus$')  # for other
     sim.connect_entities(LineStaffRes, budgetarySurplus, 'surplus$')  # for staff
     sim.connect_entities(StaffAccommodation, budgetarySurplus, 'surplus$')  # for rent
@@ -1828,6 +1833,7 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
     )
 
     sim.add_entity(opSurplus)
+    registration_e.add_child(opSurplus)
     sim.connect_entities(RegistrationFacility, opSurplus, 'opsurplus$')
 
     # applProcessed = merlin.Output("appl#",
@@ -1845,6 +1851,7 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
 
     # applProcessed.minimum = 360e3/12
     sim.add_entity(applProcessed)
+    registration_e.add_child(applProcessed)
     sim.connect_entities(RegistrationFacility, applProcessed, 'appl#')
 
     # serviceRevenue = merlin.Output("revenue$",
@@ -1859,6 +1866,7 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
     )
 
     sim.add_entity(serviceRevenue)
+    registration_e.add_child(serviceRevenue)
     sim.connect_entities(RegistrationFacility, serviceRevenue, 'revenue$')
 
     # budgetarySurplus = merlin.Output("surplus$",
@@ -1873,6 +1881,7 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
     )
 
     sim.add_entity(budgetarySurplus)
+    registration_e.add_child(budgetarySurplus)
     # sim.connect_output(RegistrationFacility, budgetarySurplus)
     sim.connect_entities(StaffAccommodation, budgetarySurplus, 'surplus$')
     sim.connect_entities(LineStaffRes, budgetarySurplus, 'surplus$')
@@ -2092,6 +2101,7 @@ def createIdentificationService(branch_e=None):
         }
     )
     sim.add_entity(opSurplus)
+    registration_e.add_child(opSurplus)
     sim.connect_entities(RegistrationFacility, opSurplus, 'opsurplus$')
 
     # applProcessed = merlin.Output("appl#",
@@ -2107,6 +2117,7 @@ def createIdentificationService(branch_e=None):
     )
     # applProcessed.minimum = 60e3
     sim.add_entity(applProcessed)
+    registration_e.add_child(applProcessed)
     sim.connect_entities(RegistrationFacility, applProcessed, 'appl#')
 
     # serviceRevenue = merlin.Output("revenue$",
@@ -2121,6 +2132,7 @@ def createIdentificationService(branch_e=None):
     )
 
     sim.add_entity(serviceRevenue)
+    registration_e.add_child(serviceRevenue)
     sim.connect_entities(RegistrationFacility, serviceRevenue, 'revenue$')
 
 
@@ -2136,6 +2148,7 @@ def createIdentificationService(branch_e=None):
     )
 
     sim.add_entity(budgetarySurplus)
+    registration_e.add_child(budgetarySurplus)
     # sim.connect_output(RegistrationFacility, budgetarySurplus)
     sim.connect_entities(StaffAccommodation, budgetarySurplus, 'surplus$')
     sim.connect_entities(LineStaffRes, budgetarySurplus, 'surplus$')
