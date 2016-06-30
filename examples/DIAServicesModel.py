@@ -1322,11 +1322,11 @@ class RegistrationServiceProcess(merlin.Process):
             default_applications_submitted
         )
 
-        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.CONSTANT
+        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.DECLINE
         # sin + decline + jitter
 
         # Settings for the different application trends
-        self.rate = 0.05
+        self.rate = 0.02
         self.jitter = 1000.0
         self.sin_magnitude = 30000
         self.random_range = 100000
@@ -1406,9 +1406,8 @@ class RegistrationServiceProcess(merlin.Process):
 
         if not sufficient_desktops:
             # reduce applications processed if lacking desktops and by extension, staff
-            desktop_deficit = desktops_required - desktops
-            work_hour_deficit = float(desktop_deficit) * monthly_work_hrs_pp
-            application_deficit = work_hour_deficit * applications_processed_per_lswork_hr
+            desktop_deficit = (desktops_required - desktops) / desktops_required
+            application_deficit = self.current_applications * desktop_deficit
             modified_current_applications -= application_deficit
             modified_current_applications = max(0, modified_current_applications)
 
