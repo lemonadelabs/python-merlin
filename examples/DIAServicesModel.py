@@ -1322,13 +1322,13 @@ class RegistrationServiceProcess(merlin.Process):
             default_applications_submitted
         )
 
-        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.DECLINE
+        self.application_trend = RegistrationServiceProcess.ApplicationsTrend.CONSTANT
         # sin + decline + jitter
 
         # Settings for the different application trends
-        self.rate = 0.1
-        self.jitter = 50000.0
-        self.sin_magnitude = 10000
+        self.rate = 0.05
+        self.jitter = 1000.0
+        self.sin_magnitude = 30000
         self.random_range = 100000
         self.current_applications = None
 
@@ -1347,9 +1347,9 @@ class RegistrationServiceProcess(merlin.Process):
             elif at == RegistrationServiceProcess.ApplicationsTrend.RANDOM_FLUCTUATION:
                 self.current_applications += (random.randint(-self.random_range, self.random_range))
 
-
-        self.current_applications += float(random.randint(-self.jitter, self.jitter))
-        self.current_applications += math.sin(tick) * self.sin_magnitude
+        # random.seed()
+        # self.current_applications += float(random.randint(-self.jitter, self.jitter))
+        # self.current_applications += math.sin(tick) * self.sin_magnitude
 
 
 
@@ -1401,13 +1401,16 @@ class RegistrationServiceProcess(merlin.Process):
                  applications_processed_per_lswork_hr)
             )
 
+
+        modified_current_applications = self.current_applications
+
         if not sufficient_desktops:
             # reduce applications processed if lacking desktops and by extension, staff
             desktop_deficit = desktops_required - desktops
             work_hour_deficit = float(desktop_deficit) * monthly_work_hrs_pp
             application_deficit = work_hour_deficit * applications_processed_per_lswork_hr
-            self.current_applications -= application_deficit
-            self.current_applications = max(0, self.current_applications)
+            modified_current_applications -= application_deficit
+            modified_current_applications = max(0, modified_current_applications)
 
         # Process inputs and outputs
 
@@ -1441,7 +1444,7 @@ class RegistrationServiceProcess(merlin.Process):
         # Provide outputs
         self.provide_output(
             'Applications Processed',
-            self.current_applications / 12.0
+            modified_current_applications / 12.0
         )
 
         self.provide_output(
