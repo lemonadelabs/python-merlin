@@ -1001,7 +1001,7 @@ class ICTDesktopContract(merlin.Process):
             self.provide_output('budget_surplus',
                                 budget-expenses)
             self.provide_output('remaining OH work hours',
-                                oh_work_hrs-contract_ohwork_hr)
+                                oh_work_hrs-contract_ohwork_hr / 12)
 
         else:
             self.consume_all_inputs(0)
@@ -1788,10 +1788,10 @@ def createRegistrationService(branch_e=None, with_external_provider=False):
     sim.add_output(opSurplus)
     sim.connect_output(RegistrationFacility, opSurplus)
 
-    # need an expectation
+    # provide an expectation
     applProcessed = merlin.Output("appl#",
                                   name="Applications Processed")
-    applProcessed.minimum = 360e3/12
+    applProcessed.minimum = 360e3/12*2.82
     sim.add_output(applProcessed)
     sim.connect_output(RegistrationFacility, applProcessed)
 
