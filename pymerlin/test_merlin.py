@@ -71,7 +71,12 @@ def computation_test_harness(sim) -> merlin.Simulation:
     sim.connect_entities(e_office, e_call_center, 'desks')
 
     # Add entity processes
-    e_budget.create_process(BudgetProcess, {'name': 'Budget'})
+    e_budget.create_process(
+        BudgetProcess, {
+            'name': 'Budget',
+            'start_amount' : 100000.00
+        }
+    )
     e_call_center.create_process(CallCenterStaffProcess, {'name': 'Call Center Staff'})
     e_office.create_process(BuildingMaintainenceProcess, {'name': 'Building Maintenance'})
     return sim
@@ -154,25 +159,23 @@ def simple_branching_output_graph():
 
 class TestIntegration:
 
-    def test_multiple_runs(self, record_storage_example):
-        sim = record_storage_example  # type: merlin.Simulation
-        # sim.run(end=10)
-        sim.num_steps = 10
-        sim.run()
-        sim.run()
-        assert False
-
-
     def test_output(self, computation_test_harness):
         sim = computation_test_harness
         sim.run()
-        result = list(sim.outputs)[0].result
+        telem = sim.get_sim_telemetry()
+        print(telem)
+        result = None
+        for t in telem:
+            if 'name' in t and t['name'] == 'requests_handled_output':
+                result = t['data']['value']
+        assert result is not None
+        assert len(result) == 10
         expected_result = \
             [20.0, 40.0, 60.0, 80.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
 
-        # for i in range(0, len(result)):
-        #     npt.assert_almost_equal(result[i], expected_result[i])
-        assert False
+        for i in range(0, len(result)):
+            npt.assert_almost_equal(result[i], expected_result[i])
+
 
 
 class TestSimulation:
@@ -239,8 +242,8 @@ class TestSimulation:
         assert f_process == call_center_process
         assert f_output == output
 
-    def test_telemetry_output(self, record_storage_example):
-        sim = record_storage_example # type: merlin.Simulation
+    def test_telemetry_output(self, dia_record_storage_model):
+        sim = dia_record_storage_model # type: merlin.Simulation
         sim.run()
         tel = sim.get_sim_telemetry()
         for to in tel:
@@ -255,11 +258,10 @@ class TestSimulation:
         for i in range(0, 5):
             sim.run()
             tel = sim.get_sim_telemetry()
-            print(tel)
             for to in tel:
                 if 'data' in to:
                     if 'value' in to['data']:
-                        print(to['name'])
+                        print('{0} (run {1})'.format(to['name'], i))
                         assert len(to['data']['value']) == sim.num_steps
 
 

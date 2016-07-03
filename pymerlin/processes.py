@@ -552,8 +552,8 @@ class BuildingMaintainenceProcess(merlin.Process):
                 merlin.MerlinMessage.MessageType.warn,
                 self,
                 msg_id="building_maint_underfund",
-                msg=("Building maint is underfunded. {{{{It needs {0}}}}} but" +
-                     " is {{{{receiving only {1}}}}}".format(
+                msg=(("Building maint is underfunded. {{{{It needs {0}}}}} but" +
+                     " is {{{{receiving only {1}}}}}").format(
                          self.props['monthly maintenance cost'].get_value(),
                          self.inputs['$'].connector.value
                      )),

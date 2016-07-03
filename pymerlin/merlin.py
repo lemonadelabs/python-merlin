@@ -638,9 +638,11 @@ class Entity(SimObject):
 
         for i in self.inputs:
             i.reset_telemetry()
+            i.time = None
 
         for o in self.outputs:
             o.reset_telemetry()
+            o.time = None
 
         self.reset_telemetry()
         procs = self._processes.values()
