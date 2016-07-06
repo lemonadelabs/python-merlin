@@ -1,6 +1,8 @@
 import builtins
+import datetime
 
-from .utilities import *
+from .utilities import *  # @UnusedWildImport
+from .businessrules import financialDataFromProjects
 
 
 def rank_by_similarity(origOffsets, successfulParameters):
@@ -31,9 +33,16 @@ def isParetoDominant(aa, bb):
     """
     returns True if aa Pareto dominant to bb
     """
-    from builtins import all, any
     return bool(all((a >= b) for a, b in zip(aa, bb)) and
                 any((a > b) for a, b in zip(aa, bb)))
+
+
+def test_pareto_dominant():
+
+    assert isParetoDominant((2,), (1,))
+    assert not isParetoDominant([0]*10, [0]*10)
+    assert isParetoDominant([1]*10, [0]*10)
+    assert isParetoDominant([1]*10+[2], [1]*10+[0])
 
 
 def offset_generator(max_sum=0, no_entries=0):
@@ -75,7 +84,7 @@ class pareto:
         timelineLength = self.myContext.timelineLength
 
         # determine the combined length of the phases,
-        # the maximal sum of times inbetween
+        # the maximal sum of times in between
         thePhases = next(p.phases
                          for p in allProjects if p.id == theProject_id)
         thePhases.sort(key=lambda ph: ph.start_date)
@@ -89,8 +98,9 @@ class pareto:
         # check for overlapping phases
         assert builtins.all(o >= 0 for o in origOffsets)
 
-        phaseLengths = [monthsDifference(ph.end_date+datetime.timedelta(days=1),
-                                         ph.start_date)
+        phaseLengths = [monthsDifference(
+                                ph.end_date+datetime.timedelta(days=1),
+                                ph.start_date)
                         for ph in thePhases]
 
         if phaseId is None:
@@ -113,29 +123,76 @@ class pareto:
 
         return origOffsets, possibleOffsets
 
+    def modifyProjectFromOffsets(self,
+                                 projectId,
+                                 newOffsets=None,
+                                 setActive=None):
+
+        projects = self.myContext.allProjects
+
+        if newOffsets is None and setActive is None:
+            # this is a no-op
+            return projects
+
+        newProjects = []
+        for p in projects:
+            if p.id != projectId:
+                newProjects.append(p)
+                continue
+
+            newPh = []
+            if newOffsets is None:
+                # don't do anything with the phase dates
+                for ph in p.phases:
+                    newPh.append(ph._replace(is_active=ph.is_active
+                                             if setActive is None
+                                             else setActive))
+            else:
+                lastDate = self.myContext.timelineStart
+                for ph, o in zip(sorted(p.phases, key=lambda x: x.start_date),
+                                 newOffsets):
+                    new_start = monthsIncrement(lastDate, o)
+                    lastDate = monthsIncrement(new_start,
+                                               monthsDifference(
+                                                    ph.end_date +
+                                                    datetime.timedelta(days=1),
+                                                    ph.start_date))
+
+                    newPh.append(ph._replace(
+                        start_date=new_start,
+                        end_date=lastDate-datetime.timedelta(days=1),
+                        is_active=(ph.is_active
+                                   if setActive is None
+                                   else setActive)
+                        ))
+
+                newProjects.append(p._replace(phases=newPh))
+
+        return newProjects
+
     def compute_choice(self, offs, theProject_id):
         """
-        todo: get info on what to calculate and how from context
+        todo: get info on what to calculate and how from context:
+
+        * how to calculate financial data
+        * which outputs to include
+        * handle rules
         """
 
         msim = self.myContext.msim
-        mscen = self.myContext.mscen
-        allProjects = self.myContext.allProjects
         # have functions nested for serialization
-        timelineLength = self.myContext.timelineLength
 
-        modProjects = modifyProjectFromOffsets(allProjects,
-                                               theProject_id,
-                                               newOffsets=offs)
+        modProjects = self.modifyProjectFromOffsets(theProject_id,
+                                                    newOffsets=offs)
 
-        totalInv, remainingInvFund, capCosts = financialDataFromProjects(
-                                                                modProjects)
+        (totalInv, remainingInvFund, capCosts  # @UnusedVariable
+         ) = financialDataFromProjects(modProjects)
 
         underfundingSum = float(builtins.sum(
                                     (s for i, s in enumerate(remainingInvFund)
                                      if i % 12 == 11 and s < 0), 0.0))
 
-        tele = runSimulation(modProjects, msim, mscen, timelineLength)
+        tele = self.myContext.runSimulation(modProjects)
         t_outputs = {t["id"]: t for t in tele
                      if "type" in t and t["type"] == "Output"}
         t_messages = next((t for t in tele if "messages" in t),
@@ -157,10 +214,7 @@ class pareto:
             from ipyparallel import Client  # @UnresolvedImport
 
             def compute_something(param):
-                import algorithms.pareto
-                from importlib import reload
-                reload(algorithms.pareto)
-                from algorithms.pareto import pareto
+                from computations.suggestions import pareto
                 con, off, theProject_id = param
                 return pareto(con).compute_choice(off, theProject_id)
 
@@ -194,10 +248,9 @@ class pareto:
         # in place operation!
         rank_by_similarity(origOffsets, successfulParameters)
 
-        # convert back to phase ids.
-        optSetup = modifyProjectFromOffsets(self.myContext.allProjects,
-                                            projectId,
-                                            successfulParameters[0])
+        # convert back to phase starts and their ids
+        optSetup = self.modifyProjectFromOffsets(projectId,
+                                                 successfulParameters[0])
 
         thePhases = next(p for p in optSetup if p.id == projectId).phases
         return {ph.id: ph.start_date for ph in thePhases}
