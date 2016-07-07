@@ -211,19 +211,20 @@ class pareto:
                                                                     phaseId)
 
         if False:
-            from ipyparallel import Client  # @UnresolvedImport
-
-            def compute_something(param):
-                from computations.suggestions import pareto
-                con, off, theProject_id = param
-                return pareto(con).compute_choice(off, theProject_id)
-
-            rrc = Client()
-            res = rrc[:].map_sync(compute_something,
-                                  ((self.myContext, o, projectId)
-                                   for o in possibleOffsets)
-                                  )
-            choiceMap = dict(zip(possibleOffsets, res))
+            pass
+            # from ipyparallel import Client  # @UnresolvedImport
+            #
+            # def compute_something(param):
+            #     from computations.suggestions import pareto
+            #     con, off, theProject_id = param
+            #     return pareto(con).compute_choice(off, theProject_id)
+            #
+            # rrc = Client()
+            # res = rrc[:].map_sync(compute_something,
+            #                       ((self.myContext, o, projectId)
+            #                        for o in possibleOffsets)
+            #                       )
+            # choiceMap = dict(zip(possibleOffsets, res))
 
         else:
             choiceMap = {o: self.compute_choice(o, projectId)

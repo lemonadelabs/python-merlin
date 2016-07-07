@@ -5,7 +5,6 @@ Created on 5/07/2016
 '''
 from collections import namedtuple
 import datetime
-import pytest
 
 __all__ = ["project", "projectphase",
            "monthsDifference", "monthsIncrement"]
@@ -45,12 +44,12 @@ def monthsIncrement(d, i):
                      month=(d.month+i-1) % 12+1)
 
 
-def test_monthsUtils():
-    testDate = datetime.date(2014, 7, 1)
-    assert monthsIncrement(testDate, 0) == testDate
-
-    with pytest.raises(AssertionError):
-        monthsDifference(testDate, testDate.replace(day=2))
-
-    assert -12 == monthsDifference(testDate,
-                                   testDate.replace(year=testDate.year+1))
+# def test_monthsUtils():
+#     testDate = datetime.date(2014, 7, 1)
+#     assert monthsIncrement(testDate, 0) == testDate
+#
+#     with pytest.raises(AssertionError):
+#         monthsDifference(testDate, testDate.replace(day=2))
+#
+#     assert -12 == monthsDifference(testDate,
+#                                    testDate.replace(year=testDate.year+1))
