@@ -71,29 +71,27 @@ class pareto:
         # except from the mscen data structure, which is updated in place
         self.myContext = myContext
 
-    def generate_parameter_list(self, projectId, phaseId=None):
-        """
-        generate offset parameter list
-
-        todo: collect outputs somewhere else!
-        """
+    def lengths_and_offsets(self, projectId):
         # go for a particular project
         theProject_id = projectId
         allProjects = self.myContext.allProjects
         timelineStart = self.myContext.timelineStart
-        timelineLength = self.myContext.timelineLength
 
         # determine the combined length of the phases,
         # the maximal sum of times in between
         thePhases = next(p.phases
-                         for p in allProjects if p.id == theProject_id)
+                         for p in allProjects if p.id == theProject_id)[:]
+
+        # this is an in-place sort, i.e. modifies the object,
+        # so working on a copy
         thePhases.sort(key=lambda ph: ph.start_date)
 
         origOffsets = [monthsDifference(ph2.start_date,
                                         (timelineStart if ph1 is None
                                          else (ph1.end_date +
                                                datetime.timedelta(days=1))))
-                       for ph1, ph2 in zip([None]+thePhases[:-1], thePhases)]
+                       for ph1, ph2 in zip([None]+thePhases[:-1],
+                                           thePhases)]
 
         # check for overlapping phases
         assert builtins.all(o >= 0 for o in origOffsets)
@@ -103,12 +101,36 @@ class pareto:
                                 ph.start_date)
                         for ph in thePhases]
 
+        assert builtins.all(l > 0 for l in phaseLengths)
+
+        return phaseLengths, origOffsets
+
+    def generate_parameter_list(self, projectId, phaseId=None):
+        """
+        generate offset parameter list
+
+        todo: collect outputs somewhere else!
+        """
+        # go for a particular project
+        theProject_id = projectId
+        allProjects = self.myContext.allProjects
+        timelineLength = self.myContext.timelineLength
+
+        phaseLengths, origOffsets = self.lengths_and_offsets(projectId)
+
         if phaseId is None:
             # act on the project, so change all phases
             offsetMax = timelineLength - sum(phaseLengths)
             possibleOffsets = list(offset_generator(offsetMax,
                                                     len(phaseLengths)))
         else:
+            thePhases = next(p.phases
+                             for p in allProjects if p.id == theProject_id)[:]
+
+            # this is an in-place sort, i.e. modifies the object,
+            # so working on a copy
+            thePhases.sort(key=lambda ph: ph.start_date)
+
             # act on one phase, so change the offset before and after
             phaseIdx = next(i for i, ph in enumerate(thePhases)
                             if ph.id == phaseId)
@@ -149,6 +171,8 @@ class pareto:
                                              else setActive))
             else:
                 lastDate = self.myContext.timelineStart
+                # the order of the new offsets is according to the time order
+                # of the phases, so sort!
                 for ph, o in zip(sorted(p.phases, key=lambda x: x.start_date),
                                  newOffsets):
                     new_start = monthsIncrement(lastDate, o)
