@@ -3,8 +3,8 @@ Created on 5/07/2016
 
 @author: achim
 '''
+import datetime
 from .utilities import *  # @UnusedWildImport
-
 
 class pareto_context:
     """
@@ -107,7 +107,7 @@ class pareto_context:
                                     ph.end_date+datetime.timedelta(days=1),
                                     ph.start_date)
                 scen.start_offset = monthsDifference(ph.start_date,
-                                                     first_tick_start) + 1
+                                                     self.first_tick_start) + 1
                 # set start, set end
                 evStartTick = min(ev.time for ev in scen.events)
                 for ev in scen.events:

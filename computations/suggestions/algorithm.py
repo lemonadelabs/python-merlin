@@ -186,7 +186,7 @@ class pareto:
                                                     newOffsets=offs)
 
         (totalInv, remainingInvFund, capCosts  # @UnusedVariable
-         ) = financialDataFromProjects(modProjects)
+         ) = financialDataFromProjects(self.myContext, modProjects)
 
         underfundingSum = float(builtins.sum(
                                     (s for i, s in enumerate(remainingInvFund)
