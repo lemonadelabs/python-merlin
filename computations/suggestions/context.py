@@ -10,10 +10,10 @@ from .utilities import *  # @UnusedWildImport
 def test_optimize():
 
     pcon = pareto_context()
-    #pcon.enableIPP()
+    # pcon.enableIPP()
     # a minimal test to try out the interface
-    #from examples.DIAServicesModel import createAllServicesInOneModel as createModel
-    from examples.DIAServicesModel import createRegistrationService as createModel
+    from examples.DIAServicesModel \
+        import createRegistrationService as createModel
     pcon.msim = createModel()
 
     from pymerlin import merlin
