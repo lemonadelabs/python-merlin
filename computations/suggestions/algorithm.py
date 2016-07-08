@@ -47,8 +47,8 @@ def test_pareto_dominant():
 
 def offset_generator(max_sum=0, no_entries=0):
     """
-    generates lists of integers >=0, which are exactly no_entries long and
-    their sum is maximal max_sum (inclusive)
+    generates all possible lists of integers >=0, which are exactly no_entries
+    long and their sum is maximal max_sum (inclusive)
     """
     assert no_entries >= 0
     if no_entries == 0:
@@ -234,22 +234,14 @@ class pareto:
         origOffsets, possibleOffsets = self.generate_parameter_list(projectId,
                                                                     phaseId)
 
-        if False:
-            pass
-            # from ipyparallel import Client  # @UnresolvedImport
-            #
-            # def compute_something(param):
-            #     from computations.suggestions import pareto
-            #     con, off, theProject_id = param
-            #     return pareto(con).compute_choice(off, theProject_id)
-            #
-            # rrc = Client()
-            # res = rrc[:].map_sync(compute_something,
-            #                       ((self.myContext, o, projectId)
-            #                        for o in possibleOffsets)
-            #                       )
-            # choiceMap = dict(zip(possibleOffsets, res))
-
+        if hasattr(self.myContext, "ippClientFactory"):
+            rrc = self.myContext.ippClientFactory()
+            res = rrc[:].map_sync(self.compute_choice,
+                                  possibleOffsets,
+                                  [projectId]*len(possibleOffsets))
+            rrc.close()
+            del rrc
+            choiceMap = dict(zip(possibleOffsets, res))
         else:
             choiceMap = {o: self.compute_choice(o, projectId)
                          for o in possibleOffsets}
