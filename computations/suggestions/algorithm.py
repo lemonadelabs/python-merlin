@@ -254,4 +254,4 @@ class pareto:
                                                  successfulParameters[0])
 
         thePhases = next(p for p in optSetup if p.id == projectId).phases
-        return {ph.id: ph.start_date for ph in thePhases}
+        return thePhases
