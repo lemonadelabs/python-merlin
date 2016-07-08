@@ -86,8 +86,7 @@ class pareto_context:
             from ipyparallel import Client
             import functools
             self.ippClientFactory = functools.partial(Client,
-                                                      url_file=ipp_config,
-                                                      debug=True)
+                                                      url_file=ipp_config)
 
     def tick_to_start_date(self, tick):
         # convert a simulation tick, as used in events/scenarios to
