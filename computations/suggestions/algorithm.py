@@ -105,11 +105,12 @@ class pareto:
 
         return phaseLengths, origOffsets
 
-    def generate_parameter_list(self, projectId, phaseId=None):
+    def generate_parameter_list(self,
+                                projectId,
+                                phaseId=None,
+                                alignToQuarters=True):
         """
         generate offset parameter list
-
-        todo: collect outputs somewhere else!
         """
         # go for a particular project
         theProject_id = projectId
@@ -117,12 +118,22 @@ class pareto:
         timelineLength = self.myContext.timelineLength
 
         phaseLengths, origOffsets = self.lengths_and_offsets(projectId)
+        if alignToQuarters:
+            assert all(l % 3 == 0 for l in phaseLengths), \
+                "phase lengths are not full quarters"
+            assert all(o % 3 == 0 for o in origOffsets), \
+                "offsets are not aligned to full quarters"
+            increments = 3  # increments only in quarters
+        else:
+            increments = 1  # increments in months
 
         if phaseId is None:
             # act on the project, so change all phases
             offsetMax = timelineLength - sum(phaseLengths)
-            possibleOffsets = list(offset_generator(offsetMax,
-                                                    len(phaseLengths)))
+            possibleOffsets = []
+            for o in offset_generator(offsetMax//increments,
+                                      len(phaseLengths)):
+                possibleOffsets.append(tuple(oo*increments for oo in o))
         else:
             thePhases = next(p.phases
                              for p in allProjects if p.id == theProject_id)[:]
@@ -137,7 +148,9 @@ class pareto:
             ooList = origOffsets + [timelineLength -
                                     sum(phaseLengths) - sum(origOffsets)]
             possibleOffsets = []
-            for o in range(-ooList[phaseIdx], ooList[phaseIdx+1]+1):
+            for o in range(-ooList[phaseIdx],
+                           ooList[phaseIdx+1]+increments,
+                           increments):
                 newOffset = ooList[:]  # copy
                 newOffset[phaseIdx] += o
                 newOffset[phaseIdx+1] -= o
