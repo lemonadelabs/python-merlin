@@ -456,8 +456,6 @@ class BuildingMaintainenceProcess(merlin.Process):
 
     def compute(self, tick):
         # Check requirements
-        # logging.debug(self.inputs['$'].connector)
-        # logging.debug(self.inputs['$'].connector.value)
         if (self.get_input_available('$') <
                 self.get_prop_value('monthly maintenance cost')):
 

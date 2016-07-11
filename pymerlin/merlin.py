@@ -836,12 +836,12 @@ class Entity(SimObject):
         Once all processes are executed with :py:meth:`.Process.compute`,
         the control flow goes depth-first to :py:meth:`.Output.tick`.
         """
-        logging.debug('Entity {0} received tick {1}'.format(self.name, time))
+        logging.debug('Entity %s received tick %s', self.name, time)
         if self.current_time and time < self.current_time:
             return
 
         if (self.current_time is None) or (time > self.current_time):
-            logging.debug("Entity {0} time updated".format(self.name))
+            logging.debug("Entity %s time updated", self.name)
             self.processed = False
             self.current_time = time
 
@@ -849,13 +849,12 @@ class Entity(SimObject):
             # need to check if we have all inputs updated before processing
             up_to_date = True
             for i in self.inputs:
-                # logging.debug(i)
                 up_to_date = up_to_date and (i.time == self.current_time)
 
             if up_to_date:
                 logging.debug(
-                    "Entity {0} inputs are all refreshed, processing..".format(
-                        self.name))
+                    "Entity %s inputs are all refreshed, processing...",
+                    self.name)
                 self._process()
                 self._update_process_telemetry()
 
@@ -917,7 +916,7 @@ class Entity(SimObject):
             for i in sorted(self._processes.keys()):
                 for proc in self._processes[i]:
                     logging.debug(
-                        "Computing level {0} process {1}".format(i, proc.name))
+                        "Computing level %s process %s", i, proc.name)
                     proc.compute(self.current_time)
                     for pp in proc.get_properties():
                         pp.changed = False
@@ -1414,26 +1413,33 @@ class OutputConnector(Connector):
         self.set_telemetry_value('value', value)
 
         logging.debug(
-            "WRITING to Output {1} value: {0} ***".format(value, self))
+            "WRITING to Output %s value: %s ***", value, self)
         self.time = self.parent.current_time
+
+        if not self._endpoints:
+            # early exit for no-op
+            return
 
         # pre-calculate the values to be written
         # and provide them in ep_output
-        if self.apportioning is self.ApportioningRules.copy_write:
-            # very simple rule, just copy
-            ep_output = [(ep, value) for ep in self._endpoints]
-
-        elif self.apportioning is self.ApportioningRules.weighted:
+        if self.apportioning is self.ApportioningRules.weighted:
+            # this is the default, so serve this first
             # get an ordered version of the end-points
-            eps = list(self._endpoints)
-            biases = [ep.bias for ep in eps]
-            assert all(b >= 0 for b in biases), "biases must not be negative"
+            eps = tuple(self._endpoints)
+            biases = tuple(ep.bias for ep in eps)
+            assert all(b >= 0 for b in biases), \
+                "biases must not be negative"
             bias_sum = sum(biases)
             if bias_sum == 0:
                 # handle no biases set (default case)
-                biases = [1.0]*len(eps)
-                bias_sum = sum(biases)
-            ep_output = zip(eps, (b/bias_sum*value for b in biases))
+                outval = value/len(eps)
+                ep_output = ((e, outval) for e in eps)
+            else:
+                ep_output = zip(eps, (b/bias_sum*value for b in biases))
+
+        elif self.apportioning is self.ApportioningRules.copy_write:
+            # very simple rule, just copy
+            ep_output = [(ep, value) for ep in self._endpoints]
 
         elif self.apportioning is self.ApportioningRules.absolute:
             # get sorted list of end-points, start with biggest one!
@@ -1453,7 +1459,7 @@ class OutputConnector(Connector):
 
         # now do the output writing
         for ep, dist_value in ep_output:
-            logging.debug("dist_value: {0}".format(dist_value))
+            logging.debug("dist_value: %s", dist_value)
             ep.connector.write(dist_value)
             ep.connector.time = self.time
 

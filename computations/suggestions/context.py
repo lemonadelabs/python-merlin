@@ -13,7 +13,7 @@ def test_optimize():
     # pcon.enableIPP()
     # a minimal test to try out the interface
     from examples.DIAServicesModel \
-        import createRegistrationService as createModel
+        import createRegistrationServiceWExternalDesktops as createModel
     pcon.msim = createModel()
 
     from pymerlin import merlin
