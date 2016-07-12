@@ -12,8 +12,7 @@ def test_optimize():
     pcon = pareto_context()
     # pcon.enableIPP()
     # a minimal test to try out the interface
-    from examples.DIAServicesModel \
-        import createRegistrationServiceWExternalDesktops as createModel
+    from examples.DIAServicesModel import createRegistrationServiceWExternalDesktops as createModel  # @UnresolvedImport
     pcon.msim = createModel()
 
     from pymerlin import merlin
@@ -48,9 +47,13 @@ def test_optimize():
 
     from .algorithm import pareto
     p = pareto(pcon)
-    assert len(p.generate_parameter_list(projectId=1)[1]) == 43
     assert len(p.generate_parameter_list(projectId=1,
-                                         phaseId=1)[1]) == 43
+                                         alignToQuarters=False)[1]
+               ) == 43
+    assert len(p.generate_parameter_list(projectId=1,
+                                         phaseId=1,
+                                         alignToQuarters=False)[1]
+               ) == 43
     del p
 
     pcon.optimize(projectId=1, phaseId=1)
@@ -72,7 +75,8 @@ class pareto_context:
         self.mscen = None
         self.msim = None
 
-    timelineLength = 4*12  # this is the planning horizon in months
+    timelineLength = 10*12  # simulation run length in ticks/months
+    planViewLength = 4*12  # planning horizon in months
 
     def enableIPP(self):
         # check for existence of default config
@@ -132,6 +136,7 @@ class pareto_context:
         # put baseline scenarios in front
         activeScenarios = ([m for m in pyScenarios
                             if m.id in baselineScenIds] +
+                           # this doesn't preserve order of phaseScenarioIds!
                            [m for m in pyScenarios
                             if m.id in phaseScenarioIds])
         self.msim.run(scenarios=activeScenarios, end=self.timelineLength)
@@ -158,3 +163,12 @@ class pareto_context:
 
         from .algorithm import pareto
         return pareto(self).optimize(projectId, phaseId)
+
+    def collectOutputs(self):
+
+        # find all outputs, name, type, minimum
+        # the data structure is used to differentiate between
+        # service outputs and their financial indicators
+
+        return {o.id: (o.name, o.type, o.minimum)
+                for o in self.msim.outputs}

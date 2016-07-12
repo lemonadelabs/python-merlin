@@ -1,12 +1,13 @@
 import builtins
 import datetime
+import statistics
 
 from .utilities import *  # @UnusedWildImport
 from .businessrules import financialDataFromProjects
 
 
 def rank_by_similarity(origOffsets, successfulParameters):
-
+    # in place operation!
     # rank according to different keys
     def rankingKey(x):
         return builtins.sum(abs(a-b)
@@ -15,34 +16,42 @@ def rank_by_similarity(origOffsets, successfulParameters):
     successfulParameters.sort(key=rankingKey)
 
 
-def get_paretoFront(resultSpace):
-
+def get_paretoFront(resultSpace, mask=None):
     # collect all tuples of result space, which are at the Pareto Frontier
+    # this algorithms should be faster by using the Simple Cull algorithm, see
+    # http://www.es.ele.tue.nl/pareto/papers/date2007_paretocalculator_final.pdf
+    # BUT be aware of using two comparisons & reflexive dominance operator!
+    if not resultSpace:
+        return []
+
+    if mask is None:
+        mask = [1.0]*len(next(iter(resultSpace)))
+
     paretoFront = []
     for r in resultSpace:
-        if builtins.all((not isParetoDominant(rr, r))
+        if builtins.all((not isParetoDominant(rr, r, mask))
                         for rr in resultSpace if rr != r):
             paretoFront.append(r)
 
-#     successfulParameters = [k for k, v in changedChoiceMap.items()
-#                             if v in paretoFront]
     return paretoFront
 
 
-def isParetoDominant(aa, bb):
+def isParetoDominant(aa, bb, mask):
     """
     returns True if aa Pareto dominant to bb
+    mask provides comparison mode for each dimension:
+    1: maximize, -1: minimize, 0 ignore
     """
-    return bool(all((a >= b) for a, b in zip(aa, bb)) and
-                any((a > b) for a, b in zip(aa, bb)))
+    return bool(all((a*m >= b*m) for a, b, m in zip(aa, bb, mask)) and
+                any((a*m > b*m) for a, b, m in zip(aa, bb, mask)))
 
 
 def test_pareto_dominant():
 
-    assert isParetoDominant((2,), (1,))
-    assert not isParetoDominant([0]*10, [0]*10)
-    assert isParetoDominant([1]*10, [0]*10)
-    assert isParetoDominant([1]*10+[2], [1]*10+[0])
+    assert isParetoDominant((2,), (1,), (1,))
+    assert not isParetoDominant([0]*10, [0]*10, [1]*10)
+    assert isParetoDominant([1]*10, [0]*10, [1]*10)
+    assert isParetoDominant([1]*10+[2], [1]*10+[0], [1]*11)
 
 
 def offset_generator(max_sum=0, no_entries=0):
@@ -94,7 +103,8 @@ class pareto:
                                            thePhases)]
 
         # check for overlapping phases
-        assert builtins.all(o >= 0 for o in origOffsets)
+        assert builtins.all(o >= 0 for o in origOffsets), \
+            "phases are overlapping"
 
         phaseLengths = [monthsDifference(
                                 ph.end_date+datetime.timedelta(days=1),
@@ -115,7 +125,7 @@ class pareto:
         # go for a particular project
         theProject_id = projectId
         allProjects = self.myContext.allProjects
-        timelineLength = self.myContext.timelineLength
+        planViewLength = self.myContext.planViewLength
 
         phaseLengths, origOffsets = self.lengths_and_offsets(projectId)
         if alignToQuarters:
@@ -129,7 +139,7 @@ class pareto:
 
         if phaseId is None:
             # act on the project, so change all phases
-            offsetMax = timelineLength - sum(phaseLengths)
+            offsetMax = planViewLength - sum(phaseLengths)
             possibleOffsets = []
             for o in offset_generator(offsetMax//increments,
                                       len(phaseLengths)):
@@ -145,7 +155,7 @@ class pareto:
             # act on one phase, so change the offset before and after
             phaseIdx = next(i for i, ph in enumerate(thePhases)
                             if ph.id == phaseId)
-            ooList = origOffsets + [timelineLength -
+            ooList = origOffsets + [planViewLength -
                                     sum(phaseLengths) - sum(origOffsets)]
             possibleOffsets = []
             for o in range(-ooList[phaseIdx],
@@ -207,51 +217,150 @@ class pareto:
 
         return newProjects
 
-    def compute_choice(self, offs, theProject_id):
-        """
-        todo: get info on what to calculate and how from context:
+    def computeServiceHealth(self, projects, tele):
+        # by now: calculate number of messages
 
-        * how to calculate financial data
-        * which outputs to include
-        * handle rules
-        """
+        t_messages = next((t for t in tele if "messages" in t),
+                          {"messages": []})["messages"]
 
-        msim = self.myContext.msim
-        # have functions nested for serialization
+        # count messages which are process related and
+        # output related separately, decide by sender
+        output_msgs = sum(1 for t in t_messages
+                          if t["sender"]["type"] == "Output")
+        other_msgs = len(t_messages)-output_msgs
 
-        modProjects = self.modifyProjectFromOffsets(theProject_id,
-                                                    newOffsets=offs)
+        return (other_msgs,)
+
+    def computeOutputs(self, projects, tele):
+        # compute the average monthly outputs normalized to its minimum
+        # return a tuple of these, always in the same order (sorted by id)
+        # count the number of months below minimum separately
+
+        t_outputs = {t["id"]: t for t in tele
+                     if "type" in t and t["type"] == "Output"}
+
+        # returns a dictionary with id: (name, unit, min)
+        outputs = self.myContext.collectOutputs()
+
+        output_ids = [o_id for o_id, (name, unit, minimum)  # @UnusedVariables
+                      in outputs.items()
+                      if "$" not in unit]
+
+        # they are ordered to have comparable results!
+        output_ids.sort()
+
+        # todo: find the minimum per month
+        # there seems to be no telemetry about changing output minima
+
+        outputSums = [statistics.mean(t_outputs[o_id]["data"]["value"]) /
+                      outputs[o_id][-1]
+                      for o_id in output_ids]
+        minCounts1yr = [sum(1 for o in t_outputs[o_id]["data"]["value"][:12]
+                        if o < outputs[o_id][-1])
+                        for o_id in output_ids]
+        minCounts4yr = [sum(1 for o in t_outputs[o_id]["data"]["value"][:12*4]
+                        if o < outputs[o_id][-1])
+                        for o_id in output_ids]
+        minCounts = [sum(1 for o in t_outputs[o_id]["data"]["value"]
+                         if o < outputs[o_id][-1])
+                     for o_id in output_ids]
+
+        return tuple(outputSums+minCounts+minCounts1yr+minCounts4yr)
+
+    def computeFinancialIndicators(self, projects, tele):
 
         (totalInv, remainingInvFund, capCosts  # @UnusedVariable
-         ) = financialDataFromProjects(self.myContext, modProjects)
+         ) = financialDataFromProjects(self.myContext, projects)
 
+        # look at funds at end of June and add up the negative ones
         underfundingSum = float(builtins.sum(
                                     (s for i, s in enumerate(remainingInvFund)
                                      if i % 12 == 11 and s < 0), 0.0))
 
+        return (underfundingSum, sum(capCosts))
+
+    def compute_choice(self, offs, theProject_id):
+        """
+        modify the projects and run the simulation
+        after that extract results by running the computeResult functions
+        """
+        modProjects = self.modifyProjectFromOffsets(theProject_id,
+                                                    newOffsets=offs)
         tele = self.myContext.runSimulation(modProjects)
-        t_outputs = {t["id"]: t for t in tele
-                     if "type" in t and t["type"] == "Output"}
-        t_messages = next((t for t in tele if "messages" in t),
-                          {"messages": []})["messages"]
 
-        output_id = next(o.id for o in msim.outputs
-                         if o.name == "Applications Processed")
+        return sum((f(modProjects, tele) for f in self.resultProcessors),
+                   ())
 
-        outputSum = sum(t_outputs[output_id]["data"]["value"])
+    def investmentFundsLimit(self, p, r):
+        # filter this result space, rejecting business rule violating ones
+        # investment fund never negative
+        # assume the fuel tank is the first parameter!
+        return r[0] >= 0
 
-        return (underfundingSum, outputSum, -len(t_messages), -sum(capCosts))
+    def noUnderperforming1Year(self, p, r):
+        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
+                   if nn.startswith("insufficient_"))
+
+    def noUnderperforming4Year(self, p, r):
+        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
+                   if nn.startswith("insufficient4_"))
+
+    def noUnderperforming10Year(self, p, r):
+        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
+                   if nn.startswith("insufficient_"))
+
+    def noError10Year(self, p, r):
+        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
+                   if nn == "nMessages_full")
 
     def optimize(self, projectId, phaseId):
-        # go for a particular project
+        # generate the input parameter vector space
+
+        # go for a particular project or phase
         origOffsets, possibleOffsets = self.generate_parameter_list(projectId,
                                                                     phaseId)
+        # calculate input array size
+        self.parameterDescription = ["offset %d" % i
+                                     for i in range(len(origOffsets))]
+
+        # list of function calls
+        # calculate result vectors for each input parameter vector
+
+        # calculate the result vectors
+        # todo: describe, so it can change
+        # define elements in result vector and then calculate
+        # now:
+        # financial data, output averages,
+        # counts of under-performing months, service health
+        outputs = self.myContext.collectOutputs()
+        outputNames = [outputs[k][0] for k in sorted(outputs.keys())
+                       if "$" not in outputs[k][1]]
+
+        self.resultDescription = (["underfundingSum", "capCostsSum"] +
+                                  ["avg_"+n for n in outputNames] +
+                                  ["insufficient_"+n for n in outputNames] +
+                                  ["insufficient1_"+n for n in outputNames] +
+                                  ["insufficient4_"+n for n in outputNames] +
+                                  ["nMessages_full"])
+        self.resultProcessors = [self.computeFinancialIndicators,
+                                 self.computeOutputs,
+                                 self.computeServiceHealth]
+        # eliminate dimensions in result space
+        # i.e. define vector with 1 (maximize), 0 (ignore), -1 (minimize)
+        # todo: implement min/max here and not all over the place
+        self.resultMask = [1.0]*len(self.resultDescription)
+        # minimize capitalization costs
+        self.resultMask[self.resultDescription.index("capCostsSum")] = -1.0
+        self.resultMask[self.resultDescription.index("nMessages_full")] = -1.0
+        for i, rd in enumerate(self.resultDescription):
+            if rd.startswith("insufficient"):
+                self.resultMask[i] = -1.0
 
         if hasattr(self.myContext, "ippClientFactory"):
             rrc = self.myContext.ippClientFactory()
             res = rrc[:].map_sync(self.compute_choice,
                                   possibleOffsets,
-                                  [projectId]*len(possibleOffsets))
+                                  (projectId,)*len(possibleOffsets))
             rrc.close()
             del rrc
             choiceMap = dict(zip(possibleOffsets, res))
@@ -259,28 +368,43 @@ class pareto:
             choiceMap = {o: self.compute_choice(o, projectId)
                          for o in possibleOffsets}
 
-        # filter this result space, rejecting business rule violating ones
-        # investment fund never negative
-        resultSpace = set(v for v in choiceMap.values() if v[0] >= 0)
-        if len(resultSpace) == 0:
-            print("dropping the business rules")
-            changedChoiceMap = {k: (v[1], v[2], v[3])
-                                for k, v in choiceMap.items()}
-            resultSpace = set(changedChoiceMap.values())
+        # progressively filter results
+        resultSpaceFilters = [self.investmentFundsLimit,
+                              self.noUnderperforming1Year,
+                              self.noUnderperforming4Year,
+                              self.noUnderperforming10Year,
+                              self.noError10Year]
+
+        for theFilter in resultSpaceFilters:
+            filteredResults = {p: r for p, r
+                               in choiceMap.items()
+                               if theFilter(p, r)}
+
+            if filteredResults:
+                choiceMap = filteredResults
+            else:
+                break
+
+        resultSpace = set(choiceMap.values())
+
+        # slim down the result space to pareto front
+        paretoFrontResults = get_paretoFront(resultSpace, self.resultMask)
+
+        # and find the front in parameter space
+        paretoFrontParameters = [k for k, v in choiceMap.items()
+                                 if v in paretoFrontResults]
+
+        if origOffsets in paretoFrontParameters:
+            # boring but honest choice
+            suggestedParameters = origOffsets
         else:
-            changedChoiceMap = choiceMap
-
-        paretoFront = get_paretoFront(resultSpace)
-
-        successfulParameters = [k for k, v in changedChoiceMap.items()
-                                if v in paretoFront]
-
-        # in place operation!
-        rank_by_similarity(origOffsets, successfulParameters)
+            # in place operation!
+            rank_by_similarity(origOffsets, paretoFrontParameters)
+            suggestedParameters = paretoFrontParameters[0]
 
         # convert back to phase starts and their ids
         optSetup = self.modifyProjectFromOffsets(projectId,
-                                                 successfulParameters[0])
+                                                 suggestedParameters)
 
         thePhases = next(p for p in optSetup if p.id == projectId).phases
         return thePhases
