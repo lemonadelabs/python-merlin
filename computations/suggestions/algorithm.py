@@ -43,8 +43,12 @@ def isParetoDominant(aa, bb, mask):
     mask provides comparison mode for each dimension:
     1: maximize, -1: minimize, 0 ignore
     """
-    return bool(all((a*m >= b*m) for a, b, m in zip(aa, bb, mask)) and
-                any((a*m > b*m) for a, b, m in zip(aa, bb, mask)))
+    return bool(all((a*m >= b*m)
+                    for a, b, m in zip(aa, bb, mask)
+                    if m != 0) and
+                any((a*m > b*m)
+                    for a, b, m in zip(aa, bb, mask)
+                    if m != 0))
 
 
 def test_pareto_dominant():
@@ -219,16 +223,18 @@ class pareto:
         return newProjects
 
     def computeServiceHealth(self, projects, tele):
-        # by now: calculate number of messages
+        # calculate number of warning/error messages from simulation, see
+        # https://github.com/lemonadelabs/django-merlin/wiki/Merlin-Messages
+        # messages from outputs are ignored, as they are counted somewhere
+        # else
 
         t_messages = next((t for t in tele if "messages" in t),
                           {"messages": []})["messages"]
 
         # count messages which are process related and
         # output related separately, decide by sender
-        output_msgs = sum(1 for t in t_messages
-                          if t["sender"]["type"] == "Output")
-        other_msgs = len(t_messages)-output_msgs
+        other_msgs = sum(1 for t in t_messages
+                         if t["sender"]["type"] != "Output" and t["type"] >= 2)
 
         return (other_msgs,)
 
@@ -292,27 +298,41 @@ class pareto:
         return sum((f(modProjects, tele) for f in self.resultProcessors),
                    ())
 
-    def investmentFundsLimit(self, p, r):
+    def investmentFundsLimit(self, choiceMap):
         # filter this result space, rejecting business rule violating ones
         # investment fund never negative
         # assume the fuel tank is the first parameter!
-        return r[self.resultDescription.index("underfundingSum")] >= 0
+        idx = self.resultDescription.index("underfundingSum")
+        return {p: r for p, r
+                in choiceMap.items()
+                if r[idx] >= 0}
 
-    def noUnderperforming1Year(self, p, r):
-        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
-                   if nn.startswith("insufficient_"))
+    def noUnderperforming1Year(self, choiceMap):
+        indexes = [i for i, n in enumerate(self.resultDescription)
+                   if n.startswith("insufficient1_")]
+        return {p: r for p, r
+                in choiceMap.items()
+                if all(r[i] == 0 for i in indexes)}
 
-    def noUnderperforming4Year(self, p, r):
-        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
-                   if nn.startswith("insufficient4_"))
+    def noUnderperforming4Year(self, choiceMap):
+        indexes = [i for i, n in enumerate(self.resultDescription)
+                   if n.startswith("insufficient4_")]
+        return {p: r for p, r
+                in choiceMap.items()
+                if all(r[i] == 0 for i in indexes)}
 
-    def noUnderperforming10Year(self, p, r):
-        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
-                   if nn.startswith("insufficient_"))
+    def noUnderperforming10Year(self, choiceMap):
+        indexes = [i for i, n in enumerate(self.resultDescription)
+                   if n.startswith("insufficient_")]
+        return {p: r for p, r
+                in choiceMap.items()
+                if all(r[i] == 0 for i in indexes)}
 
-    def noError10Year(self, p, r):
-        return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
-                   if nn == "nMessages_full")
+    def noError10Year(self, choiceMap):
+        idx = self.resultDescription.index("nMessages_full")
+        return {p: r for p, r
+                in choiceMap.items()
+                if r[idx] == 0}
 
     def optimize(self, projectId, phaseId):
         # generate the input parameter vector space
@@ -324,15 +344,13 @@ class pareto:
         self.parameterDescription = ["offset %d" % i
                                      for i in range(len(origOffsets))]
 
-        # list of function calls
+        # setup list of function calls to
         # calculate result vectors for each input parameter vector
+        self.resultProcessors = [self.computeFinancialIndicators,
+                                 self.computeOutputs,
+                                 self.computeServiceHealth]
 
-        # calculate the result vectors
-        # todo: describe, so it can change
-        # define elements in result vector and then calculate
-        # now:
-        # financial data, output averages,
-        # counts of under-performing months, service health
+        # define elements in result vector
         outputs = self.myContext.collectOutputs()
         outputNames = [outputs[k][0] for k in sorted(outputs.keys())
                        if "$" not in outputs[k][1]]
@@ -343,9 +361,6 @@ class pareto:
                                   ["insufficient1_"+n for n in outputNames] +
                                   ["insufficient4_"+n for n in outputNames] +
                                   ["nMessages_full"])
-        self.resultProcessors = [self.computeFinancialIndicators,
-                                 self.computeOutputs,
-                                 self.computeServiceHealth]
 
         # default: all max!
         # define vector with 1 (maximize), 0 (ignore), -1 (minimize)
@@ -353,11 +368,14 @@ class pareto:
 
         # minimize capitalization costs
         self.resultMask[self.resultDescription.index("capCostsSum")] = -1.0
+        #  and messages
         self.resultMask[self.resultDescription.index("nMessages_full")] = -1.0
+        # and the insufficient-messages
         for i, rd in enumerate(self.resultDescription):
             if rd.startswith("insufficient"):
                 self.resultMask[i] = -1.0
 
+        # now calculate result vectors for all parameters
         if hasattr(self.myContext, "ippClientFactory"):
             rrc = self.myContext.ippClientFactory()
             res = rrc[:].map_sync(self.compute_choice,
@@ -370,16 +388,17 @@ class pareto:
             choiceMap = {o: self.compute_choice(o, projectId)
                          for o in possibleOffsets}
 
-        logging.info("%s\norgiginal value: %s",
-                     self.parameterDescription,
-                     origOffsets)
-
-        # print out the choice map
+        # print out the choice map description
         logging.info("%s -> %s",
                      self.parameterDescription,
                      self.resultDescription)
-        for p, r in choiceMap.items():
-            logging.info("%s -> %s", p, r)
+        logging.info("initial parameter: %s",
+                     origOffsets)
+        logging.info("%d parameter sets calculated", len(choiceMap))
+
+        # print out the choice map
+        # for p, r in choiceMap.items():
+        #    logging.debug("%s -> %s", p, r)
 
         # progressively filter results
         resultSpaceFilters = [self.investmentFundsLimit,
@@ -389,37 +408,47 @@ class pareto:
                               self.noError10Year]
 
         for theFilter in resultSpaceFilters:
-            filteredResults = {p: r for p, r
-                               in choiceMap.items()
-                               if theFilter(p, r)}
+            filteredResults = theFilter(choiceMap)
 
             if filteredResults:
-                logging.info("applying filter %s", theFilter.__func__)
+                logging.info("applying filter %s - %d parameter sets left",
+                             theFilter.__func__.__name__,
+                             len(filteredResults))
                 choiceMap = filteredResults
             else:
                 break
 
+        logging.info("after filtering: %d parameter sets", len(choiceMap))
         # print out the choice map
-        logging.info("after filtering")
-        for p, r in choiceMap.items():
-            logging.info("%s -> %s", p, r)
+        # for p, r in choiceMap.items():
+        #    logging.info("%s -> %s", p, r)
 
         resultSpace = set(choiceMap.values())
 
         # slim down the result space to pareto front
         # todo: eliminate dimensions in result space
         paretoFrontResults = get_paretoFront(resultSpace, self.resultMask)
+        logging.info("%d results, %d in pareto front",
+                     len(resultSpace), len(paretoFrontResults))
 
         # and find the front in parameter space
         paretoFrontParameters = [k for k, v in choiceMap.items()
                                  if v in paretoFrontResults]
+        logging.info("%d parameter sets for pareto front",
+                     len(paretoFrontParameters))
 
         # tuples do not compare with lists!
-        if tuple(origOffsets) in paretoFrontParameters:
+        if not paretoFrontParameters:
+            # if there is none left!
+            logging.info("using original parameters as none are left "
+                         "to choose from")
+            suggestedParameters = tuple(origOffsets)
+
+        elif tuple(origOffsets) in paretoFrontParameters:
             # boring but honest choice
             suggestedParameters = origOffsets
-            logging.info("selecting original parameters %s",
-                         suggestedParameters)
+            logging.info("selecting original parameters")
+
         else:
             # in place operation!
             rank_by_similarity(origOffsets, paretoFrontParameters)
@@ -437,10 +466,6 @@ class pareto:
 
         logging.info("scenario ids of projects: %s",
                      [ph.scenario_id for ph in sortedPhases])
-
-        logging.info("scenario ids of haircut: %s",
-                     [m.id for m in self.myContext.mscen
-                      if m.name == "haircut"])
 
         thePhases = next(p for p in optSetup if p.id == projectId).phases
         return thePhases
