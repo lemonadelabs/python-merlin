@@ -124,8 +124,10 @@ class Simulation(SimObject):
                     if i.id == s_id],
                 'Endpoint': lambda s_id: [
                     ep for ep in itertools.chain.from_iterable(
-                        [o.get_endpoint_objects() for o in itertools.chain.from_iterable(
-                            [e.outputs for e in self._entities])]) if ep.id == s_id]
+                        [o.get_endpoint_objects()
+                         for o in itertools.chain.from_iterable(
+                            [e.outputs for e in self._entities])])
+                    if ep.id == s_id]
             }
             search_dict = id_search
 
@@ -150,8 +152,10 @@ class Simulation(SimObject):
                     if i.name == s_name],
                 'Endpoint': lambda s_name: [
                     ep for ep in itertools.chain.from_iterable(
-                        [o.get_endpoint_objects() for o in itertools.chain.from_iterable(
-                            [e.outputs for e in self._entities])]) if ep.name == s_name]
+                        [o.get_endpoint_objects()
+                         for o in itertools.chain.from_iterable(
+                            [e.outputs for e in self._entities])])
+                    if ep.name == s_name]
             }
             search_dict = name_search
 
@@ -836,12 +840,14 @@ class Entity(SimObject):
         Once all processes are executed with :py:meth:`.Process.compute`,
         the control flow goes depth-first to :py:meth:`.Output.tick`.
         """
-        logging.debug('Entity %s received tick %s', self.name, time)
+        debug = logging.root.debug
+
+        debug('Entity %s received tick %s', self.name, time)
         if self.current_time and time < self.current_time:
             return
 
         if (self.current_time is None) or (time > self.current_time):
-            logging.debug("Entity %s time updated", self.name)
+            debug("Entity %s time updated", self.name)
             self.processed = False
             self.current_time = time
 
@@ -852,9 +858,8 @@ class Entity(SimObject):
                 up_to_date = up_to_date and (i.time == self.current_time)
 
             if up_to_date:
-                logging.debug(
-                    "Entity %s inputs are all refreshed, processing...",
-                    self.name)
+                debug("Entity %s inputs are all refreshed, processing...",
+                      self.name)
                 self._process()
                 self._update_process_telemetry()
 
@@ -1412,8 +1417,9 @@ class OutputConnector(Connector):
         """
         self.set_telemetry_value('value', value)
 
-        logging.debug(
-            "WRITING to Output %s value: %s ***", value, self)
+        debug = logging.root.debug
+
+        debug("WRITING to Output %s value: %s ***", value, self)
         self.time = self.parent.current_time
 
         if not self._endpoints:
@@ -1459,7 +1465,7 @@ class OutputConnector(Connector):
 
         # now do the output writing
         for ep, dist_value in ep_output:
-            logging.debug("dist_value: %s", dist_value)
+            debug("dist_value: %s", dist_value)
             ep.connector.write(dist_value)
             ep.connector.time = self.time
 
@@ -2199,7 +2205,6 @@ class RemoveEntityAction(Action):
         super(RemoveEntityAction, self).__init__()
         self.entity_id = self.convert_to_id(entity_id) or entity_id
 
-
     def execute(self, simulation):
         entity_to_remove = simulation.find_sim_object(self.entity_id, 'Entity')
         if entity_to_remove:
@@ -2286,7 +2291,8 @@ class RemoveConnectionAction(Action):
 
         super(RemoveConnectionAction, self).__init__()
 
-        self.from_entity_id = self.convert_to_id(from_entity_id) or from_entity_id
+        self.from_entity_id = (self.convert_to_id(from_entity_id) or
+                               from_entity_id)
         self.to_entity_id = self.convert_to_id(to_entity_id) or to_entity_id
         self.unit_type = self.convert_to_id(unit_type) or unit_type
 
@@ -2335,8 +2341,10 @@ class AddConnectionAction(Action):
         super(AddConnectionAction, self).__init__()
 
         self.unit_type = unit_type
-        self.output_entity_id = self.convert_to_id(output_entity_id) or output_entity_id
-        self.input_entity_id = self.convert_to_id(input_entity_id) or input_entity_id
+        self.output_entity_id = (self.convert_to_id(output_entity_id) or
+                                 output_entity_id)
+        self.input_entity_id = (self.convert_to_id(input_entity_id) or
+                                input_entity_id)
         self.apportioning = \
             OutputConnector.ApportioningRules(int(apportioning))
         self.additive_write = bool(additive_write)
@@ -2552,8 +2560,10 @@ class ParentEntityAction(Action):
             parent_entity_id
             ):
         super(ParentEntityAction, self).__init__()
-        self.parent_entity_id = self.convert_to_id(parent_entity_id) or parent_entity_id
-        self.child_entity_id = self.convert_to_id(child_entity_id) or child_entity_id
+        self.parent_entity_id = (self.convert_to_id(parent_entity_id) or
+                                 parent_entity_id)
+        self.child_entity_id = (self.convert_to_id(child_entity_id) or
+                                child_entity_id)
 
     def serialize(self) -> Dict[str, Any]:
         return {
@@ -2582,7 +2592,7 @@ class ParentEntityAction(Action):
 
 
 class ModifyOutputMinimumAction(Action):
-    
+
     def __init__(
             self,
             output_id,

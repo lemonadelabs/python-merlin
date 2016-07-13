@@ -1,4 +1,5 @@
 import builtins
+import logging
 import datetime
 import statistics
 
@@ -295,7 +296,7 @@ class pareto:
         # filter this result space, rejecting business rule violating ones
         # investment fund never negative
         # assume the fuel tank is the first parameter!
-        return r[0] >= 0
+        return r[self.resultDescription.index("underfundingSum")] >= 0
 
     def noUnderperforming1Year(self, p, r):
         return all(rr == 0 for rr, nn in zip(r, self.resultDescription)
@@ -345,10 +346,11 @@ class pareto:
         self.resultProcessors = [self.computeFinancialIndicators,
                                  self.computeOutputs,
                                  self.computeServiceHealth]
-        # eliminate dimensions in result space
-        # i.e. define vector with 1 (maximize), 0 (ignore), -1 (minimize)
-        # todo: implement min/max here and not all over the place
+
+        # default: all max!
+        # define vector with 1 (maximize), 0 (ignore), -1 (minimize)
         self.resultMask = [1.0]*len(self.resultDescription)
+
         # minimize capitalization costs
         self.resultMask[self.resultDescription.index("capCostsSum")] = -1.0
         self.resultMask[self.resultDescription.index("nMessages_full")] = -1.0
@@ -368,6 +370,17 @@ class pareto:
             choiceMap = {o: self.compute_choice(o, projectId)
                          for o in possibleOffsets}
 
+        logging.info("%s\norgiginal value: %s",
+                     self.parameterDescription,
+                     origOffsets)
+
+        # print out the choice map
+        logging.info("%s -> %s",
+                     self.parameterDescription,
+                     self.resultDescription)
+        for p, r in choiceMap.items():
+            logging.info("%s -> %s", p, r)
+
         # progressively filter results
         resultSpaceFilters = [self.investmentFundsLimit,
                               self.noUnderperforming1Year,
@@ -381,30 +394,53 @@ class pareto:
                                if theFilter(p, r)}
 
             if filteredResults:
+                logging.info("applying filter %s", theFilter.__func__)
                 choiceMap = filteredResults
             else:
                 break
 
+        # print out the choice map
+        logging.info("after filtering")
+        for p, r in choiceMap.items():
+            logging.info("%s -> %s", p, r)
+
         resultSpace = set(choiceMap.values())
 
         # slim down the result space to pareto front
+        # todo: eliminate dimensions in result space
         paretoFrontResults = get_paretoFront(resultSpace, self.resultMask)
 
         # and find the front in parameter space
         paretoFrontParameters = [k for k, v in choiceMap.items()
                                  if v in paretoFrontResults]
 
-        if origOffsets in paretoFrontParameters:
+        # tuples do not compare with lists!
+        if tuple(origOffsets) in paretoFrontParameters:
             # boring but honest choice
             suggestedParameters = origOffsets
+            logging.info("selecting original parameters %s",
+                         suggestedParameters)
         else:
             # in place operation!
             rank_by_similarity(origOffsets, paretoFrontParameters)
             suggestedParameters = paretoFrontParameters[0]
+            logging.info("selecting highest ranked parameters %s",
+                         suggestedParameters)
 
         # convert back to phase starts and their ids
         optSetup = self.modifyProjectFromOffsets(projectId,
                                                  suggestedParameters)
+
+        sortedPhases = sorted((ph for p in optSetup for ph in p.phases
+                               if ph.is_active),
+                              key=lambda x: x.start_date)
+
+        logging.info("scenario ids of projects: %s",
+                     [ph.scenario_id for ph in sortedPhases])
+
+        logging.info("scenario ids of haircut: %s",
+                     [m.id for m in self.myContext.mscen
+                      if m.name == "haircut"])
 
         thePhases = next(p for p in optSetup if p.id == projectId).phases
         return thePhases

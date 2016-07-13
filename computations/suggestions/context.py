@@ -3,6 +3,7 @@ Created on 5/07/2016
 
 @author: achim
 '''
+import logging
 import datetime
 from .utilities import *  # @UnusedWildImport
 
@@ -125,20 +126,22 @@ class pareto_context:
         self.updateScenarios(theProjects)
         pyScenarios = self.mscen
         # put in the scenarios from baseline and then the projects
-        baselineScenIds = [b.id for b in pyScenarios if b.name == "baseline"]
-        # also order projects by time (scenario.start_offset)
-        phaseScenarioIds = [ph.id
-                            for p in sorted(
-                                    theProjects,
-                                    key=lambda pp: min(pph.start_date
-                                                       for pph in pp.phases))
-                            for ph in p.phases if ph.is_active]
+        # when comparing with the haircut, the baseline scenario isn't in there
+        # baselineScenIds = [b.id for b in pyScenarios if b.name == "baseline"]
+        # haircutScenIds = [b.id for b in pyScenarios if b.name == "haircut"]
+
+        sortedPhases = sorted((ph for p in theProjects for ph in p.phases
+                               if ph.is_active),
+                              key=lambda x: x.start_date)
+
         # put baseline scenarios in front
-        activeScenarios = ([m for m in pyScenarios
-                            if m.id in baselineScenIds] +
-                           # this doesn't preserve order of phaseScenarioIds!
-                           [m for m in pyScenarios
-                            if m.id in phaseScenarioIds])
+        activeScenarios = (
+#                            [m for m in pyScenarios
+#                             if m.id in haircutScenIds] +
+                           [next(s for s in pyScenarios
+                                 if s.id == ph.scenario_id)
+                            for ph in sortedPhases])
+
         self.msim.run(scenarios=activeScenarios, end=self.timelineLength)
         tele = self.msim.get_sim_telemetry()
         return tele
