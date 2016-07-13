@@ -1372,7 +1372,7 @@ class RegistrationServiceProcess(merlin.Process):
 
         self._compute_applications(tick)
 
-        revenue = self.current_applications * registration_fee / 12.0
+
 
         total_expenses = (staff_expenses + accommodation_expenses +
                           it_expenses)
@@ -1410,6 +1410,8 @@ class RegistrationServiceProcess(merlin.Process):
             application_deficit = self.current_applications * desktop_deficit
             modified_current_applications -= application_deficit
             modified_current_applications = max(0, modified_current_applications)
+
+        revenue = modified_current_applications * registration_fee / 12.0
 
         # Process inputs and outputs
 
