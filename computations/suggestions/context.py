@@ -109,18 +109,18 @@ class pareto_context:
                                     ph.end_date+datetime.timedelta(days=1),
                                     ph.start_date)
                 scen.start_offset = monthsDifference(ph.start_date,
-                                                     self.timelineStart) + 1
+                                                     self.timelineStart)
                 if scen.events:
                     # set time for start and end events separately
                     evStartTick = min(ev.time for ev in scen.events)
                     for ev in scen.events:
                         # the minimum should be start
                         if ev.time == evStartTick:
-                            ev.time = 0
+                            ev.time = 1
                             # the other one an end event, which happens at the
                             # begin of the first month after start.
                         else:
-                            ev.time = length
+                            ev.time = length+1
 
     def runSimulation(self, theProjects):
         self.updateScenarios(theProjects)
@@ -134,10 +134,11 @@ class pareto_context:
                                if ph.is_active),
                               key=lambda x: x.start_date)
 
-        # put baseline scenarios in front
         activeScenarios = (
-#                            [m for m in pyScenarios
-#                             if m.id in haircutScenIds] +
+                           # put no scenarios in front, which should be
+                           # equivalent to a haircut scenario with 0%
+                           # [m for m in pyScenarios
+                           #  if m.id in haircutScenIds] +
                            [next(s for s in pyScenarios
                                  if s.id == ph.scenario_id)
                             for ph in sortedPhases])
